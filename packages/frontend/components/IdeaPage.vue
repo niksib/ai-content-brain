@@ -66,7 +66,133 @@
 
         <!-- Show produced content when completed -->
         <div v-if="idea.status === 'completed' && idea.producedContent" class="idea-page__produced">
-          <pre class="idea-page__produced-content">{{ idea.producedContent }}</pre>
+
+          <!-- TEXT POST (Threads, LinkedIn) -->
+          <template v-if="idea.format === 'text_post' && contentBody">
+            <div class="idea-page__text-post">
+              <div class="idea-page__text-body">{{ contentBody.text }}</div>
+              <div v-if="contentBody.hashtags?.length" class="idea-page__hashtags">
+                <span
+                  v-for="tag in contentBody.hashtags"
+                  :key="tag"
+                  class="idea-page__hashtag"
+                >#{{ tag }}</span>
+              </div>
+              <button
+                type="button"
+                class="idea-page__copy-btn"
+                @click="copyTextContent"
+              >
+                {{ copyLabel }}
+              </button>
+            </div>
+          </template>
+
+          <!-- VIDEO SCRIPT (TikTok, Reels) -->
+          <template v-else-if="idea.format === 'video_script' && contentBody">
+            <div class="idea-page__video-script">
+              <!-- Script section -->
+              <details class="idea-page__collapsible" open>
+                <summary class="idea-page__collapsible-title">Script</summary>
+                <div class="idea-page__script-lines">
+                  <div
+                    v-for="(line, index) in contentBody.script"
+                    :key="index"
+                    class="idea-page__script-line"
+                  >
+                    <span class="idea-page__timestamp">{{ line.timestamp }}</span>
+                    <span class="idea-page__script-text">{{ line.text }}</span>
+                  </div>
+                </div>
+              </details>
+
+              <!-- Shooting brief -->
+              <details v-if="contentBody.shootingBrief" class="idea-page__collapsible">
+                <summary class="idea-page__collapsible-title">Shooting Brief</summary>
+                <p class="idea-page__collapsible-body">{{ contentBody.shootingBrief }}</p>
+              </details>
+
+              <!-- Delivery notes -->
+              <details v-if="contentBody.deliveryNotes" class="idea-page__collapsible">
+                <summary class="idea-page__collapsible-title">Delivery Notes</summary>
+                <p class="idea-page__collapsible-body">{{ contentBody.deliveryNotes }}</p>
+              </details>
+
+              <!-- Caption -->
+              <details v-if="contentBody.caption" class="idea-page__collapsible">
+                <summary class="idea-page__collapsible-title">Caption</summary>
+                <p class="idea-page__collapsible-body">{{ contentBody.caption }}</p>
+                <div v-if="contentBody.hashtags?.length" class="idea-page__hashtags">
+                  <span
+                    v-for="tag in contentBody.hashtags"
+                    :key="tag"
+                    class="idea-page__hashtag"
+                  >#{{ tag }}</span>
+                </div>
+              </details>
+            </div>
+          </template>
+
+          <!-- CAROUSEL (Instagram) -->
+          <template v-else-if="idea.format === 'carousel' && contentBody">
+            <div class="idea-page__carousel">
+              <div
+                v-for="slide in contentBody.slides"
+                :key="slide.slideNumber"
+                class="idea-page__slide"
+              >
+                <div class="idea-page__slide-header">Slide {{ slide.slideNumber }}</div>
+                <p class="idea-page__slide-text">{{ slide.text }}</p>
+                <p v-if="slide.designNotes" class="idea-page__slide-design">
+                  {{ slide.designNotes }}
+                </p>
+              </div>
+
+              <!-- Caption -->
+              <div v-if="contentBody.caption" class="idea-page__carousel-caption">
+                <h3 class="idea-page__subsection-title">Caption</h3>
+                <p>{{ contentBody.caption }}</p>
+              </div>
+
+              <div v-if="contentBody.hashtags?.length" class="idea-page__hashtags">
+                <span
+                  v-for="tag in contentBody.hashtags"
+                  :key="tag"
+                  class="idea-page__hashtag"
+                >#{{ tag }}</span>
+              </div>
+            </div>
+          </template>
+
+          <!-- STORIES (Instagram) -->
+          <template v-else-if="idea.format === 'stories' && contentBody">
+            <div class="idea-page__stories">
+              <div
+                v-for="story in contentBody.stories"
+                :key="story.storyNumber"
+                class="idea-page__story"
+              >
+                <div class="idea-page__story-header">Story {{ story.storyNumber }}</div>
+                <p class="idea-page__story-text">{{ story.textOverlay }}</p>
+                <p v-if="story.background" class="idea-page__story-bg">
+                  Background: {{ story.background }}
+                </p>
+                <p v-if="story.interactiveElement" class="idea-page__story-interactive">
+                  Interactive: {{ story.interactiveElement }}
+                </p>
+              </div>
+
+              <div v-if="contentBody.notes" class="idea-page__stories-notes">
+                <h3 class="idea-page__subsection-title">Notes</h3>
+                <p>{{ contentBody.notes }}</p>
+              </div>
+            </div>
+          </template>
+
+          <!-- Fallback for unknown formats -->
+          <template v-else>
+            <pre class="idea-page__produced-content">{{ idea.producedContent.body }}</pre>
+          </template>
         </div>
 
         <!-- Producing state -->
@@ -89,7 +215,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useSessionStore, type SessionIdea } from '~/stores/session';
+import { useSessionStore, type SessionIdea, type ProducedContentBody } from '~/stores/session';
 
 const props = defineProps<{
   ideaId: string;
@@ -105,6 +231,7 @@ const store = useSessionStore();
 const idea = ref<SessionIdea | null>(null);
 const isLoading = ref(false);
 const loadError = ref<string | null>(null);
+const copyLabel = ref('Copy');
 
 const platformEmojiMap: Record<string, string> = {
   threads: '\uD83E\uDDF5',
@@ -134,10 +261,45 @@ const statusLabel = computed(() => {
   return statusLabels[idea.value.status] ?? idea.value.status;
 });
 
+const contentBody = computed<ProducedContentBody | null>(() => {
+  if (!idea.value?.producedContent?.body) return null;
+  const body = idea.value.producedContent.body;
+  // Body may be a string (JSON) or already parsed object
+  if (typeof body === 'string') {
+    try {
+      return JSON.parse(body) as ProducedContentBody;
+    } catch {
+      return null;
+    }
+  }
+  return body as ProducedContentBody;
+});
+
+async function copyTextContent() {
+  if (!contentBody.value?.text) return;
+
+  const hashtagString = contentBody.value.hashtags?.length
+    ? '\n\n' + contentBody.value.hashtags.map((tag) => `#${tag}`).join(' ')
+    : '';
+
+  try {
+    await navigator.clipboard.writeText(contentBody.value.text + hashtagString);
+    copyLabel.value = 'Copied!';
+    setTimeout(() => {
+      copyLabel.value = 'Copy';
+    }, 2000);
+  } catch {
+    copyLabel.value = 'Failed';
+    setTimeout(() => {
+      copyLabel.value = 'Copy';
+    }, 2000);
+  }
+}
+
 function handleApprove() {
   emit('approve', props.ideaId);
   if (idea.value) {
-    idea.value.status = 'approved';
+    idea.value.status = 'producing';
   }
 }
 
@@ -364,5 +526,233 @@ onMounted(async () => {
   white-space: pre-wrap;
   word-wrap: break-word;
   font-family: inherit;
+}
+
+/* Text post */
+.idea-page__text-post {
+  padding: 1.25rem;
+}
+
+.idea-page__text-body {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: #1f2937;
+  white-space: pre-wrap;
+  margin-bottom: 1rem;
+}
+
+.idea-page__hashtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 1rem;
+}
+
+.idea-page__hashtag {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.idea-page__copy-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.idea-page__copy-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+/* Video script */
+.idea-page__video-script {
+  padding: 0.5rem;
+}
+
+.idea-page__collapsible {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.idea-page__collapsible-title {
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  background: white;
+  user-select: none;
+}
+
+.idea-page__collapsible-title:hover {
+  background: #f9fafb;
+}
+
+.idea-page__collapsible-body {
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #4b5563;
+  white-space: pre-wrap;
+}
+
+.idea-page__script-lines {
+  padding: 0.5rem 1rem 1rem;
+}
+
+.idea-page__script-line {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.idea-page__script-line:last-child {
+  border-bottom: none;
+}
+
+.idea-page__timestamp {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6366f1;
+  font-family: monospace;
+  min-width: 4rem;
+  padding-top: 0.125rem;
+}
+
+.idea-page__script-text {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #374151;
+}
+
+/* Carousel */
+.idea-page__carousel {
+  padding: 1rem;
+}
+
+.idea-page__slide {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  background: white;
+}
+
+.idea-page__slide-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6366f1;
+  margin-bottom: 0.5rem;
+}
+
+.idea-page__slide-text {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #1f2937;
+  white-space: pre-wrap;
+}
+
+.idea-page__slide-design {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.idea-page__carousel-caption {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.idea-page__carousel-caption p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #374151;
+}
+
+.idea-page__subsection-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+/* Stories */
+.idea-page__stories {
+  padding: 1rem;
+}
+
+.idea-page__story {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  background: white;
+}
+
+.idea-page__story-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b5cf6;
+  margin-bottom: 0.5rem;
+}
+
+.idea-page__story-text {
+  margin: 0 0 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #1f2937;
+}
+
+.idea-page__story-bg {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.idea-page__story-interactive {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #059669;
+  font-weight: 500;
+}
+
+.idea-page__stories-notes {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.idea-page__stories-notes p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #4b5563;
+  white-space: pre-wrap;
 }
 </style>

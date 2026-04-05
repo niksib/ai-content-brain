@@ -20,6 +20,39 @@ export interface SessionMessage {
   createdAt: string;
 }
 
+export interface ProducedContentBody {
+  // text_post (Threads, LinkedIn)
+  text?: string;
+  hashtags?: string[];
+
+  // video_script (TikTok, Reels)
+  script?: Array<{ timestamp: string; text: string }>;
+  shootingBrief?: string;
+  deliveryNotes?: string;
+  caption?: string;
+
+  // carousel (Instagram)
+  slides?: Array<{ slideNumber: number; text: string; designNotes?: string }>;
+
+  // stories (Instagram)
+  stories?: Array<{
+    storyNumber: number;
+    textOverlay: string;
+    background?: string;
+    interactiveElement?: string;
+  }>;
+  notes?: string;
+}
+
+export interface ProducedContent {
+  id: string;
+  contentIdeaId: string;
+  platform: string;
+  format: string;
+  body: ProducedContentBody;
+  createdAt: string;
+}
+
 export interface SessionIdea {
   id: string;
   sessionId: string;
@@ -27,7 +60,7 @@ export interface SessionIdea {
   format: string;
   angle: string;
   description?: string;
-  producedContent?: string;
+  producedContent?: ProducedContent | null;
   status: 'proposed' | 'approved' | 'rejected' | 'producing' | 'completed';
   createdAt: string;
   updatedAt: string;
