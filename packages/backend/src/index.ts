@@ -5,6 +5,7 @@ import { logger } from "hono/logger";
 import { healthRoute } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { onboardingRoutes } from "./routes/onboarding.js";
+import { profileRoutes } from "./routes/profile.js";
 
 const app = new Hono();
 
@@ -20,6 +21,7 @@ app.use(
 app.route("/api", healthRoute);
 app.route("/api", authRoutes);
 app.route("/api", onboardingRoutes);
+app.route("/api", profileRoutes);
 
 const port = 3001;
 
