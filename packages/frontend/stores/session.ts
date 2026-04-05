@@ -84,12 +84,17 @@ export const useSessionStore = defineStore('session', () => {
   const sseStream = useSSEStream();
 
   async function createOrLoadSession(sessionId?: string): Promise<void> {
-    if (sessionId) {
-      const response = await apiClient.get<{ session: Session }>(`/api/sessions/${sessionId}`);
-      session.value = response.session;
-    } else {
-      const response = await apiClient.post<{ session: Session }>('/api/sessions');
-      session.value = response.session;
+    try {
+      if (sessionId) {
+        const response = await apiClient.get<{ session: Session }>(`/api/sessions/${sessionId}`);
+        session.value = response.session;
+      } else {
+        const response = await apiClient.post<{ session: Session }>('/api/sessions');
+        session.value = response.session;
+      }
+    } catch (error) {
+      console.error('Failed to create or load session:', error);
+      throw error;
     }
   }
 
@@ -137,76 +142,92 @@ export const useSessionStore = defineStore('session', () => {
     currentStreamText.value = '';
     isStreaming.value = true;
 
-    const body: Record<string, unknown> = { message: text };
-    if (session.value.sdkSessionId) {
-      body.sdkSessionId = session.value.sdkSessionId;
-    }
-
-    await sseStream.streamMessage(
-      `${baseURL}/api/sessions/${session.value.id}/message`,
-      body,
-    );
-
-    // Capture streamed text as assistant message
-    const assistantContent = sseStream.tokens.value;
-    if (assistantContent) {
-      const assistantMessage: SessionMessage = {
-        id: `temp-${Date.now()}-assistant`,
-        sessionId: session.value.id,
-        role: 'assistant',
-        content: assistantContent,
-        createdAt: new Date().toISOString(),
-      };
-      messages.value.push(assistantMessage);
-    }
-
-    // Capture any new ideas from the stream
-    if (sseStream.ideas.value.length > 0) {
-      for (const rawIdea of sseStream.ideas.value) {
-        const idea: SessionIdea = {
-          id: (rawIdea as Record<string, unknown>).id as string ?? `idea-${Date.now()}`,
-          sessionId: session.value.id,
-          platform: (rawIdea as Record<string, unknown>).platform as string ?? '',
-          format: (rawIdea as Record<string, unknown>).format as string ?? '',
-          angle: (rawIdea as Record<string, unknown>).angle as string ?? (rawIdea as Record<string, unknown>).text as string ?? '',
-          description: (rawIdea as Record<string, unknown>).description as string | undefined,
-          status: ((rawIdea as Record<string, unknown>).status as SessionIdea['status']) ?? 'proposed',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        ideas.value.push(idea);
+    try {
+      const body: Record<string, unknown> = { content: text };
+      if (session.value.sdkSessionId) {
+        body.sdkSessionId = session.value.sdkSessionId;
       }
-    }
 
-    // Update SDK session ID if returned
-    if (sseStream.sdkSessionId.value && session.value) {
-      session.value.sdkSessionId = sseStream.sdkSessionId.value;
-    }
+      await sseStream.streamMessage(
+        `${baseURL}/api/sessions/${session.value.id}/message`,
+        body,
+      );
 
-    // Reset streaming state
-    currentStreamText.value = '';
-    isStreaming.value = false;
+      // Capture streamed text as assistant message
+      const assistantContent = sseStream.tokens.value;
+      if (assistantContent) {
+        const assistantMessage: SessionMessage = {
+          id: `temp-${Date.now()}-assistant`,
+          sessionId: session.value.id,
+          role: 'assistant',
+          content: assistantContent,
+          createdAt: new Date().toISOString(),
+        };
+        messages.value.push(assistantMessage);
+      }
+
+      // Capture any new ideas from the stream
+      if (sseStream.ideas.value.length > 0) {
+        for (const rawIdea of sseStream.ideas.value) {
+          const idea: SessionIdea = {
+            id: (rawIdea as Record<string, unknown>).id as string ?? `idea-${Date.now()}`,
+            sessionId: session.value.id,
+            platform: (rawIdea as Record<string, unknown>).platform as string ?? '',
+            format: (rawIdea as Record<string, unknown>).format as string ?? '',
+            angle: (rawIdea as Record<string, unknown>).angle as string ?? (rawIdea as Record<string, unknown>).text as string ?? '',
+            description: (rawIdea as Record<string, unknown>).description as string | undefined,
+            status: ((rawIdea as Record<string, unknown>).status as SessionIdea['status']) ?? 'proposed',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          ideas.value.push(idea);
+        }
+      }
+
+      // Update SDK session ID if returned
+      if (sseStream.sdkSessionId.value && session.value) {
+        session.value.sdkSessionId = sseStream.sdkSessionId.value;
+      }
+    } catch (error) {
+      // Remove optimistic user message on failure
+      const messageIndex = messages.value.indexOf(userMessage);
+      if (messageIndex !== -1) {
+        messages.value.splice(messageIndex, 1);
+      }
+      console.error('Failed to send message:', error);
+      throw error;
+    } finally {
+      // Reset streaming state
+      currentStreamText.value = '';
+      isStreaming.value = false;
+    }
   }
 
   async function approveIdea(ideaId: string): Promise<void> {
     if (!session.value) return;
-    await apiClient.patch(`/api/sessions/${session.value.id}/ideas/${ideaId}`, {
-      status: 'approved',
-    });
-    const idea = ideas.value.find((item) => item.id === ideaId);
-    if (idea) {
-      idea.status = 'approved';
+    try {
+      await apiClient.patch(`/api/ideas/${ideaId}/approve`);
+      const idea = ideas.value.find((item) => item.id === ideaId);
+      if (idea) {
+        idea.status = 'approved';
+      }
+    } catch (error) {
+      console.error('Failed to approve idea:', error);
+      throw error;
     }
   }
 
   async function rejectIdea(ideaId: string): Promise<void> {
     if (!session.value) return;
-    await apiClient.patch(`/api/sessions/${session.value.id}/ideas/${ideaId}`, {
-      status: 'rejected',
-    });
-    const idea = ideas.value.find((item) => item.id === ideaId);
-    if (idea) {
-      idea.status = 'rejected';
+    try {
+      await apiClient.patch(`/api/ideas/${ideaId}/reject`);
+      const idea = ideas.value.find((item) => item.id === ideaId);
+      if (idea) {
+        idea.status = 'rejected';
+      }
+    } catch (error) {
+      console.error('Failed to reject idea:', error);
+      throw error;
     }
   }
 

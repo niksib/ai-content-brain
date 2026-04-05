@@ -1,18 +1,13 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
+import type { AppEnv } from "../types/hono.js";
 
-interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export const sessionRoutes = new Hono();
+export const sessionRoutes = new Hono<AppEnv>();
 
 // Create or return today's session
 sessionRoutes.post("/sessions", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -44,7 +39,7 @@ sessionRoutes.post("/sessions", requireAuth, async (context) => {
 
 // List user sessions for calendar
 sessionRoutes.get("/sessions", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
 
   const sessions = await prisma.chatSession.findMany({
     where: {
@@ -75,11 +70,11 @@ sessionRoutes.get("/sessions", requireAuth, async (context) => {
 
 // Get session detail
 sessionRoutes.get("/sessions/:id", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const sessionId = context.req.param("id");
 
   const session = await prisma.chatSession.findUnique({
-    where: { id: sessionId },
+    where: { id: sessionId, userId: user.id },
     include: {
       messages: {
         orderBy: { createdAt: "asc" },
@@ -94,7 +89,7 @@ sessionRoutes.get("/sessions/:id", requireAuth, async (context) => {
     },
   });
 
-  if (!session || session.userId !== user.id) {
+  if (!session) {
     return context.json({ error: "Session not found" }, 404);
   }
 

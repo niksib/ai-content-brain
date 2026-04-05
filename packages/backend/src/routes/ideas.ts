@@ -5,12 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { agentRunner } from "../services/agent-runner.service.js";
 import { billingService } from "../services/billing.service.js";
 import { createSSEStream } from "../lib/sse.js";
-
-interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-}
+import type { AppEnv } from "../types/hono.js";
 
 interface PlatformAgentMapping {
   agent: string;
@@ -44,18 +39,18 @@ function resolvePlatformAgent(
   return { agent: platform, description: `${platform} ${format}` };
 }
 
-export const ideaRoutes = new Hono();
+export const ideaRoutes = new Hono<AppEnv>();
 
 // List ideas from session
 ideaRoutes.get("/sessions/:id/ideas", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const sessionId = context.req.param("id");
 
   const chatSession = await prisma.chatSession.findUnique({
-    where: { id: sessionId },
+    where: { id: sessionId, userId: user.id },
   });
 
-  if (!chatSession || chatSession.userId !== user.id) {
+  if (!chatSession) {
     return context.json({ error: "Session not found" }, 404);
   }
 
@@ -77,14 +72,14 @@ ideaRoutes.get("/sessions/:id/ideas", requireAuth, async (context) => {
 
 // Approve idea and start content production
 ideaRoutes.patch("/ideas/:id/approve", requireAuth, requireCredits(20, "content_production"), async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const ideaId = context.req.param("id");
 
   const idea = await prisma.contentIdea.findUnique({
-    where: { id: ideaId },
+    where: { id: ideaId, userId: user.id },
   });
 
-  if (!idea || idea.userId !== user.id) {
+  if (!idea) {
     return context.json({ error: "Idea not found" }, 404);
   }
 
@@ -131,14 +126,14 @@ ideaRoutes.patch("/ideas/:id/approve", requireAuth, requireCredits(20, "content_
 
 // Reject idea
 ideaRoutes.patch("/ideas/:id/reject", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const ideaId = context.req.param("id");
 
   const idea = await prisma.contentIdea.findUnique({
-    where: { id: ideaId },
+    where: { id: ideaId, userId: user.id },
   });
 
-  if (!idea || idea.userId !== user.id) {
+  if (!idea) {
     return context.json({ error: "Idea not found" }, 404);
   }
 
@@ -152,17 +147,17 @@ ideaRoutes.patch("/ideas/:id/reject", requireAuth, async (context) => {
 
 // Get idea detail with produced content
 ideaRoutes.get("/ideas/:id", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const ideaId = context.req.param("id");
 
   const idea = await prisma.contentIdea.findUnique({
-    where: { id: ideaId },
+    where: { id: ideaId, userId: user.id },
     include: {
       producedContent: true,
     },
   });
 
-  if (!idea || idea.userId !== user.id) {
+  if (!idea) {
     return context.json({ error: "Idea not found" }, 404);
   }
 

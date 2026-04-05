@@ -1,12 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
-
-interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-}
+import type { AppEnv } from "../types/hono.js";
 
 const EDITABLE_FIELDS = [
   "platforms",
@@ -20,11 +15,11 @@ const EDITABLE_FIELDS = [
   "goals",
 ] as const;
 
-export const profileRoutes = new Hono();
+export const profileRoutes = new Hono<AppEnv>();
 
 // Get creator profile for authenticated user
 profileRoutes.get("/profile", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
 
   const profile = await prisma.creatorProfile.findUnique({
     where: { userId: user.id },
@@ -42,7 +37,7 @@ profileRoutes.get("/profile", requireAuth, async (context) => {
 
 // Update editable fields on the creator profile
 profileRoutes.patch("/profile", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const body = await context.req.json();
 
   // Only allow known editable fields

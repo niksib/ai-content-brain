@@ -2,25 +2,20 @@ import { Hono } from "hono";
 import Stripe from "stripe";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { billingService } from "../services/billing.service.js";
+import type { AppEnv } from "../types/hono.js";
 
-interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export const billingRoutes = new Hono();
+export const billingRoutes = new Hono<AppEnv>();
 
 // Get credit balance
 billingRoutes.get("/billing/balance", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const balance = await billingService.getBalance(user.id);
   return context.json({ balance });
 });
 
 // Get transaction history (paginated)
 billingRoutes.get("/billing/transactions", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const page = parseInt(context.req.query("page") || "1", 10);
   const limit = parseInt(context.req.query("limit") || "20", 10);
   const transactions = await billingService.getTransactions(user.id, page, limit);
@@ -29,7 +24,7 @@ billingRoutes.get("/billing/transactions", requireAuth, async (context) => {
 
 // Create Stripe Checkout session
 billingRoutes.post("/billing/checkout", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const body = await context.req.json();
   const { priceId, mode } = body;
 
@@ -79,7 +74,7 @@ billingRoutes.post("/billing/webhook", async (context) => {
 
 // Subscription status placeholder
 billingRoutes.get("/billing/subscription", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const balance = await billingService.getBalance(user.id);
   return context.json({ plan: "free_beta", credits: balance });
 });

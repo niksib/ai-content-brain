@@ -5,25 +5,20 @@ import { prisma } from "../lib/prisma.js";
 import { agentRunner } from "../services/agent-runner.service.js";
 import { billingService } from "../services/billing.service.js";
 import { createSSEStream } from "../lib/sse.js";
+import type { AppEnv } from "../types/hono.js";
 
-interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export const chatRoutes = new Hono();
+export const chatRoutes = new Hono<AppEnv>();
 
 // Send message to strategist agent
 chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "content_plan"), async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const sessionId = context.req.param("id");
 
   const chatSession = await prisma.chatSession.findUnique({
-    where: { id: sessionId },
+    where: { id: sessionId, userId: user.id },
   });
 
-  if (!chatSession || chatSession.userId !== user.id) {
+  if (!chatSession) {
     return context.json({ error: "Session not found" }, 404);
   }
 
@@ -100,14 +95,14 @@ chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "conten
 
 // Get message history
 chatRoutes.get("/sessions/:id/messages", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const sessionId = context.req.param("id");
 
   const chatSession = await prisma.chatSession.findUnique({
-    where: { id: sessionId },
+    where: { id: sessionId, userId: user.id },
   });
 
-  if (!chatSession || chatSession.userId !== user.id) {
+  if (!chatSession) {
     return context.json({ error: "Session not found" }, 404);
   }
 

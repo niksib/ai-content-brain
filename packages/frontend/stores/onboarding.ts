@@ -4,8 +4,8 @@ import { useApiClient } from '~/services/api';
 import { useSSEStream } from '~/composables/useSSEStream';
 
 interface OnboardingStatus {
-  isComplete: boolean;
-  sessionId?: string;
+  completed: boolean;
+  profile: Record<string, unknown> | null;
 }
 
 export const useOnboardingStore = defineStore('onboarding', () => {
@@ -25,10 +25,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     isLoading.value = true;
     try {
       const status = await apiClient.get<OnboardingStatus>('/api/onboarding/status');
-      isComplete.value = status.isComplete;
-      if (status.sessionId) {
-        sessionId.value = status.sessionId;
-      }
+      isComplete.value = status.completed;
       return status;
     } finally {
       isLoading.value = false;
@@ -57,7 +54,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     currentQuestion.value = '';
     sseStream.reset();
 
-    const body: Record<string, unknown> = { message: text };
+    const body: Record<string, unknown> = { content: text };
     if (sessionId.value) {
       body.sessionId = sessionId.value;
     }

@@ -103,7 +103,7 @@ async function handleAudioReady(blob: Blob) {
 onMounted(async () => {
   try {
     const status = await store.checkStatus();
-    if (status.isComplete) {
+    if (status.completed) {
       router.push('/dashboard');
       return;
     }

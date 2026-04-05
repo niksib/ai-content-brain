@@ -1,18 +1,13 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
+import type { AppEnv } from "../types/hono.js";
 
-interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export const libraryRoutes = new Hono();
+export const libraryRoutes = new Hono<AppEnv>();
 
 // List all produced content for user with pagination and filters
 libraryRoutes.get("/library", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
 
   const page = Math.max(1, Number(context.req.query("page")) || 1);
   const limit = Math.min(100, Math.max(1, Number(context.req.query("limit")) || 20));
@@ -56,17 +51,17 @@ libraryRoutes.get("/library", requireAuth, async (context) => {
 
 // Get specific produced content by ID
 libraryRoutes.get("/library/:id", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const contentId = context.req.param("id");
 
   const content = await prisma.producedContent.findUnique({
-    where: { id: contentId },
+    where: { id: contentId, userId: user.id },
     include: {
       contentIdea: true,
     },
   });
 
-  if (!content || content.userId !== user.id) {
+  if (!content) {
     return context.json({ error: "Content not found" }, 404);
   }
 

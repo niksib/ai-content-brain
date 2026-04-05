@@ -3,18 +3,13 @@ import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { agentRunner } from "../services/agent-runner.service.js";
 import { createSSEStream } from "../lib/sse.js";
+import type { AppEnv } from "../types/hono.js";
 
-interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export const onboardingRoutes = new Hono();
+export const onboardingRoutes = new Hono<AppEnv>();
 
 // Check if onboarding is complete
 onboardingRoutes.get("/onboarding/status", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const profile = await prisma.creatorProfile.findUnique({
     where: { userId: user.id },
   });
@@ -26,7 +21,7 @@ onboardingRoutes.get("/onboarding/status", requireAuth, async (context) => {
 
 // Start onboarding session
 onboardingRoutes.post("/onboarding/start", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
 
   // Check if already onboarded
   const existingProfile = await prisma.creatorProfile.findUnique({
@@ -82,7 +77,7 @@ onboardingRoutes.post("/onboarding/start", requireAuth, async (context) => {
 
 // Send message to onboarding agent
 onboardingRoutes.post("/onboarding/message", requireAuth, async (context) => {
-  const user = context.get("user" as never) as AuthUser;
+  const user = context.get("user");
   const body = await context.req.json();
   const { content } = body;
 
