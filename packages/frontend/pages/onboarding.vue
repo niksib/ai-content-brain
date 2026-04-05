@@ -52,6 +52,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
 import { useOnboardingStore } from '~/stores/onboarding';
+import { useVoiceService } from '~/services/voice';
 import AnimatedOrb from '~/components/AnimatedOrb.vue';
 import VoiceRecorder from '~/components/VoiceRecorder.vue';
 
@@ -60,6 +61,7 @@ definePageMeta({
 });
 
 const store = useOnboardingStore();
+const { transcribeAudio } = useVoiceService();
 const router = useRouter();
 const isUserRecording = ref(false);
 
@@ -85,13 +87,17 @@ async function handleTextSubmit(text: string) {
 }
 
 async function handleAudioReady(blob: Blob) {
-  // For now, audio transcription will be handled server-side.
-  // Send audio as form data to a transcription endpoint,
-  // then forward the text to sendAnswer.
-  // Placeholder: send a note that audio was recorded
-  // In production, this would POST the blob to /api/transcribe
-  // and then call sendAnswer with the transcribed text.
-  console.warn('Audio recording received — transcription not yet integrated. Use text mode.');
+  try {
+    const transcript = await transcribeAudio(blob);
+    if (transcript.trim()) {
+      await store.sendAnswer(transcript);
+      if (store.isComplete) {
+        router.push('/dashboard');
+      }
+    }
+  } catch (error) {
+    console.error('Transcription failed:', error);
+  }
 }
 
 onMounted(async () => {
