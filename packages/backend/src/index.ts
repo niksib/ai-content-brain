@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { healthRoute } from "./routes/health.js";
+import { authRoutes } from "./routes/auth.js";
 
 const app = new Hono();
 
@@ -16,6 +17,7 @@ app.use(
 );
 
 app.route("/api", healthRoute);
+app.route("/api", authRoutes);
 
 const port = 3001;
 
