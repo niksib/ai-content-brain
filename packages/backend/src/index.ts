@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { healthRoute } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
+import { onboardingRoutes } from "./routes/onboarding.js";
 
 const app = new Hono();
 
@@ -18,6 +19,7 @@ app.use(
 
 app.route("/api", healthRoute);
 app.route("/api", authRoutes);
+app.route("/api", onboardingRoutes);
 
 const port = 3001;
 
