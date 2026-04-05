@@ -1,0 +1,15 @@
+{
+  "name": "daily-content-brain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI app that turns voice dumps into ready-to-post social media content",
+  "scripts": {
+    "dev": "echo 'TODO: add turbo or concurrently'",
+    "build": "echo 'TODO: add build script'",
+    "lint": "echo 'TODO: add lint script'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@10.33.0"
+}
