@@ -3,6 +3,7 @@
     <header class="app-header">
       <NuxtLink to="/dashboard" class="app-name">Daily Content Brain</NuxtLink>
       <nav class="app-nav">
+        <NuxtLink to="/library">Library</NuxtLink>
         <NuxtLink to="/profile">Profile</NuxtLink>
       </nav>
     </header>
@@ -32,6 +33,11 @@
   font-weight: 700;
   color: #111827;
   text-decoration: none;
+}
+
+.app-nav {
+  display: flex;
+  gap: 1.25rem;
 }
 
 .app-nav a {
