@@ -4,12 +4,14 @@ export function useApiClient() {
 
   async function request<T>(
     path: string,
-    options: RequestInit = {},
+    options: RequestInit & { method?: string } = {},
   ): Promise<T> {
     const url = `${baseURL}${path}`;
 
     const response = await $fetch<T>(url, {
-      ...options,
+      method: options.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+      headers: options.headers as Record<string, string>,
+      body: options.body as string | undefined,
       credentials: 'include',
     });
 
@@ -36,9 +38,17 @@ export function useApiClient() {
     });
   }
 
+  function patch<T>(path: string, body?: unknown): Promise<T> {
+    return request<T>(path, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
   function del<T>(path: string): Promise<T> {
     return request<T>(path, { method: 'DELETE' });
   }
 
-  return { get, post, put, del, request };
+  return { get, post, put, patch, del, request };
 }
