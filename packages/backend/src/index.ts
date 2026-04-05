@@ -10,6 +10,7 @@ import { voiceRoutes } from "./routes/voice.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { chatRoutes } from "./routes/chat.js";
 import { ideaRoutes } from "./routes/ideas.js";
+import { libraryRoutes } from "./routes/library.js";
 
 const app = new Hono();
 
@@ -30,6 +31,7 @@ app.route("/api", voiceRoutes);
 app.route("/api", sessionRoutes);
 app.route("/api", chatRoutes);
 app.route("/api", ideaRoutes);
+app.route("/api", libraryRoutes);
 
 const port = 3001;
 
