@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
+import { requireCredits } from "../middleware/credits.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { agentRunner } from "../services/agent-runner.service.js";
+import { billingService } from "../services/billing.service.js";
 import { createSSEStream } from "../lib/sse.js";
 
 interface AuthUser {
@@ -13,7 +15,7 @@ interface AuthUser {
 export const chatRoutes = new Hono();
 
 // Send message to strategist agent
-chatRoutes.post("/sessions/:id/message", requireAuth, async (context) => {
+chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "content_plan"), async (context) => {
   const user = context.get("user" as never) as AuthUser;
   const sessionId = context.req.param("id");
 
@@ -88,6 +90,9 @@ chatRoutes.post("/sessions/:id/message", requireAuth, async (context) => {
           data: { sdkSessionId },
         });
       }
+
+      // Deduct credits after successful processing
+      await billingService.deductCredits(user.id, 10, "content_plan", chatSession.id);
     });
 
   return response;

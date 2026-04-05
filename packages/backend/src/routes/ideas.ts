@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
+import { requireCredits } from "../middleware/credits.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { agentRunner } from "../services/agent-runner.service.js";
+import { billingService } from "../services/billing.service.js";
 import { createSSEStream } from "../lib/sse.js";
 
 interface AuthUser {
@@ -74,7 +76,7 @@ ideaRoutes.get("/sessions/:id/ideas", requireAuth, async (context) => {
 });
 
 // Approve idea and start content production
-ideaRoutes.patch("/ideas/:id/approve", requireAuth, async (context) => {
+ideaRoutes.patch("/ideas/:id/approve", requireAuth, requireCredits(20, "content_production"), async (context) => {
   const user = context.get("user" as never) as AuthUser;
   const ideaId = context.req.param("id");
 
@@ -112,6 +114,9 @@ ideaRoutes.patch("/ideas/:id/approve", requireAuth, async (context) => {
         where: { id: ideaId },
         data: { status: "completed" },
       });
+
+      // Deduct credits after successful content production
+      await billingService.deductCredits(user.id, 20, "content_production", ideaId);
     })
     .catch(async () => {
       // If agent fails, revert status to approved so user can retry
