@@ -9,6 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.92",
     "@hono/node-server": "^1.14.0",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
@@ -16,7 +17,8 @@
     "dotenv": "^17.4.0",
     "hono": "^4.7.0",
     "pg": "^8.20.0",
-    "prisma": "^7.6.0"
+    "prisma": "^7.6.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
