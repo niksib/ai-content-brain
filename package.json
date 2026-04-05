@@ -4,9 +4,14 @@
   "private": true,
   "description": "AI app that turns voice dumps into ready-to-post social media content",
   "scripts": {
-    "dev": "echo 'TODO: add turbo or concurrently'",
+    "dev": "pnpm --filter @daily-content-brain/backend dev & pnpm --filter @daily-content-brain/frontend dev & wait",
+    "dev:backend": "pnpm --filter @daily-content-brain/backend dev",
+    "dev:frontend": "pnpm --filter @daily-content-brain/frontend dev",
     "build": "echo 'TODO: add build script'",
-    "lint": "echo 'TODO: add lint script'"
+    "lint": "echo 'TODO: add lint script'",
+    "db:migrate": "pnpm --filter @daily-content-brain/backend exec prisma migrate dev",
+    "db:studio": "pnpm --filter @daily-content-brain/backend exec prisma studio",
+    "db:generate": "pnpm --filter @daily-content-brain/backend exec prisma generate"
   },
   "keywords": [],
   "author": "",
