@@ -6,6 +6,7 @@ import { healthRoute } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { onboardingRoutes } from "./routes/onboarding.js";
 import { profileRoutes } from "./routes/profile.js";
+import { voiceRoutes } from "./routes/voice.js";
 
 const app = new Hono();
 
@@ -22,6 +23,7 @@ app.route("/api", healthRoute);
 app.route("/api", authRoutes);
 app.route("/api", onboardingRoutes);
 app.route("/api", profileRoutes);
+app.route("/api", voiceRoutes);
 
 const port = 3001;
 
