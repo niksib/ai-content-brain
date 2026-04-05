@@ -1,0 +1,240 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== BETTER AUTH TABLES ====================
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ==================== CREATOR PROFILE ====================
+
+model CreatorProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+
+  platforms String[]
+  niche     String
+  topics    String[]
+
+  audienceDescription String
+  audiencePainPoints  String?
+  stage               CreatorStage
+
+  toneOfVoice  String
+  toneExamples String[]
+  goals        String[]
+  rawNotes     String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum CreatorStage {
+  starting
+  growing
+  established
+}
+
+// ==================== CHAT SESSION ====================
+
+model ChatSession {
+  id              String        @id @default(cuid())
+  userId          String
+  type            SessionType
+  status          SessionStatus @default(active)
+  sessionDate     DateTime      @db.Date
+
+  sdkSessionId    String?       @unique
+
+  messages        ChatMessage[]
+  contentPlan     ContentPlan?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([userId, sessionDate])
+}
+
+enum SessionType {
+  onboarding
+  daily
+}
+
+enum SessionStatus {
+  active
+  completed
+}
+
+model ChatMessage {
+  id            String      @id @default(cuid())
+  chatSessionId String
+  chatSession   ChatSession @relation(fields: [chatSessionId], references: [id])
+
+  role          MessageRole
+  content       String
+  audioUrl      String?
+
+  contentIdeaId String?
+  contentIdea   ContentIdea? @relation(fields: [contentIdeaId], references: [id])
+
+  createdAt     DateTime    @default(now())
+}
+
+enum MessageRole {
+  user
+  assistant
+}
+
+// ==================== CONTENT PLAN ====================
+
+model ContentPlan {
+  id             String       @id @default(cuid())
+  userId         String
+  chatSessionId  String       @unique
+  chatSession    ChatSession  @relation(fields: [chatSessionId], references: [id])
+
+  ideas          ContentIdea[]
+
+  createdAt      DateTime     @default(now())
+}
+
+// ==================== CONTENT IDEAS ====================
+
+model ContentIdea {
+  id            String        @id @default(cuid())
+  contentPlanId String
+  contentPlan   ContentPlan   @relation(fields: [contentPlanId], references: [id])
+  userId        String
+
+  platform      Platform
+  format        ContentFormat
+  angle         String
+  description   String
+
+  status        IdeaStatus    @default(proposed)
+
+  producedContent ProducedContent?
+  chatMessages    ChatMessage[]
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+enum Platform {
+  threads
+  linkedin
+  tiktok
+  instagram
+}
+
+enum ContentFormat {
+  text_post
+  video_script
+  carousel
+  stories
+}
+
+enum IdeaStatus {
+  proposed
+  approved
+  rejected
+  producing
+  completed
+}
+
+// ==================== PRODUCED CONTENT ====================
+
+model ProducedContent {
+  id            String      @id @default(cuid())
+  contentIdeaId String      @unique
+  contentIdea   ContentIdea @relation(fields: [contentIdeaId], references: [id])
+  userId        String
+
+  platform      Platform
+  format        ContentFormat
+
+  body          Json
+
+  createdAt     DateTime    @default(now())
+}
+
+// ==================== CREDITS ====================
+
+model CreditBalance {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model CreditTransaction {
+  id        String                @id @default(cuid())
+  userId    String
+  amount    Int
+  type      CreditTransactionType
+  reference String?
+
+  createdAt DateTime              @default(now())
+}
+
+enum CreditTransactionType {
+  subscription_grant
+  topup_purchase
+  voice_processing
+  content_plan
+  content_production
+}
