@@ -11,6 +11,7 @@ import { sessionRoutes } from "./routes/sessions.js";
 import { chatRoutes } from "./routes/chat.js";
 import { ideaRoutes } from "./routes/ideas.js";
 import { libraryRoutes } from "./routes/library.js";
+import { billingRoutes } from "./routes/billing.js";
 
 const app = new Hono();
 
@@ -32,6 +33,7 @@ app.route("/api", sessionRoutes);
 app.route("/api", chatRoutes);
 app.route("/api", ideaRoutes);
 app.route("/api", libraryRoutes);
+app.route("/api", billingRoutes);
 
 const port = 3001;
 
