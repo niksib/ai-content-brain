@@ -138,7 +138,7 @@
       </form>
     </section>
 
-    <!-- Section 2: Subscription -->
+    <!-- Section 2: Subscription & Credits -->
     <section class="profile-section">
       <h2 class="section-title">Subscription</h2>
       <div class="info-row">
@@ -147,11 +147,45 @@
       </div>
       <div class="info-row">
         <span class="info-label">Credit Balance</span>
-        <span class="info-value">0</span>
+        <span class="info-value info-value--credits">{{ billingStore.balance }}</span>
       </div>
       <div class="placeholder-actions">
-        <button type="button" class="btn btn--secondary" disabled>Manage Subscription</button>
-        <button type="button" class="btn btn--secondary" disabled>Buy Credits</button>
+        <button
+          type="button"
+          class="btn btn--primary"
+          @click="handleBuyCredits"
+        >
+          Buy Credits
+        </button>
+      </div>
+
+      <!-- Billing status messages -->
+      <p v-if="billingStatus === 'success'" class="save-message">Payment successful! Credits have been added.</p>
+      <p v-if="billingStatus === 'cancel'" class="save-message save-message--error">Payment was cancelled.</p>
+
+      <!-- Transaction History -->
+      <div v-if="billingStore.transactions.length > 0" class="transactions-section">
+        <h3 class="subsection-title">Transaction History</h3>
+        <table class="transactions-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Amount</th>
+              <th>Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="transaction in billingStore.transactions" :key="transaction.id">
+              <td>{{ formatDate(transaction.createdAt) }}</td>
+              <td>{{ formatType(transaction.type) }}</td>
+              <td :class="transaction.amount > 0 ? 'amount-positive' : 'amount-negative'">
+                {{ transaction.amount > 0 ? '+' : '' }}{{ transaction.amount }}
+              </td>
+              <td class="reference-cell">{{ transaction.reference || '---' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
@@ -171,8 +205,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted } from 'vue';
+import { ref, reactive, watch, onMounted, computed } from 'vue';
 import { useProfileStore, type ProfileUpdateData } from '~/stores/profile';
+import { useBillingStore } from '~/stores/billing';
 import { useApiClient } from '~/services/api';
 
 definePageMeta({
@@ -180,6 +215,10 @@ definePageMeta({
 });
 
 const profileStore = useProfileStore();
+const billingStore = useBillingStore();
+
+const route = useRoute();
+const billingStatus = computed(() => route.query.billing as string | undefined);
 
 const availablePlatforms = ['threads', 'linkedin', 'tiktok', 'instagram'] as const;
 
@@ -273,8 +312,36 @@ async function handleSave() {
   }
 }
 
+function handleBuyCredits() {
+  // Use a placeholder price ID — will be replaced with real Stripe price
+  billingStore.createCheckout('price_credits_500', 'payment');
+}
+
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function formatType(type: string): string {
+  const typeLabels: Record<string, string> = {
+    subscription_grant: 'Subscription',
+    topup_purchase: 'Top-up',
+    voice_processing: 'Voice',
+    content_plan: 'Content Plan',
+    content_production: 'Production',
+  };
+  return typeLabels[type] || type;
+}
+
 onMounted(async () => {
-  await profileStore.loadProfile();
+  await Promise.all([
+    profileStore.loadProfile(),
+    billingStore.loadBalance(),
+    billingStore.loadTransactions(),
+  ]);
   populateForm();
 
   // Extract email from the API response (stored alongside profile)
@@ -500,5 +567,63 @@ onMounted(async () => {
 
 .save-message--error {
   color: #dc2626;
+}
+
+/* Credits highlight */
+.info-value--credits {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #6366f1;
+}
+
+/* Transactions */
+.transactions-section {
+  margin-top: 1.5rem;
+}
+
+.subsection-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 0.75rem;
+}
+
+.transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.transactions-table th {
+  text-align: left;
+  padding: 0.5rem 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.transactions-table td {
+  padding: 0.5rem 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  color: #111827;
+}
+
+.amount-positive {
+  color: #059669;
+  font-weight: 500;
+}
+
+.amount-negative {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.reference-cell {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
