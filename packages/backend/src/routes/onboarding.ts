@@ -1,9 +1,8 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
-import { agentRunner } from "../services/agent-runner.service.js";
-import { createSSEStream } from "../lib/sse.js";
 import type { AppEnv } from "../types/hono.js";
+import { processOnboardingAnswers, type OnboardingAnswer } from "../services/onboarding.service.js";
 
 export const onboardingRoutes = new Hono<AppEnv>();
 
@@ -19,109 +18,32 @@ onboardingRoutes.get("/onboarding/status", requireAuth, async (context) => {
   });
 });
 
-// Start onboarding session
-onboardingRoutes.post("/onboarding/start", requireAuth, async (context) => {
-  const user = context.get("user");
-
-  // Check if already onboarded
-  const existingProfile = await prisma.creatorProfile.findUnique({
-    where: { userId: user.id },
-  });
-  if (existingProfile) {
-    return context.json({ error: "Already onboarded" }, 400);
-  }
-
-  // Create or find onboarding chat session
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  let chatSession = await prisma.chatSession.findFirst({
-    where: { userId: user.id, type: "onboarding" },
-  });
-
-  if (!chatSession) {
-    chatSession = await prisma.chatSession.create({
-      data: {
-        userId: user.id,
-        type: "onboarding",
-        status: "active",
-        sessionDate: today,
-      },
-    });
-  }
-
-  // Stream onboarding agent's first question
-  const { send, close, response } = createSSEStream(context);
-
-  // Run agent in background, don't await
-  agentRunner
-    .streamAgentResponse(
-      "onboarding",
-      "Start the onboarding interview. Ask the first question.",
-      chatSession.sdkSessionId || undefined,
-      user.id,
-      { send, close }
-    )
-    .then(async ({ sdkSessionId }) => {
-      // Save SDK session ID for resume
-      if (sdkSessionId && !chatSession.sdkSessionId) {
-        await prisma.chatSession.update({
-          where: { id: chatSession.id },
-          data: { sdkSessionId },
-        });
-      }
-    });
-
-  return response;
-});
-
-// Send message to onboarding agent
-onboardingRoutes.post("/onboarding/message", requireAuth, async (context) => {
+// Submit all onboarding answers for agent processing
+onboardingRoutes.post("/onboarding/submit", requireAuth, async (context) => {
   const user = context.get("user");
   const body = await context.req.json();
-  const { content } = body;
+  const { answers } = body as { answers: OnboardingAnswer[] };
 
-  if (!content || typeof content !== "string") {
-    return context.json({ error: "content is required" }, 400);
+  if (!Array.isArray(answers) || answers.length === 0) {
+    return context.json({ error: "answers array is required" }, 400);
   }
 
-  // Find active onboarding session
-  const chatSession = await prisma.chatSession.findFirst({
-    where: { userId: user.id, type: "onboarding", status: "active" },
-  });
-
-  if (!chatSession) {
-    return context.json({ error: "No active onboarding session" }, 404);
+  for (const a of answers) {
+    if (typeof a.question !== "string" || typeof a.answer !== "string") {
+      return context.json({ error: "each answer must have question and answer strings" }, 400);
+    }
   }
 
-  // Save user message
-  await prisma.chatMessage.create({
-    data: {
-      chatSessionId: chatSession.id,
-      role: "user",
-      content,
-    },
-  });
-
-  // Stream agent response
-  const { send, close, response } = createSSEStream(context);
-
-  agentRunner
-    .streamAgentResponse(
-      "onboarding",
-      content,
-      chatSession.sdkSessionId || undefined,
-      user.id,
-      { send, close }
-    )
-    .then(async ({ sdkSessionId }) => {
-      if (sdkSessionId && chatSession.sdkSessionId !== sdkSessionId) {
-        await prisma.chatSession.update({
-          where: { id: chatSession.id },
-          data: { sdkSessionId },
-        });
-      }
-    });
-
-  return response;
+  try {
+    const result = await processOnboardingAnswers(user.id, answers);
+    return context.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    const isOverloaded = message.includes("overloaded");
+    console.error("[onboarding/submit]", err);
+    return context.json(
+      { error: isOverloaded ? "Service temporarily overloaded. Please try again." : "Something went wrong." },
+      503
+    );
+  }
 });

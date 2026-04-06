@@ -165,7 +165,12 @@ export function useSSEStream() {
       }
 
       case 'error': {
-        error.value = data;
+        try {
+          const parsed = JSON.parse(data);
+          error.value = parsed.message ?? data;
+        } catch {
+          error.value = data;
+        }
         break;
       }
 

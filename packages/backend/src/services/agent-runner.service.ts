@@ -1,6 +1,7 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import path from "path";
-import { contentToolsServer } from "../tools/server.js";
+import fs from "fs";
+import { createAgentMcpServer } from "../tools/server.js";
 
 interface SSEWriter {
   send: (event: string, data: unknown) => void;
@@ -9,9 +10,11 @@ interface SSEWriter {
 
 export class AgentRunnerService {
   private agentsBasePath: string;
+  private agentHome: string;
 
   constructor() {
     this.agentsBasePath = path.join(import.meta.dirname, "../agents");
+    this.agentHome = path.join(this.agentsBasePath, ".claude-home");
   }
 
   async streamAgentResponse(
@@ -22,6 +25,10 @@ export class AgentRunnerService {
     sse: SSEWriter
   ): Promise<{ sdkSessionId?: string }> {
     const agentDir = path.join(this.agentsBasePath, agentName);
+    const claudeMdPath = path.join(agentDir, ".claude", "CLAUDE.md");
+    const systemPrompt = fs.existsSync(claudeMdPath)
+      ? fs.readFileSync(claudeMdPath, "utf-8")
+      : "";
     let capturedSessionId: string | undefined = sdkSessionId;
 
     try {
@@ -29,14 +36,14 @@ export class AgentRunnerService {
         prompt,
         options: {
           cwd: agentDir,
-          systemPrompt: { type: "preset", preset: "claude_code" },
-          settingSources: ["project"],
+          systemPrompt,
+          settingSources: [],
           allowedTools: [
             "Read",
-            "Skill",
+            ...(agentName !== "onboarding" ? ["Skill"] : []),
             ...this.getAllowedMcpTools(agentName),
           ],
-          mcpServers: { content: contentToolsServer },
+          mcpServers: { content: createAgentMcpServer(agentName) },
           permissionMode: "bypassPermissions",
           allowDangerouslySkipPermissions: true,
           ...(sdkSessionId ? { resume: sdkSessionId } : {}),
@@ -56,9 +63,9 @@ export class AgentRunnerService {
           }
         }
 
-        // Handle result
         if (message.type === "result") {
-          // Stream complete — session result available
+          console.log(`[${agentName}] usage:`, JSON.stringify(message.usage ?? "n/a"));
+          console.log(`[${agentName}] cost:`, message.total_cost_usd ?? "n/a");
         }
       }
     } catch (error) {
