@@ -1,38 +1,69 @@
-import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
-import { getCreatorProfile, saveCreatorProfile } from "./creator-profile.js";
-import { getContentHistory, saveContentIdea, saveProducedContent } from "./content.js";
+import type Anthropic from "@anthropic-ai/sdk";
+import {
+  getCreatorProfileTool,
+  executeGetCreatorProfile,
+  saveCreatorProfileTool,
+  executeSaveCreatorProfile,
+} from "./creator-profile.js";
+import {
+  getSessionContextTool,
+  executeGetSessionContext,
+  getContentHistoryTool,
+  executeGetContentHistory,
+  saveContentIdeaTool,
+  makeSaveContentIdea,
+  saveProducedContentTool,
+  executeSaveProducedContent,
+} from "./content.js";
+import type { ContentIdea } from "../generated/prisma/client.js";
 
-export function createAgentMcpServer(agentName: string) {
+type ToolExecutor = (input: Record<string, unknown>) => Promise<string>;
+
+export interface AgentToolSet {
+  definitions: Anthropic.Tool[];
+  executors: Record<string, ToolExecutor>;
+}
+
+interface AgentToolOptions {
+  onIdeaSaved?: (idea: ContentIdea) => void;
+}
+
+export function getAgentTools(agentName: string, options: AgentToolOptions = {}): AgentToolSet {
   switch (agentName) {
     case "onboarding":
-      return createSdkMcpServer({
-        name: "content",
-        version: "1.0.0",
-        tools: [getCreatorProfile, saveCreatorProfile],
-      });
+      return {
+        definitions: [getCreatorProfileTool, saveCreatorProfileTool],
+        executors: {
+          get_creator_profile: executeGetCreatorProfile,
+          save_creator_profile: executeSaveCreatorProfile,
+        },
+      };
 
     case "strategist":
-      return createSdkMcpServer({
-        name: "content",
-        version: "1.0.0",
-        tools: [getCreatorProfile, getContentHistory, saveContentIdea],
-      });
+      return {
+        definitions: [getSessionContextTool, saveContentIdeaTool],
+        executors: {
+          get_session_context: executeGetSessionContext,
+          save_content_idea: makeSaveContentIdea(options.onIdeaSaved),
+        },
+      };
 
     case "threads":
     case "linkedin":
     case "video":
     case "instagram":
-      return createSdkMcpServer({
-        name: "content",
-        version: "1.0.0",
-        tools: [getCreatorProfile, saveProducedContent],
-      });
+      return {
+        definitions: [getCreatorProfileTool, saveProducedContentTool],
+        executors: {
+          get_creator_profile: executeGetCreatorProfile,
+          save_produced_content: executeSaveProducedContent,
+        },
+      };
 
     default:
-      return createSdkMcpServer({
-        name: "content",
-        version: "1.0.0",
-        tools: [getCreatorProfile],
-      });
+      return {
+        definitions: [getCreatorProfileTool],
+        executors: { get_creator_profile: executeGetCreatorProfile },
+      };
   }
 }

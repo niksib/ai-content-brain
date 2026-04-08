@@ -1,72 +1,112 @@
-import { tool } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import type Anthropic from "@anthropic-ai/sdk";
 
-export const getCreatorProfile = tool(
-  "get_creator_profile",
-  "Get the creator profile for a user, including their niche, platforms, tone of voice, audience details, and goals.",
-  {
-    userId: z.string().describe("The user ID to fetch the creator profile for"),
+// ── Tool definitions (Anthropic Messages API format) ────────────────────────
+
+export const getCreatorProfileTool: Anthropic.Tool = {
+  name: "get_creator_profile",
+  description:
+    "Get the creator profile for a user, including their niche, platforms, tone of voice, audience details, and goals.",
+  input_schema: {
+    type: "object",
+    properties: {
+      userId: { type: "string", description: "The user ID to fetch the creator profile for" },
+    },
+    required: ["userId"],
   },
-  async ({ userId }) => {
-    const profile = await prisma.creatorProfile.findUnique({
-      where: { userId },
-    });
+};
 
-    if (!profile) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({ found: false, message: "No creator profile found for this user." }),
-          },
-        ],
-      };
-    }
-
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify({ found: true, profile }),
-        },
-      ],
-    };
-  }
-);
-
-export const saveCreatorProfile = tool(
-  "save_creator_profile",
-  "Create or update a creator profile for a user. Use this after the onboarding conversation to persist the creator's information.",
-  {
-    userId: z.string().describe("The user ID"),
-    platforms: z.array(z.string()).describe("Platforms the creator uses (e.g. threads, linkedin, tiktok, instagram)"),
-    niche: z.string().describe("The creator's niche or industry"),
-    topics: z.array(z.string()).describe("Key topics the creator covers"),
-    audienceDescription: z.string().describe("Description of the target audience"),
-    audiencePainPoints: z.string().optional().describe("Pain points of the target audience"),
-    stage: z.enum(["starting", "growing", "established"]).describe("The creator's current stage"),
-    toneOfVoice: z.string().describe("The creator's desired tone of voice"),
-    toneExamples: z.array(z.string()).describe("Examples of the creator's tone"),
-    goals: z.array(z.string()).describe("The creator's content goals"),
-    rawNotes: z.string().describe("Raw notes from the onboarding conversation"),
+export const saveCreatorProfileTool: Anthropic.Tool = {
+  name: "save_creator_profile",
+  description:
+    "Create or update a creator profile for a user. Use this after the onboarding conversation to persist the creator's information.",
+  input_schema: {
+    type: "object",
+    properties: {
+      userId: { type: "string", description: "The user ID" },
+      platforms: {
+        type: "array",
+        items: { type: "string" },
+        description: "Platforms the creator uses (e.g. threads, linkedin, tiktok, instagram)",
+      },
+      niche: { type: "string", description: "The creator's niche or industry" },
+      topics: {
+        type: "array",
+        items: { type: "string" },
+        description: "Key topics the creator covers",
+      },
+      audienceDescription: { type: "string", description: "Description of the target audience" },
+      audiencePainPoints: {
+        type: "string",
+        description: "Pain points of the target audience",
+      },
+      stage: {
+        type: "string",
+        enum: ["starting", "growing", "established"],
+        description: "The creator's current stage",
+      },
+      toneOfVoice: { type: "string", description: "The creator's desired tone of voice" },
+      toneExamples: {
+        type: "array",
+        items: { type: "string" },
+        description: "Examples of the creator's tone",
+      },
+      goals: {
+        type: "array",
+        items: { type: "string" },
+        description: "The creator's content goals",
+      },
+      rawNotes: { type: "string", description: "Raw notes from the onboarding conversation" },
+    },
+    required: [
+      "userId",
+      "platforms",
+      "niche",
+      "topics",
+      "audienceDescription",
+      "stage",
+      "toneOfVoice",
+      "toneExamples",
+      "goals",
+      "rawNotes",
+    ],
   },
-  async (input) => {
-    const { userId, ...profileData } = input;
+};
 
-    await prisma.creatorProfile.upsert({
-      where: { userId },
-      create: { userId, ...profileData },
-      update: profileData,
-    });
+// ── Executors ───────────────────────────────────────────────────────────────
 
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify({ success: true, message: "Creator profile saved successfully." }),
-        },
-      ],
-    };
+export async function executeGetCreatorProfile(input: Record<string, unknown>): Promise<string> {
+  const userId = input.userId as string;
+
+  const profile = await prisma.creatorProfile.findUnique({ where: { userId } });
+
+  if (!profile) {
+    return JSON.stringify({ found: false, message: "No creator profile found for this user." });
   }
-);
+
+  return JSON.stringify({ found: true, profile });
+}
+
+export async function executeSaveCreatorProfile(input: Record<string, unknown>): Promise<string> {
+  const { userId, ...profileData } = input as {
+    userId: string;
+    platforms: string[];
+    niche: string;
+    topics: string[];
+    audienceDescription: string;
+    audiencePainPoints?: string;
+    stage: "starting" | "growing" | "established";
+    toneOfVoice: string;
+    toneExamples: string[];
+    goals: string[];
+    rawNotes: string;
+  };
+
+  await prisma.creatorProfile.upsert({
+    where: { userId },
+    create: { userId, ...profileData },
+    update: profileData,
+  });
+
+  return JSON.stringify({ success: true, message: "Creator profile saved successfully." });
+}

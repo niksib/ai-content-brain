@@ -9,18 +9,27 @@ interface SSEIdea {
 export function useSSEStream() {
   const tokens = ref('');
   const ideas = ref<SSEIdea[]>([]);
+  const pendingIdeas = ref(0);
+  // activePendingIdeas drives skeleton visibility.
+  // Incremented synchronously on idea_pending, decremented via setTimeout
+  // so Vue always renders at least one frame with the skeleton visible.
+  const activePendingIdeas = ref(0);
   const isStreaming = ref(false);
   const error = ref<string | null>(null);
   const sdkSessionId = ref<string | null>(null);
+  const costUsd = ref<number | null>(null);
 
   let abortController: AbortController | null = null;
 
   function reset(): void {
     tokens.value = '';
     ideas.value = [];
+    pendingIdeas.value = 0;
+    activePendingIdeas.value = 0;
     isStreaming.value = false;
     error.value = null;
     sdkSessionId.value = null;
+    costUsd.value = null;
 
     if (abortController) {
       abortController.abort();
@@ -139,10 +148,21 @@ export function useSSEStream() {
         break;
       }
 
+      case 'idea_pending': {
+        pendingIdeas.value += 1;
+        activePendingIdeas.value += 1; // show skeleton immediately
+        break;
+      }
+
       case 'idea': {
         try {
           const parsed = JSON.parse(data);
           ideas.value.push(parsed);
+          // Delay decrement so skeleton is visible for at least one render frame
+          // even if idea_pending and idea arrive in the same SSE buffer chunk
+          setTimeout(() => {
+            activePendingIdeas.value = Math.max(0, activePendingIdeas.value - 1);
+          }, 600);
         } catch {
           console.warn('Failed to parse idea event:', data);
         }
@@ -158,8 +178,11 @@ export function useSSEStream() {
           if (parsed.sessionId) {
             sdkSessionId.value = parsed.sessionId;
           }
+          if (parsed.costUsd !== undefined) {
+            costUsd.value = parsed.costUsd;
+          }
         } catch {
-          // No session ID in done event
+          // No data in done event
         }
         break;
       }
@@ -183,9 +206,12 @@ export function useSSEStream() {
   return {
     tokens,
     ideas,
+    pendingIdeas,
+    activePendingIdeas,
     isStreaming,
     error,
     sdkSessionId,
+    costUsd,
     streamMessage,
     reset,
   };

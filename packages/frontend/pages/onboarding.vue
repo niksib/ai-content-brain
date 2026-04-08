@@ -1,226 +1,328 @@
 <template>
   <div class="onboarding-page">
-    <!-- Progress bar -->
-    <header class="onboarding-header">
+
+    <!-- ── Progress bar (quiz phase only) ── -->
+    <header v-if="store.phase === 'quiz'" class="onboarding-header">
       <div class="onboarding-header__inner">
-        <span class="onboarding-header__step-label">
-          <template v-if="store.phase === 'processing'">Analyzing your answers…</template>
-          <template v-else-if="store.isFollowUp">Follow-up · {{ store.questionNumber }} of {{ store.totalQuestions }}</template>
-          <template v-else>Question {{ store.questionNumber }} of {{ store.totalQuestions }}</template>
-        </span>
+        <span class="onboarding-header__label">Step {{ store.quizSection + 1 }} of 6</span>
         <div class="onboarding-progress">
-          <div class="onboarding-progress__fill" :style="progressStyle"></div>
+          <div class="onboarding-progress__fill" :style="{ width: `${((store.quizSection + 1) / 6) * 100}%` }"></div>
         </div>
       </div>
     </header>
 
     <main class="onboarding-main">
 
-      <!-- ── COLLECTING phase ── -->
-      <template v-if="store.phase === 'collecting'">
-        <div class="onboarding-question">
-          <p v-if="store.isFollowUp" class="onboarding-question__followup-label">
-            A few more details needed
+      <!-- ════════════════════════════════════
+           QUIZ PHASE — sections 0-5
+      ════════════════════════════════════ -->
+      <Transition name="slide" mode="out-in">
+        <div v-if="store.phase === 'quiz'" :key="store.quizSection" class="quiz-card">
+
+          <!-- Section 0 — Platforms -->
+          <template v-if="store.quizSection === 0">
+            <div class="quiz-card__header">
+              <p class="quiz-card__eyebrow">Platforms</p>
+              <h2 class="quiz-card__question">Which platforms are you active on or planning to post on?</h2>
+            </div>
+            <div class="quiz-options quiz-options--wrap">
+              <button
+                v-for="p in PLATFORMS"
+                :key="p"
+                class="quiz-chip"
+                :class="{ 'quiz-chip--selected': store.quiz.platforms.includes(p) }"
+                @click="toggleMulti(store.quiz.platforms, p)"
+              >{{ p }}</button>
+            </div>
+          </template>
+
+          <!-- Section 1 — Stage -->
+          <template v-else-if="store.quizSection === 1">
+            <div class="quiz-card__header">
+              <p class="quiz-card__eyebrow">Creator Stage</p>
+              <h2 class="quiz-card__question">Where are you in your creator journey?</h2>
+            </div>
+            <div class="quiz-options quiz-options--column">
+              <button
+                v-for="s in STAGES"
+                :key="s.value"
+                class="quiz-option-card"
+                :class="{ 'quiz-option-card--selected': store.quiz.stage === s.value }"
+                @click="store.quiz.stage = s.value"
+              >
+                <span class="quiz-option-card__label">{{ s.label }}</span>
+                <span class="quiz-option-card__sub">{{ s.sub }}</span>
+              </button>
+            </div>
+          </template>
+
+          <!-- Section 2 — Topics -->
+          <template v-else-if="store.quizSection === 2">
+            <div class="quiz-card__header">
+              <p class="quiz-card__eyebrow">Content Topics</p>
+              <h2 class="quiz-card__question">What do you mainly create content about? <span class="quiz-card__question-note">Pick up to 3.</span></h2>
+            </div>
+            <div class="quiz-options quiz-options--wrap">
+              <button
+                v-for="t in TOPICS"
+                :key="t"
+                class="quiz-chip"
+                :class="{
+                  'quiz-chip--selected': store.quiz.topics.includes(t),
+                  'quiz-chip--disabled': !store.quiz.topics.includes(t) && store.quiz.topics.filter(x => x !== 'other').length >= 3
+                }"
+                @click="toggleTopic(t)"
+              >{{ t }}</button>
+            </div>
+            <div v-if="store.quiz.topics.includes('other')" class="quiz-text-field quiz-text-field--sm">
+              <input
+                v-model="store.quiz.topicOther"
+                class="quiz-text-field__input"
+                type="text"
+                placeholder="Describe your niche in a few words"
+                maxlength="80"
+              />
+            </div>
+          </template>
+
+          <!-- Section 3 — Audience -->
+          <template v-else-if="store.quizSection === 3">
+            <div class="quiz-card__header">
+              <p class="quiz-card__eyebrow">Your Audience</p>
+              <h2 class="quiz-card__question">When you write a post — who are you writing it for?</h2>
+              <p class="quiz-card__subtext">Describe one specific person.</p>
+            </div>
+            <div class="quiz-text-field">
+              <textarea
+                v-model="store.quiz.audience"
+                class="quiz-text-field__textarea"
+                placeholder="e.g. A developer who wants to launch their own product but doesn't know where to start"
+                rows="3"
+              />
+            </div>
+            <p class="quiz-helper">Don't overthink this. Just picture one real person who would stop scrolling and think "this post is for me."</p>
+          </template>
+
+          <!-- Section 4 — Goal -->
+          <template v-else-if="store.quizSection === 4">
+            <div class="quiz-card__header">
+              <p class="quiz-card__eyebrow">Content Goal</p>
+              <h2 class="quiz-card__question">What is your main goal with content right now?</h2>
+            </div>
+            <div class="quiz-options quiz-options--column">
+              <button
+                v-for="g in GOALS"
+                :key="g"
+                class="quiz-option-card"
+                :class="{ 'quiz-option-card--selected': store.quiz.goal === g }"
+                @click="store.quiz.goal = g"
+              >
+                <span class="quiz-option-card__label">{{ g }}</span>
+              </button>
+            </div>
+          </template>
+
+          <!-- Section 5 — Tone of Voice -->
+          <template v-else-if="store.quizSection === 5">
+            <div class="quiz-card__header">
+              <p class="quiz-card__eyebrow">Tone of Voice</p>
+              <h2 class="quiz-card__question">How would you describe your communication style? <span class="quiz-card__question-note">Pick all that apply.</span></h2>
+            </div>
+            <div class="quiz-options quiz-options--wrap">
+              <button
+                v-for="t in TONE_STYLES"
+                :key="t"
+                class="quiz-chip"
+                :class="{ 'quiz-chip--selected': store.quiz.toneStyles.includes(t) }"
+                @click="toggleMulti(store.quiz.toneStyles, t)"
+              >{{ t }}</button>
+            </div>
+            <div class="quiz-divider"></div>
+            <div class="quiz-card__header">
+              <p class="quiz-card__eyebrow">One more thing</p>
+              <p class="quiz-card__question quiz-card__question--sm">How would you explain what you do to a stranger at a coffee shop?</p>
+            </div>
+            <div class="quiz-text-field">
+              <textarea
+                v-model="store.quiz.toneExample"
+                class="quiz-text-field__textarea"
+                placeholder="Just type naturally — this helps us write in your voice, not ours"
+                rows="3"
+              />
+            </div>
+          </template>
+
+          <!-- Error -->
+          <p v-if="store.error" class="quiz-error">{{ store.error }}</p>
+
+          <!-- Navigation -->
+          <div class="quiz-nav">
+            <button
+              class="quiz-nav__back"
+              :disabled="store.quizSection === 0"
+              @click="store.prevSection()"
+            >
+              <span class="material-symbols-outlined">arrow_back</span>
+              Back
+            </button>
+            <button
+              class="quiz-nav__continue"
+              :disabled="!store.sectionValid"
+              @click="store.nextSection()"
+            >
+              {{ store.quizSection === 5 ? 'Finish' : 'Continue' }}
+              <span class="material-symbols-outlined">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════
+             PROCESSING PHASE
+        ════════════════════════════════════ -->
+        <div v-else-if="store.phase === 'processing'" key="processing" class="processing-state">
+          <div class="onboarding-orb-wrap">
+            <div class="onboarding-orb__glow"></div>
+            <div class="onboarding-orb onboarding-orb--processing">
+              <div class="onboarding-orb__overlay"></div>
+              <div class="onboarding-orb__content">
+                <span class="material-symbols-outlined orb-icon" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">auto_awesome</span>
+                <span class="orb-hint">Building your profile</span>
+              </div>
+            </div>
+          </div>
+          <p class="processing-label">This takes a few seconds…</p>
+        </div>
+
+        <!-- ════════════════════════════════════
+             FOLLOW-UP PHASE
+        ════════════════════════════════════ -->
+        <div v-else-if="store.phase === 'followup'" key="followup" class="quiz-card">
+          <div class="quiz-card__header">
+            <p class="quiz-card__eyebrow">A couple more things</p>
+            <h2 class="quiz-card__question quiz-card__question--sm">{{ store.currentFollowUpQuestion }}</h2>
+          </div>
+          <div class="quiz-text-field">
+            <textarea
+              v-model="followUpInput"
+              class="quiz-text-field__textarea"
+              placeholder="Type your answer…"
+              rows="4"
+              @keydown.enter.meta.exact.prevent="submitFollowUp"
+              @keydown.enter.ctrl.exact.prevent="submitFollowUp"
+            />
+          </div>
+          <p v-if="store.followUpQuestions.length > 1" class="quiz-helper">
+            Question {{ store.followUpIndex + 1 }} of {{ store.followUpQuestions.length }}
           </p>
-          <h1 class="onboarding-question__text">{{ store.currentQuestion }}</h1>
-        </div>
-
-        <!-- Orb (voice mode) -->
-        <div v-if="inputMode === 'voice'" class="onboarding-orb-wrap">
-          <div class="onboarding-orb__glow"></div>
-          <button
-            class="onboarding-orb"
-            :class="`onboarding-orb--${orbState}`"
-            :disabled="isTranscribing"
-            @click="toggleRecording"
-          >
-            <div class="onboarding-orb__overlay"></div>
-            <div class="onboarding-orb__content">
-              <template v-if="isTranscribing">
-                <span class="material-symbols-outlined orb-icon" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">hourglass_top</span>
-                <span class="orb-hint">Transcribing…</span>
-              </template>
-              <template v-else-if="isRecording">
-                <span class="material-symbols-outlined orb-icon" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">stop_circle</span>
-                <span class="orb-timer">{{ recordingTime }}</span>
-                <span class="orb-hint">Tap to stop</span>
-              </template>
-              <template v-else>
-                <span class="material-symbols-outlined orb-icon" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">mic</span>
-                <span class="orb-hint">Tap to record</span>
-              </template>
-            </div>
-          </button>
-        </div>
-
-        <!-- Error -->
-        <p v-if="store.error" class="onboarding-error">{{ store.error }}</p>
-
-        <!-- Mode toggle -->
-        <div class="onboarding-mode-toggle">
-          <div class="onboarding-mode-toggle__track">
+          <div class="quiz-nav quiz-nav--right">
             <button
-              class="onboarding-mode-toggle__btn"
-              :class="{ 'onboarding-mode-toggle__btn--active': inputMode === 'voice' }"
-              @click="switchToVoice"
+              class="quiz-nav__continue"
+              :disabled="!followUpInput.trim()"
+              @click="submitFollowUp"
             >
-              <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">settings_voice</span>
-              Voice
-            </button>
-            <button
-              class="onboarding-mode-toggle__btn"
-              :class="{ 'onboarding-mode-toggle__btn--active': inputMode === 'text' }"
-              @click="inputMode = 'text'"
-            >
-              Text
+              {{ store.isLastFollowUp ? 'Submit' : 'Next' }}
+              <span class="material-symbols-outlined">arrow_forward</span>
             </button>
           </div>
         </div>
-
-        <!-- Text input -->
-        <div v-if="inputMode === 'text'" class="onboarding-input">
-          <VoiceRecorder :disabled="isTranscribing" @submit="handleTextSubmit" />
-        </div>
-      </template>
-
-      <!-- ── PROCESSING phase ── -->
-      <template v-else-if="store.phase === 'processing'">
-        <div class="onboarding-question">
-          <h1 class="onboarding-question__text">Building your profile…</h1>
-          <p class="onboarding-question__hint">This takes a few seconds.</p>
-        </div>
-
-        <div class="onboarding-orb-wrap">
-          <div class="onboarding-orb__glow"></div>
-          <div class="onboarding-orb onboarding-orb--processing">
-            <div class="onboarding-orb__overlay"></div>
-            <div class="onboarding-orb__content">
-              <span class="material-symbols-outlined orb-icon" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">auto_awesome</span>
-              <span class="orb-hint">Analyzing</span>
-            </div>
-          </div>
-        </div>
-      </template>
-
+      </Transition>
     </main>
 
-    <!-- Bottom nav (only in collecting phase) -->
-    <nav v-if="store.phase === 'collecting'" class="onboarding-bottom-nav">
-      <div class="onboarding-bottom-nav__inner">
-        <button class="onboarding-bottom-nav__prev" @click="handlePrev" :disabled="store.currentIndex === 0 && !store.isFollowUp">
-          <span class="material-symbols-outlined">arrow_back</span>
-          Previous
-        </button>
-        <button class="onboarding-bottom-nav__next" @click="handleSkip" :disabled="isTranscribing">
-          Skip
-          <span class="material-symbols-outlined">arrow_forward</span>
-        </button>
-      </div>
-    </nav>
-
-    <div class="onboarding-bg onboarding-bg--top-right"></div>
-    <div class="onboarding-bg onboarding-bg--bottom-left"></div>
+    <div class="onboarding-bg onboarding-bg--tr"></div>
+    <div class="onboarding-bg onboarding-bg--bl"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { useOnboardingStore } from '~/stores/onboarding';
-import { useVoiceService } from '~/services/voice';
-import { useVoiceRecorder } from '~/composables/useVoiceRecorder';
-import VoiceRecorder from '~/components/VoiceRecorder.vue';
 
 definePageMeta({ layout: false });
 
 const store = useOnboardingStore();
-const { transcribeAudio } = useVoiceService();
 const router = useRouter();
-const inputMode = ref<'voice' | 'text'>('voice');
-const isTranscribing = ref(false);
+const followUpInput = ref('');
 
-const { isRecording, audioBlob, duration, startRecording, stopRecording } = useVoiceRecorder();
+// ── Static data ──────────────────────────────────────────
+const PLATFORMS = ['Threads', 'Instagram', 'TikTok', 'LinkedIn', 'YouTube / Shorts', 'X (Twitter)'];
 
-const recordingTime = computed(() => {
-  const m = Math.floor(duration.value / 60).toString().padStart(2, '0');
-  const s = (duration.value % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-});
+const STAGES = [
+  { value: 'Just starting (0–1K followers)', label: 'Just starting out', sub: '0–1K followers' },
+  { value: 'Growing (1K–50K followers)',     label: 'Growing',           sub: '1K–50K followers' },
+  { value: 'Established (50K+ followers)',   label: 'Established',       sub: '50K+ followers' },
+];
 
-const orbState = computed(() => {
-  if (isTranscribing.value) return 'processing';
-  if (isRecording.value) return 'listening';
-  return 'idle';
-});
+const TOPICS = [
+  'Tech / Software / AI',
+  'Business / Entrepreneurship',
+  'Personal Finance',
+  'Health & Fitness',
+  'Lifestyle / Personal Brand',
+  'Education / Coaching',
+  'Marketing / Social Media',
+  'Creative (design, art, music)',
+  'Other',
+];
 
-const progressStyle = computed(() => {
-  if (store.phase === 'processing') return { width: '100%' };
-  const pct = (store.questionNumber / store.totalQuestions) * 100;
-  return { width: `${pct}%` };
-});
+const GOALS = [
+  'Build an audience and grow followers',
+  'Get clients or customers',
+  'Build authority in my niche',
+  'Document my journey / share my story',
+  'All of the above',
+];
 
-async function toggleRecording() {
-  if (isRecording.value) {
-    stopRecording();
+const TONE_STYLES = [
+  'Casual and conversational',
+  'Direct and no-nonsense',
+  'Educational and informative',
+  'Inspirational and motivating',
+  'Humorous and entertaining',
+  'Vulnerable and personal',
+  'Professional and formal',
+];
+
+// ── Helpers ──────────────────────────────────────────────
+function toggleMulti(arr: string[], value: string) {
+  const idx = arr.indexOf(value);
+  if (idx === -1) arr.push(value);
+  else arr.splice(idx, 1);
+}
+
+function toggleTopic(topic: string) {
+  const normalTopics = store.quiz.topics.filter((t) => t !== 'other');
+  const isSelected = store.quiz.topics.includes(topic);
+
+  if (isSelected) {
+    toggleMulti(store.quiz.topics, topic);
   } else {
-    await startRecording();
+    // Max 3 non-"other" topics
+    if (topic !== 'Other' && normalTopics.length >= 3) return;
+    toggleMulti(store.quiz.topics, topic === 'Other' ? 'other' : topic);
   }
 }
 
-function switchToVoice() {
-  if (isRecording.value) stopRecording();
-  inputMode.value = 'voice';
+async function submitFollowUp() {
+  const answer = followUpInput.value.trim();
+  if (!answer) return;
+  followUpInput.value = '';
+  await store.submitFollowUpAnswer(answer);
 }
-
-watch(audioBlob, async (blob) => {
-  if (!blob) return;
-  isTranscribing.value = true;
-  try {
-    const transcript = await transcribeAudio(blob);
-    if (transcript.trim()) {
-      store.submitAnswer(transcript.trim());
-    }
-  } catch (err) {
-    console.error('Transcription failed:', err);
-  } finally {
-    isTranscribing.value = false;
-  }
-});
 
 watch(() => store.phase, (phase) => {
-  if (phase === 'complete') {
-    router.push('/dashboard');
-  }
+  if (phase === 'complete') router.push('/dashboard');
 });
-
-function handleTextSubmit(text: string) {
-  store.submitAnswer(text);
-}
-
-function handlePrev() {
-  // no-op — going back would complicate the accumulated answers model
-}
-
-function handleSkip() {
-  store.submitAnswer('(skipped)');
-}
 
 onMounted(async () => {
   try {
     const status = await store.checkStatus();
-    if (status.completed) {
-      router.push('/dashboard');
-    }
-  } catch (err) {
-    console.error('Status check failed:', err);
-  }
-});
-
-onUnmounted(() => {
-  if (isRecording.value) stopRecording();
+    if (status.completed) router.push('/dashboard');
+  } catch {}
 });
 </script>
 
 <style scoped>
+/* ─── Page ─── */
 .onboarding-page {
   position: relative;
   min-height: 100vh;
@@ -229,7 +331,6 @@ onUnmounted(() => {
   align-items: center;
   overflow-x: hidden;
   background: radial-gradient(circle at top right, #e2dfff 0%, #f7f9fb 40%, #ffffff 100%);
-  color: #191c1e;
   font-family: 'Inter', sans-serif;
 }
 
@@ -237,23 +338,24 @@ onUnmounted(() => {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
+  z-index: 0;
 }
-.onboarding-bg--top-right {
+.onboarding-bg--tr {
   top: -10%; right: -10%;
   width: 40%; padding-top: 40%;
-  background: radial-gradient(circle, rgba(53, 37, 205, 0.05) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(53,37,205,0.05) 0%, transparent 70%);
 }
-.onboarding-bg--bottom-left {
+.onboarding-bg--bl {
   bottom: -10%; left: -10%;
   width: 50%; padding-top: 50%;
-  background: radial-gradient(circle, rgba(79, 70, 229, 0.07) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(79,70,229,0.07) 0%, transparent 70%);
 }
 
 /* ─── Header ─── */
 .onboarding-header {
   position: fixed;
   top: 0; left: 0; right: 0;
-  height: 72px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -261,20 +363,20 @@ onUnmounted(() => {
 }
 .onboarding-header__inner {
   width: 100%;
-  max-width: 480px;
+  max-width: 560px;
   padding: 0 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.5rem;
 }
-.onboarding-header__step-label {
+.onboarding-header__label {
   font-size: 0.6875rem;
   font-weight: 700;
   font-family: 'Manrope', sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: rgba(53, 37, 205, 0.6);
+  color: rgba(53,37,205,0.6);
 }
 .onboarding-progress {
   width: 100%;
@@ -287,54 +389,255 @@ onUnmounted(() => {
   height: 100%;
   background: #3525cd;
   border-radius: 9999px;
-  transition: width 0.5s ease;
-  box-shadow: 0 0 8px rgba(79, 70, 229, 0.4);
+  transition: width 0.4s ease;
+  box-shadow: 0 0 8px rgba(79,70,229,0.4);
 }
 
 /* ─── Main ─── */
 .onboarding-main {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6rem 1.5rem 8rem;
-  max-width: 680px;
+  padding: 5rem 1.25rem 3rem;
   width: 100%;
-  gap: 2.5rem;
   position: relative;
-  z-index: 10;
+  z-index: 1;
 }
 
-/* ─── Question ─── */
-.onboarding-question {
-  text-align: center;
+/* ─── Quiz card ─── */
+.quiz-card {
+  width: 100%;
+  max-width: 560px;
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 28px;
+  padding: 2.25rem 2rem 2rem;
+  box-shadow: 0 20px 60px rgba(53,37,205,0.07), 0 4px 16px rgba(25,28,30,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
-.onboarding-question__followup-label {
-  font-size: 0.75rem;
+
+.quiz-card__header { display: flex; flex-direction: column; gap: 0.5rem; }
+.quiz-card__eyebrow {
+  font-size: 0.6875rem;
   font-weight: 700;
   font-family: 'Manrope', sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #4f46e5;
-  margin: 0 0 0.75rem;
+  color: rgba(53,37,205,0.6);
+  margin: 0;
 }
-.onboarding-question__text {
+.quiz-card__question {
   font-family: 'Manrope', sans-serif;
-  font-size: clamp(1.625rem, 4vw, 2.75rem);
+  font-size: 1.375rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.25;
+  letter-spacing: -0.02em;
   color: #191c1e;
-  margin: 0 0 0.875rem;
+  margin: 0;
+  line-height: 1.3;
 }
-.onboarding-question__hint {
-  font-size: 0.9375rem;
-  color: rgba(70, 69, 85, 0.65);
+.quiz-card__question--sm { font-size: 1.125rem; }
+.quiz-card__question-note {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #777587;
+}
+.quiz-card__subtext {
+  font-size: 0.875rem;
+  color: #464555;
   margin: 0;
 }
 
-/* ─── Orb ─── */
+/* ─── Options ─── */
+.quiz-options { display: flex; gap: 0.5rem; }
+.quiz-options--wrap { flex-wrap: wrap; }
+.quiz-options--column { flex-direction: column; }
+
+/* Chip (multi-select pill) */
+.quiz-chip {
+  padding: 0.5rem 1.125rem;
+  border-radius: 9999px;
+  border: 1.5px solid #e0e2e5;
+  background: #f4f6f8;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #464555;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.quiz-chip:hover:not(:disabled):not(.quiz-chip--disabled) {
+  border-color: #3525cd;
+  color: #3525cd;
+  background: rgba(53,37,205,0.05);
+}
+.quiz-chip--selected {
+  background: #3525cd;
+  border-color: #3525cd;
+  color: #fff;
+}
+.quiz-chip--disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+/* Option card (single-select) */
+.quiz-option-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.875rem 1.125rem;
+  border-radius: 14px;
+  border: 1.5px solid #e0e2e5;
+  background: #f4f6f8;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+.quiz-option-card:hover:not(:disabled) {
+  border-color: #3525cd;
+  background: rgba(53,37,205,0.04);
+}
+.quiz-option-card--selected {
+  border-color: #3525cd;
+  background: rgba(53,37,205,0.07);
+}
+.quiz-option-card__label {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #191c1e;
+}
+.quiz-option-card--selected .quiz-option-card__label { color: #3525cd; }
+.quiz-option-card__sub {
+  font-size: 0.8125rem;
+  color: #777587;
+}
+
+/* ─── Text field ─── */
+.quiz-text-field {}
+.quiz-text-field--sm {}
+.quiz-text-field__input,
+.quiz-text-field__textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: #f4f6f8;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9375rem;
+  color: #191c1e;
+  outline: none;
+  resize: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  line-height: 1.6;
+}
+.quiz-text-field__input:focus,
+.quiz-text-field__textarea:focus {
+  background: #fff;
+  border-color: #3525cd;
+  box-shadow: 0 0 0 3px rgba(53,37,205,0.1);
+}
+.quiz-text-field__input::placeholder,
+.quiz-text-field__textarea::placeholder { color: #a09faf; }
+
+/* ─── Helper text ─── */
+.quiz-helper {
+  font-size: 0.8125rem;
+  color: #777587;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ─── Divider ─── */
+.quiz-divider {
+  height: 1px;
+  background: rgba(199,196,216,0.3);
+}
+
+/* ─── Error ─── */
+.quiz-error {
+  font-size: 0.8125rem;
+  color: #ba1a1a;
+  background: rgba(186,26,26,0.06);
+  border-radius: 8px;
+  padding: 0.625rem 0.875rem;
+  margin: 0;
+}
+
+/* ─── Navigation ─── */
+.quiz-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+.quiz-nav--right { justify-content: flex-end; }
+
+.quiz-nav__back {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #777587;
+  transition: color 0.15s;
+}
+.quiz-nav__back:hover:not(:disabled) { color: #3525cd; }
+.quiz-nav__back:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.quiz-nav__continue {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  background: linear-gradient(135deg, #3525cd, #4f46e5);
+  color: #fff;
+  border: none;
+  border-radius: 9999px;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(53,37,205,0.25);
+  transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.quiz-nav__continue:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(53,37,205,0.32);
+}
+.quiz-nav__continue:active:not(:disabled) { transform: translateY(0); }
+.quiz-nav__continue:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+/* ─── Processing orb ─── */
+.processing-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+.processing-label {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #777587;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
 .onboarding-orb-wrap {
   position: relative;
   display: flex;
@@ -344,46 +647,33 @@ onUnmounted(() => {
 .onboarding-orb__glow {
   position: absolute;
   inset: 0;
-  background: rgba(53, 37, 205, 0.1);
+  background: rgba(53,37,205,0.1);
   border-radius: 50%;
   filter: blur(60px);
   transform: scale(1.5);
-  animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulse-slow 4s cubic-bezier(0.4,0,0.6,1) infinite;
   pointer-events: none;
 }
 .onboarding-orb {
   position: relative;
-  width: 220px;
-  height: 220px;
+  width: 200px;
+  height: 200px;
   border-radius: 50%;
   overflow: hidden;
-  border: 4px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+  border: 4px solid rgba(255,255,255,0.5);
+  box-shadow: 0 25px 50px rgba(0,0,0,0.15);
   background: linear-gradient(-45deg, #4f46e5, #8b5cf6, #c084fc, #e0e7ff);
   background-size: 400% 400%;
-  animation: fluid-shift 10s ease infinite;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  padding: 0;
 }
-.onboarding-orb:hover:not(:disabled) {
-  transform: scale(1.04);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
-}
-.onboarding-orb:active:not(:disabled) { transform: scale(0.97); }
-.onboarding-orb:disabled { cursor: default; }
-.onboarding-orb--listening { animation: fluid-shift 3s ease infinite, orb-pulse 1s ease infinite; }
 .onboarding-orb--processing { animation: fluid-shift 5s ease infinite; opacity: 0.9; }
-
 .onboarding-orb__overlay {
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255,255,255,0.05);
   mix-blend-mode: overlay;
-  backdrop-filter: blur(2px);
   pointer-events: none;
 }
 .onboarding-orb__content {
@@ -399,23 +689,20 @@ onUnmounted(() => {
   color: #fff;
   filter: drop-shadow(0 2px 8px rgba(0,0,0,0.2));
 }
-.orb-timer {
-  font-family: 'Manrope', sans-serif;
-  font-size: 1.625rem;
-  font-weight: 300;
-  letter-spacing: 0.12em;
-  color: #fff;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
 .orb-hint {
   font-family: 'Manrope', sans-serif;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255,255,255,0.8);
 }
+
+/* ─── Transitions ─── */
+.slide-enter-active,
+.slide-leave-active { transition: all 0.25s ease; }
+.slide-enter-from { opacity: 0; transform: translateX(24px); }
+.slide-leave-to   { opacity: 0; transform: translateX(-24px); }
 
 @keyframes fluid-shift {
   0%   { background-position: 0% 50%; }
@@ -426,117 +713,4 @@ onUnmounted(() => {
   0%, 100% { opacity: 0.6; transform: scale(1.5); }
   50%       { opacity: 1;   transform: scale(1.7); }
 }
-@keyframes orb-pulse {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.03); }
-}
-
-/* ─── Error ─── */
-.onboarding-error {
-  color: #ba1a1a;
-  font-size: 0.875rem;
-  text-align: center;
-  padding: 0.625rem 1rem;
-  background: rgba(186, 26, 26, 0.06);
-  border-radius: 8px;
-  width: 100%;
-  max-width: 480px;
-}
-
-/* ─── Mode toggle ─── */
-.onboarding-mode-toggle { display: flex; justify-content: center; }
-.onboarding-mode-toggle__track {
-  display: flex;
-  padding: 5px;
-  background: #e6e8ea;
-  border-radius: 9999px;
-  gap: 4px;
-}
-.onboarding-mode-toggle__btn {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 1.75rem;
-  border-radius: 9999px;
-  border: none;
-  cursor: pointer;
-  font-family: 'Manrope', sans-serif;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #464555;
-  background: transparent;
-  transition: all 0.2s;
-}
-.onboarding-mode-toggle__btn--active {
-  background: #3525cd;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(53, 37, 205, 0.25);
-}
-
-/* ─── Text input ─── */
-.onboarding-input { width: 100%; max-width: 520px; }
-
-/* ─── Cursor blink ─── */
-.cursor-blink { animation: blink 1s step-end infinite; color: #3525cd; }
-@keyframes blink { 50% { opacity: 0; } }
-
-/* ─── Bottom nav ─── */
-.onboarding-bottom-nav {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  z-index: 50;
-  display: flex;
-  justify-content: center;
-  padding: 0 3rem 2.5rem;
-  background: linear-gradient(to top, rgba(247, 249, 251, 0.9) 0%, transparent 100%);
-  pointer-events: none;
-  height: 120px;
-  align-items: flex-end;
-}
-.onboarding-bottom-nav__inner {
-  width: 100%;
-  max-width: 960px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  pointer-events: auto;
-}
-.onboarding-bottom-nav__prev {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.625rem 1.25rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-family: 'Manrope', sans-serif;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: #464555;
-  transition: color 0.15s;
-}
-.onboarding-bottom-nav__prev:hover:not(:disabled) { color: #3525cd; }
-.onboarding-bottom-nav__prev:disabled { opacity: 0.3; cursor: not-allowed; }
-
-.onboarding-bottom-nav__next {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.625rem 1.75rem;
-  background: #e6e8ea;
-  border: none;
-  border-radius: 9999px;
-  cursor: pointer;
-  font-family: 'Manrope', sans-serif;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: #464555;
-  transition: all 0.2s;
-}
-.onboarding-bottom-nav__next:hover:not(:disabled) { background: #3525cd; color: #fff; }
-.onboarding-bottom-nav__next:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>

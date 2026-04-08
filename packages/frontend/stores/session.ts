@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { useApiClient } from '~/services/api';
 import { useSSEStream } from '~/composables/useSSEStream';
 
@@ -17,6 +17,7 @@ export interface SessionMessage {
   sessionId: string;
   role: 'user' | 'assistant';
   content: string;
+  costUsd?: number | null;
   createdAt: string;
 }
 
@@ -142,6 +143,30 @@ export const useSessionStore = defineStore('session', () => {
     currentStreamText.value = '';
     isStreaming.value = true;
 
+    // Watch for incoming idea SSE events and push them to the panel in real-time
+    const stopIdeaWatcher = watch(
+      sseStream.ideas,
+      (incomingIdeas) => {
+        const existingIds = new Set(ideas.value.map((idea) => idea.id));
+        for (const raw of incomingIdeas) {
+          if (!existingIds.has(raw.id as string)) {
+            ideas.value.push({
+              id: raw.id as string,
+              sessionId: session.value!.id,
+              platform: raw.platform as string,
+              format: raw.format as string,
+              angle: raw.angle as string,
+              description: raw.description as string | undefined,
+              status: (raw.status as SessionIdea['status']) ?? 'proposed',
+              createdAt: raw.createdAt as string ?? new Date().toISOString(),
+              updatedAt: raw.updatedAt as string ?? new Date().toISOString(),
+            });
+          }
+        }
+      },
+      { deep: true },
+    );
+
     try {
       const body: Record<string, unknown> = { content: text };
       if (session.value.sdkSessionId) {
@@ -161,28 +186,15 @@ export const useSessionStore = defineStore('session', () => {
           sessionId: session.value.id,
           role: 'assistant',
           content: assistantContent,
+          costUsd: sseStream.costUsd.value,
           createdAt: new Date().toISOString(),
         };
         messages.value.push(assistantMessage);
       }
 
-      // Capture any new ideas from the stream
-      if (sseStream.ideas.value.length > 0) {
-        for (const rawIdea of sseStream.ideas.value) {
-          const idea: SessionIdea = {
-            id: (rawIdea as Record<string, unknown>).id as string ?? `idea-${Date.now()}`,
-            sessionId: session.value.id,
-            platform: (rawIdea as Record<string, unknown>).platform as string ?? '',
-            format: (rawIdea as Record<string, unknown>).format as string ?? '',
-            angle: (rawIdea as Record<string, unknown>).angle as string ?? (rawIdea as Record<string, unknown>).text as string ?? '',
-            description: (rawIdea as Record<string, unknown>).description as string | undefined,
-            status: ((rawIdea as Record<string, unknown>).status as SessionIdea['status']) ?? 'proposed',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          ideas.value.push(idea);
-        }
-      }
+      // Reload ideas from backend — the agent saves them via MCP tools,
+      // no idea SSE events are emitted, so we must fetch after stream ends.
+      await loadIdeas();
 
       // Update SDK session ID if returned
       if (sseStream.sdkSessionId.value && session.value) {
@@ -197,7 +209,7 @@ export const useSessionStore = defineStore('session', () => {
       console.error('Failed to send message:', error);
       throw error;
     } finally {
-      // Reset streaming state
+      stopIdeaWatcher();
       currentStreamText.value = '';
       isStreaming.value = false;
     }
@@ -239,6 +251,12 @@ export const useSessionStore = defineStore('session', () => {
     return response.idea;
   }
 
+  async function deleteSession(): Promise<void> {
+    if (!session.value) return;
+    await apiClient.del(`/api/sessions/${session.value.id}`);
+    resetSession();
+  }
+
   function resetSession(): void {
     session.value = null;
     messages.value = [];
@@ -260,6 +278,7 @@ export const useSessionStore = defineStore('session', () => {
     selectedIdeaId,
     streamTokens: sseStream.tokens,
     streamError: sseStream.error,
+    pendingIdeasCount: sseStream.activePendingIdeas,
     createOrLoadSession,
     loadMessages,
     loadIdeas,
@@ -267,6 +286,7 @@ export const useSessionStore = defineStore('session', () => {
     approveIdea,
     rejectIdea,
     loadIdea,
+    deleteSession,
     resetSession,
   };
 });

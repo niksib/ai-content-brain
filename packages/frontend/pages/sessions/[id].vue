@@ -11,70 +11,17 @@
         <div class="recording-bg recording-bg--br"></div>
 
         <div class="recording-container">
-          <!-- Heading -->
           <h1 class="recording-title">What did you do today?</h1>
 
-          <!-- Orb -->
-          <div class="recording-orb-wrap">
-            <div class="recording-orb__glow"></div>
-            <div class="recording-orb" :class="`recording-orb--${orbState}`">
-              <div class="recording-orb__overlay"></div>
-              <div class="recording-orb__center">
-                <span
-                  class="material-symbols-outlined"
-                  style="font-size:40px;color:#fff;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;"
-                >mic</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Timer when recording -->
-          <div v-if="isUserRecording" class="recording-timer">
-            <div class="recording-timer__time">{{ recordingTime }}</div>
-            <div class="recording-timer__label">LISTENING TO YOUR THOUGHTS...</div>
-          </div>
-
-          <!-- Mode toggle -->
-          <div class="recording-mode-toggle">
-            <div class="recording-mode-toggle__track">
-              <button
-                class="recording-mode-toggle__btn"
-                :class="{ 'recording-mode-toggle__btn--active': inputMode === 'voice' }"
-                @click="inputMode = 'voice'"
-              >
-                <span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">settings_voice</span>
-                Voice
-              </button>
-              <button
-                class="recording-mode-toggle__btn"
-                :class="{ 'recording-mode-toggle__btn--active': inputMode === 'text' }"
-                @click="inputMode = 'text'"
-              >
-                Text
-              </button>
-            </div>
-          </div>
-
-          <!-- Error -->
           <p v-if="store.streamError" class="session-error">{{ store.streamError }}</p>
 
-          <!-- Voice recorder -->
-          <div class="recording-input">
-            <VoiceRecorder
-              :disabled="store.isStreaming"
-              @submit="handleSubmit"
-              @audio-ready="handleAudioReady"
-              @recording="handleRecordingChange"
-            />
-          </div>
-
-          <!-- Stop button (shown when recording) -->
-          <div v-if="isUserRecording" class="recording-stop-wrap">
-            <button class="recording-stop-btn">
-              <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">stop_circle</span>
-              Stop Recording
-            </button>
-          </div>
+          <OrbRecorder
+            :disabled="store.isStreaming"
+            :external-state="store.isStreaming ? 'processing' : 'idle'"
+            @transcribed="handleSubmit"
+            @submit="handleSubmit"
+            @recording="isUserRecording = $event"
+          />
         </div>
       </div>
 
@@ -102,9 +49,10 @@
                 </div>
                 <div class="transcript-msg__body">
                   <span class="transcript-msg__label transcript-msg__label--user">You</span>
-                  <div class="transcript-msg__bubble transcript-msg__bubble--user">
-                    {{ msg.content }}
-                  </div>
+                  <div
+                    class="transcript-msg__bubble transcript-msg__bubble--user"
+                    v-html="renderMarkdown(msg.content)"
+                  ></div>
                 </div>
               </div>
 
@@ -115,14 +63,34 @@
                 </div>
                 <div class="transcript-msg__body">
                   <span class="transcript-msg__label transcript-msg__label--ai">AI Curator</span>
-                  <div class="transcript-msg__bubble transcript-msg__bubble--ai">
-                    {{ msg.content }}
-                  </div>
+                  <div
+                    class="transcript-msg__bubble transcript-msg__bubble--ai"
+                    v-html="renderMarkdown(msg.content)"
+                  ></div>
+                  <span v-if="profileStore.isAdmin && msg.costUsd != null" class="msg-cost">
+                    ${{ msg.costUsd.toFixed(2) }}
+                  </span>
                 </div>
               </div>
             </template>
 
-            <!-- Streaming in progress -->
+            <!-- Thinking indicator (streaming but no tokens yet) -->
+            <div v-if="store.isStreaming && !store.streamTokens" class="transcript-msg transcript-msg--ai">
+              <div class="transcript-msg__avatar transcript-msg__avatar--ai">
+                <span class="material-symbols-outlined" style="font-size:14px;">smart_toy</span>
+              </div>
+              <div class="transcript-msg__body">
+                <span class="transcript-msg__label transcript-msg__label--ai">AI Curator</span>
+                <div class="transcript-msg__bubble transcript-msg__bubble--ai thinking-bubble">
+                  <span class="thinking-dots">
+                    <span></span><span></span><span></span>
+                  </span>
+                  <span class="thinking-phrase">{{ thinkingPhrase }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Streaming tokens in progress -->
             <div v-if="store.isStreaming && store.streamTokens" class="transcript-msg transcript-msg--ai">
               <div class="transcript-msg__avatar transcript-msg__avatar--ai">
                 <span class="material-symbols-outlined" style="font-size:14px;">smart_toy</span>
@@ -130,7 +98,8 @@
               <div class="transcript-msg__body">
                 <span class="transcript-msg__label transcript-msg__label--ai">AI Curator</span>
                 <div class="transcript-msg__bubble transcript-msg__bubble--ai">
-                  {{ store.streamTokens }}<span class="cursor-blink">|</span>
+                  <!-- eslint-disable-next-line vue/no-v-html -->
+                  <span v-html="renderMarkdown(store.streamTokens ?? '')"></span><span class="cursor-blink">|</span>
                 </div>
               </div>
             </div>
@@ -163,13 +132,40 @@
           <div class="workspace-panel__header">
             <h3 class="workspace-panel__title">
               <span class="material-symbols-outlined" style="font-size:20px;color:#3525cd;">lightbulb</span>
-              Generated Idea Cards
+              Idea Cards
             </h3>
-            <span v-if="store.streamError" class="session-error session-error--inline">{{ store.streamError }}</span>
+            <div class="workspace-panel__actions">
+              <span v-if="store.streamError" class="session-error session-error--inline">{{ store.streamError }}</span>
+              <button
+                v-if="profileStore.isAdmin"
+                class="reset-btn"
+                title="Reset session"
+                :disabled="store.isStreaming"
+                @click="handleResetSession"
+              >
+                <span class="material-symbols-outlined" style="font-size:16px;">delete_sweep</span>
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty state — nothing generated yet -->
+          <div v-if="store.ideas.length === 0 && skeletonCount === 0" class="workspace-empty">
+            <div class="workspace-empty__icon">
+              <span class="material-symbols-outlined">auto_awesome</span>
+            </div>
+            <h4 class="workspace-empty__title">Ideas will appear here</h4>
+            <p class="workspace-empty__hint">
+              Share what you've been up to — the AI will extract content ideas and populate this panel in real time.
+            </p>
+            <div class="workspace-empty__dots">
+              <span></span><span></span><span></span>
+            </div>
           </div>
 
           <!-- Idea grid -->
-          <div class="ideas-grid">
+          <div v-else class="ideas-grid">
+            <!-- Real idea cards -->
             <article
               v-for="idea in store.ideas"
               :key="idea.id"
@@ -181,13 +177,15 @@
               }"
             >
               <div class="idea-card__top">
-                <span class="idea-card__category-badge">
-                  {{ idea.format || idea.platform || 'IDEA' }}
-                </span>
+                <div class="idea-card__meta">
+                  <PlatformIcon :platform="(idea.platform as any)" />
+                  <span class="idea-card__platform-name">{{ platformLabel(idea.platform) }}</span>
+                  <span class="idea-card__format-badge">{{ formatLabel(idea.format) }}</span>
+                </div>
                 <span class="material-symbols-outlined idea-card__open-icon">open_in_new</span>
               </div>
               <h4 class="idea-card__title">{{ idea.angle }}</h4>
-              <p class="idea-card__body">{{ idea.description || `${idea.platform} · ${idea.format}` }}</p>
+              <p class="idea-card__body">{{ idea.description }}</p>
 
               <div class="idea-card__actions">
                 <button
@@ -203,126 +201,115 @@
               </div>
             </article>
 
-            <!-- Loading placeholder -->
-            <div v-if="store.isStreaming || store.ideas.length === 0" class="idea-card idea-card--loading">
-              <div class="idea-card-loading__icon">
-                <span class="material-symbols-outlined" style="color:#464555;">auto_fix_high</span>
+            <!-- Skeleton cards — pendingIdeas is high-water mark, skeletons = pending - arrived -->
+            <div
+              v-for="n in skeletonCount"
+              :key="`skeleton-${n}`"
+              class="idea-card idea-card--skeleton"
+            >
+              <div class="idea-card__top">
+                <div class="idea-card__meta">
+                  <span class="skeleton-block skeleton-block--icon"></span>
+                  <span class="skeleton-block skeleton-block--badge"></span>
+                </div>
               </div>
-              <h4 class="idea-card-loading__title">
-                {{ store.isStreaming ? 'Generating ideas...' : 'No ideas yet' }}
-              </h4>
-              <p class="idea-card-loading__hint">
-                {{ store.isStreaming ? 'The AI is analyzing your session' : 'Continue the conversation to generate ideas' }}
-              </p>
+              <span class="skeleton-block skeleton-block--title"></span>
+              <span class="skeleton-block skeleton-block--body"></span>
+              <span class="skeleton-block skeleton-block--body skeleton-block--body-short"></span>
+              <div class="idea-card__actions">
+                <span class="skeleton-block skeleton-block--btn"></span>
+                <span class="skeleton-block skeleton-block--btn"></span>
+              </div>
             </div>
           </div>
 
-          <!-- Session synthesis summary -->
-          <div v-if="store.ideas.length > 0" class="session-synthesis">
-            <div class="session-synthesis__glow"></div>
-            <div class="session-synthesis__content">
-              <h3 class="session-synthesis__title">Session Synthesis</h3>
-              <p class="session-synthesis__text">
-                Your session has been synthesized into actionable idea cards. Review and curate them to build your content strategy.
-              </p>
-              <div class="session-synthesis__tags">
-                <span
-                  v-for="tag in synthesisTags"
-                  :key="tag"
-                  class="session-synthesis__tag"
-                >{{ tag }}</span>
-              </div>
-            </div>
-          </div>
         </section>
       </div>
 
     </Transition>
 
-    <!-- Floating status bar (shown in chat state) -->
-    <div v-if="store.pageState !== 'recording'" class="status-bar">
-      <div class="status-bar__left">
-        <span class="status-bar__dot" :class="store.isStreaming ? 'status-bar__dot--active' : 'status-bar__dot--done'"></span>
-        <span class="status-bar__label">{{ store.isStreaming ? 'PROCESSING' : 'SYNTHESIZED' }}</span>
-      </div>
-      <div class="status-bar__divider"></div>
-      <div class="status-bar__actions">
-        <button class="status-bar__action-btn">
-          <span class="material-symbols-outlined" style="font-size:18px;">download</span>
-          Export
-        </button>
-        <button class="status-bar__action-btn">
-          <span class="material-symbols-outlined" style="font-size:18px;">share</span>
-          Share
-        </button>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import { useSessionStore } from '~/stores/session';
-import { useVoiceService } from '~/services/voice';
-import VoiceRecorder from '~/components/VoiceRecorder.vue';
+import { useProfileStore } from '~/stores/profile';
+import OrbRecorder from '~/components/OrbRecorder.vue';
+import { useMarkdown } from '~/composables/useMarkdown';
 
 definePageMeta({
   layout: 'default',
 });
 
 const route = useRoute();
+const router = useRouter();
 const store = useSessionStore();
-const { transcribeAudio } = useVoiceService();
-const isUserRecording = ref(false);
-const inputMode = ref<'voice' | 'text'>('voice');
-const chatInputText = ref('');
+const profileStore = useProfileStore();
+const { renderMarkdown } = useMarkdown();
 
-// Timer
-const recordingSeconds = ref(0);
-let timerInterval: ReturnType<typeof setInterval> | null = null;
+// ─── Skeleton count ───
+// Driven by activePendingIdeas which uses setTimeout to guarantee
+// at least one render frame with skeleton visible before idea replaces it.
+const skeletonCount = computed(() => store.pendingIdeasCount);
+
+// ─── Thinking indicator ───
+const THINKING_PHRASES = [
+  'Thinking...',
+  'Loading your profile...',
+  'Scanning content history...',
+  'Analyzing your dump...',
+  'Finding the best angles...',
+  'Matching platforms...',
+  'Crafting ideas...',
+  'Saving to your plan...',
+];
+const thinkingPhraseIndex = ref(0);
+const thinkingPhrase = computed(() => THINKING_PHRASES[thinkingPhraseIndex.value]);
+let thinkingTimer: ReturnType<typeof setInterval> | null = null;
+
+watch(
+  () => store.isStreaming,
+  (streaming) => {
+    if (streaming) {
+      thinkingPhraseIndex.value = 0;
+      thinkingTimer = setInterval(() => {
+        thinkingPhraseIndex.value = (thinkingPhraseIndex.value + 1) % THINKING_PHRASES.length;
+      }, 2000);
+    } else {
+      if (thinkingTimer) { clearInterval(thinkingTimer); thinkingTimer = null; }
+    }
+  },
+);
+onUnmounted(() => { if (thinkingTimer) clearInterval(thinkingTimer); });
+
+// ─── Platform helpers ───
+const PLATFORM_LABELS: Record<string, string> = {
+  threads: 'Threads',
+  linkedin: 'LinkedIn',
+  tiktok: 'TikTok',
+  instagram: 'Instagram',
+};
+const FORMAT_LABELS: Record<string, string> = {
+  text_post: 'Post',
+  video_script: 'Video',
+  carousel: 'Carousel',
+  stories: 'Story',
+};
+function platformLabel(platform: string): string {
+  return PLATFORM_LABELS[platform] ?? platform;
+}
+function formatLabel(format: string): string {
+  return FORMAT_LABELS[format] ?? format;
+}
+const isUserRecording = ref(false);
+const chatInputText = ref('');
 
 const sessionId = computed(() => route.params.id as string);
 
-const orbState = computed<'idle' | 'listening' | 'processing'>(() => {
-  if (store.isStreaming) return 'processing';
-  if (isUserRecording.value) return 'listening';
-  return 'idle';
-});
-
-const recordingTime = computed(() => {
-  const m = Math.floor(recordingSeconds.value / 60).toString().padStart(2, '0');
-  const s = (recordingSeconds.value % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-});
-
-const synthesisTags = computed(() => {
-  const tags = store.ideas.slice(0, 4).map((i) => i.platform || i.format || i.angle?.split(' ')[0]);
-  return [...new Set(tags)].filter(Boolean).slice(0, 4);
-});
-
-function handleRecordingChange(recording: boolean) {
-  isUserRecording.value = recording;
-  if (recording) {
-    recordingSeconds.value = 0;
-    timerInterval = setInterval(() => { recordingSeconds.value++; }, 1000);
-  } else {
-    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-  }
-}
 
 async function handleSubmit(text: string) {
   await store.sendMessage(text);
-}
-
-async function handleAudioReady(blob: Blob) {
-  try {
-    const transcript = await transcribeAudio(blob);
-    if (transcript.trim()) {
-      await store.sendMessage(transcript);
-    }
-  } catch (error) {
-    console.error('Transcription failed:', error);
-  }
 }
 
 async function submitChatInput() {
@@ -340,17 +327,22 @@ async function handleRejectIdea(ideaId: string) {
   await store.rejectIdea(ideaId);
 }
 
+async function handleResetSession() {
+  if (!confirm('Delete this session and start fresh?')) return;
+  await store.deleteSession();
+  router.push('/dashboard');
+}
+
 onMounted(async () => {
   try {
-    await store.createOrLoadSession(sessionId.value);
+    await Promise.all([
+      store.createOrLoadSession(sessionId.value),
+      profileStore.loadProfile(),
+    ]);
     await Promise.all([store.loadMessages(), store.loadIdeas()]);
   } catch (error) {
     console.error('Session initialization failed:', error);
   }
-});
-
-onUnmounted(() => {
-  if (timerInterval) clearInterval(timerInterval);
 });
 </script>
 
@@ -358,8 +350,6 @@ onUnmounted(() => {
 /* ─── Page wrapper ─── */
 .session-page {
   position: relative;
-  /* offset the layout padding so we can go full-bleed */
-  margin: -2.5rem -2rem;
   height: calc(100vh - 72px);
   overflow: hidden;
   font-family: 'Inter', sans-serif;
@@ -752,6 +742,70 @@ onUnmounted(() => {
 
 @keyframes blink { 50% { opacity: 0; } }
 
+/* ─── Markdown rendering inside bubbles ─── */
+.transcript-msg__bubble :deep(p) {
+  margin: 0 0 0.5rem;
+}
+.transcript-msg__bubble :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.transcript-msg__bubble :deep(strong) {
+  font-weight: 700;
+  color: inherit;
+}
+.transcript-msg__bubble :deep(em) {
+  font-style: italic;
+}
+.transcript-msg__bubble :deep(h1),
+.transcript-msg__bubble :deep(h2),
+.transcript-msg__bubble :deep(h3) {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  margin: 0.75rem 0 0.375rem;
+  line-height: 1.3;
+  color: #191c1e;
+}
+.transcript-msg__bubble :deep(h1) { font-size: 1rem; }
+.transcript-msg__bubble :deep(h2) { font-size: 0.9375rem; }
+.transcript-msg__bubble :deep(h3) { font-size: 0.875rem; }
+.transcript-msg__bubble :deep(ul),
+.transcript-msg__bubble :deep(ol) {
+  margin: 0.375rem 0 0.5rem 1.25rem;
+  padding: 0;
+}
+.transcript-msg__bubble :deep(li) {
+  margin-bottom: 0.25rem;
+}
+.transcript-msg__bubble :deep(hr) {
+  border: none;
+  border-top: 1px solid rgba(199, 196, 216, 0.3);
+  margin: 0.75rem 0;
+}
+.transcript-msg__bubble :deep(code) {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.8125rem;
+  background: rgba(53, 37, 205, 0.07);
+  color: #3525cd;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+.transcript-msg__bubble--user :deep(code) {
+  background: rgba(70, 69, 85, 0.08);
+  color: #464555;
+}
+.transcript-msg__bubble :deep(pre) {
+  background: rgba(25, 28, 30, 0.05);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+.transcript-msg__bubble :deep(pre code) {
+  background: transparent;
+  padding: 0;
+  color: #191c1e;
+}
+
 /* Chat input */
 .transcript-input {
   flex-shrink: 0;
@@ -857,7 +911,8 @@ onUnmounted(() => {
 /* Ideas grid */
 .ideas-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
+  align-content: start;
   gap: 1.25rem;
   overflow-y: auto;
   flex: 1;
@@ -989,6 +1044,59 @@ onUnmounted(() => {
   background: #d8dadc;
 }
 
+/* ─── Skeleton card ─── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.idea-card--skeleton {
+  pointer-events: none;
+}
+
+.skeleton-block {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #eceef0 25%, #f5f6f7 50%, #eceef0 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-block--icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.skeleton-block--badge {
+  width: 64px;
+  height: 20px;
+  border-radius: 6px;
+}
+
+.skeleton-block--title {
+  width: 85%;
+  height: 16px;
+  margin-top: 0.25rem;
+}
+
+.skeleton-block--body {
+  width: 100%;
+  height: 12px;
+  margin-top: 0.5rem;
+}
+
+.skeleton-block--body-short {
+  width: 65%;
+}
+
+.skeleton-block--btn {
+  flex: 1;
+  height: 34px;
+  border-radius: 8px;
+}
+
 /* Loading placeholder card */
 .idea-card--loading {
   display: flex;
@@ -1089,6 +1197,143 @@ onUnmounted(() => {
   color: #191c1e;
 }
 
+/* ─── Thinking bubble ─── */
+.thinking-bubble {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-style: normal !important;
+}
+
+.thinking-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.thinking-dots span {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #3525cd;
+  opacity: 0.4;
+  animation: thinking-bounce 1.2s ease-in-out infinite;
+}
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% { opacity: 0.4; transform: translateY(0); }
+  40%            { opacity: 1;   transform: translateY(-4px); }
+}
+
+.thinking-phrase {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #464555;
+  font-style: italic;
+  animation: phrase-fade 0.4s ease;
+}
+
+@keyframes phrase-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Workspace empty state ─── */
+.workspace-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 2rem;
+  gap: 0.75rem;
+}
+
+.workspace-empty__icon {
+  width: 64px;
+  height: 64px;
+  background: rgba(53, 37, 205, 0.07);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.workspace-empty__icon .material-symbols-outlined {
+  font-size: 32px !important;
+  color: #3525cd;
+  opacity: 0.6;
+}
+
+.workspace-empty__title {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #191c1e;
+  margin: 0;
+}
+
+.workspace-empty__hint {
+  font-size: 0.8125rem;
+  color: #464555;
+  line-height: 1.6;
+  max-width: 280px;
+  margin: 0;
+  opacity: 0.7;
+}
+
+.workspace-empty__dots {
+  display: flex;
+  gap: 6px;
+  margin-top: 0.5rem;
+}
+
+.workspace-empty__dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c7c4d8;
+  animation: empty-pulse 2s ease-in-out infinite;
+}
+.workspace-empty__dots span:nth-child(2) { animation-delay: 0.3s; }
+.workspace-empty__dots span:nth-child(3) { animation-delay: 0.6s; }
+
+@keyframes empty-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.3); }
+}
+
+/* ─── Platform meta row on idea cards ─── */
+.idea-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+
+.idea-card__platform-name {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #464555;
+}
+
+.idea-card__format-badge {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #f2f4f6;
+  color: #464555;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
 /* ─── Error ─── */
 .session-error {
   color: #ba1a1a;
@@ -1101,6 +1346,44 @@ onUnmounted(() => {
 
 .session-error--inline {
   text-align: left;
+}
+
+.workspace-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.07);
+  border: 1px solid rgba(192, 57, 43, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.reset-btn:hover:not(:disabled) {
+  background: rgba(192, 57, 43, 0.13);
+  border-color: rgba(192, 57, 43, 0.4);
+}
+.reset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.msg-cost {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #9b8fbb;
+  letter-spacing: 0.02em;
 }
 
 /* ─── Status bar ─── */

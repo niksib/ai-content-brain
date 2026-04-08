@@ -21,9 +21,10 @@ export const profileRoutes = new Hono<AppEnv>();
 profileRoutes.get("/profile", requireAuth, async (context) => {
   const user = context.get("user");
 
-  const profile = await prisma.creatorProfile.findUnique({
-    where: { userId: user.id },
-  });
+  const [profile, dbUser] = await Promise.all([
+    prisma.creatorProfile.findUnique({ where: { userId: user.id } }),
+    prisma.user.findUnique({ where: { id: user.id }, select: { isAdmin: true } }),
+  ]);
 
   if (!profile) {
     return context.json({ error: "Profile not found" }, 404);
@@ -32,6 +33,7 @@ profileRoutes.get("/profile", requireAuth, async (context) => {
   return context.json({
     profile,
     email: user.email,
+    isAdmin: dbUser?.isAdmin ?? false,
   });
 });
 

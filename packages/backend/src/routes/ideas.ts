@@ -102,7 +102,7 @@ ideaRoutes.patch("/ideas/:id/approve", requireAuth, requireCredits(20, "content_
   const { send, close, response } = createSSEStream(context);
 
   agentRunner
-    .streamAgentResponse(agent, prompt, undefined, user.id, { send, close })
+    .streamAgentResponse(agent, [{ role: "user", content: prompt }], user.id, { send, close })
     .then(async () => {
       // After agent finishes, update idea status to completed
       await prisma.contentIdea.update({

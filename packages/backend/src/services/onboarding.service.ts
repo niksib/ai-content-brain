@@ -10,9 +10,20 @@ const SYSTEM_PROMPT = fs.readFileSync(
   "utf-8"
 );
 
-export interface OnboardingAnswer {
-  question: string;
-  answer: string;
+export interface QuizData {
+  platforms: string[];
+  stage: string;
+  topics: string[];
+  topicOther?: string;
+  audience: string;
+  goal: string;
+  toneStyles: string[];
+  toneExample: string;
+}
+
+export interface OnboardingSubmission {
+  quiz: QuizData;
+  followUpAnswers?: { question: string; answer: string }[];
 }
 
 export interface OnboardingResult {
@@ -56,15 +67,13 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "request_clarification",
     description:
-      "Request additional information from the user when critical fields cannot be determined from the answers. Use this instead of save_creator_profile when you are missing platform, niche, or tone of voice.",
+      "Request specific follow-up questions when the audience description or tone example is too vague. Maximum 3 questions. Do not use this if the answers are clear enough.",
     input_schema: {
       type: "object",
       properties: {
         questions: {
           type: "array",
           items: { type: "string" },
-          description:
-            "Specific follow-up questions. Maximum 3. Each question must name exactly what information is missing.",
           minItems: 1,
           maxItems: 3,
         },
@@ -74,16 +83,43 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+function formatSubmission(submission: OnboardingSubmission): string {
+  const { quiz, followUpAnswers } = submission;
+
+  const topics =
+    quiz.topics.includes("other") && quiz.topicOther
+      ? [...quiz.topics.filter((t) => t !== "other"), `Other: ${quiz.topicOther}`]
+      : quiz.topics;
+
+  const lines = [
+    `PLATFORMS: ${quiz.platforms.join(", ")}`,
+    `CREATOR STAGE: ${quiz.stage}`,
+    `CONTENT TOPICS: ${topics.join(", ")}`,
+    `AUDIENCE: ${quiz.audience}`,
+    `MAIN GOAL: ${quiz.goal}`,
+    `COMMUNICATION STYLE: ${quiz.toneStyles.join(", ")}`,
+    `TONE EXAMPLE: "${quiz.toneExample}"`,
+  ];
+
+  if (followUpAnswers?.length) {
+    lines.push(
+      "",
+      "FOLLOW-UP ANSWERS:",
+      ...followUpAnswers.map((a) => `Q: ${a.question}\nA: ${a.answer}`)
+    );
+  }
+
+  return lines.join("\n");
+}
+
 export async function processOnboardingAnswers(
   userId: string,
-  answers: OnboardingAnswer[]
+  submission: OnboardingSubmission
 ): Promise<OnboardingResult> {
-  const answersText = answers
-    .map((a, i) => `Question ${i + 1}: ${a.question}\nAnswer: ${a.answer}`)
-    .join("\n\n");
+  const content = formatSubmission(submission);
 
   const messages: Anthropic.MessageParam[] = [
-    { role: "user", content: answersText },
+    { role: "user", content },
   ];
 
   while (true) {
@@ -117,8 +153,8 @@ export async function processOnboardingAnswers(
         await prisma.creatorProfile.upsert({
           where: { userId: uid },
           create: {
-            userId: uid,
             ...(profileData as Parameters<typeof prisma.creatorProfile.create>[0]["data"]),
+            userId: uid,
           },
           update: profileData as Parameters<typeof prisma.creatorProfile.update>[0]["data"],
         });

@@ -42,6 +42,13 @@ chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "conten
     },
   });
 
+  // Load full conversation history to pass as context to the agent
+  const messageHistory = await prisma.chatMessage.findMany({
+    where: { chatSessionId: chatSession.id },
+    orderBy: { createdAt: "asc" },
+    select: { role: true, content: true },
+  });
+
   // Stream agent response with token accumulation
   const { send, close, response } = createSSEStream(context);
   const tokenChunks: string[] = [];
@@ -58,15 +65,9 @@ chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "conten
   };
 
   agentRunner
-    .streamAgentResponse(
-      "strategist",
-      content,
-      chatSession.sdkSessionId || undefined,
-      user.id,
-      wrappedSse
-    )
-    .then(async ({ sdkSessionId }) => {
-      // Save assistant message with accumulated text
+    .streamAgentResponse("strategist", messageHistory, user.id, wrappedSse, chatSession.id)
+    .then(async ({ costUsd }) => {
+      // Save assistant message with accumulated text and cost
       const assistantContent = tokenChunks.join("");
       if (assistantContent.length > 0) {
         await prisma.chatMessage.create({
@@ -74,15 +75,8 @@ chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "conten
             chatSessionId: chatSession.id,
             role: "assistant",
             content: assistantContent,
+            costUsd,
           },
-        });
-      }
-
-      // Update SDK session ID for resume
-      if (sdkSessionId && chatSession.sdkSessionId !== sdkSessionId) {
-        await prisma.chatSession.update({
-          where: { id: chatSession.id },
-          data: { sdkSessionId },
         });
       }
 

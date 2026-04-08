@@ -1,7 +1,8 @@
 <template>
   <div class="profile-page">
+    <div class="profile-grid">
     <!-- Section 1: Creator Profile -->
-    <section class="profile-section">
+    <section class="profile-section profile-grid__left">
       <h2 class="section-title">Creator Profile</h2>
 
       <div v-if="profileStore.isLoading" class="loading-state">Loading profile...</div>
@@ -138,6 +139,9 @@
       </form>
     </section>
 
+    <!-- Right column: Subscription + Account -->
+    <div class="profile-grid__right">
+
     <!-- Section 2: Subscription & Credits -->
     <section class="profile-section">
       <h2 class="section-title">Subscription</h2>
@@ -145,9 +149,18 @@
         <span class="info-label">Plan</span>
         <span class="info-value">Free (Beta)</span>
       </div>
-      <div class="info-row">
-        <span class="info-label">Credit Balance</span>
-        <span class="info-value info-value--credits">{{ billingStore.balance }}</span>
+      <div class="credits-progress-wrap">
+        <div class="credits-progress__header">
+          <span class="info-label">Credits Used</span>
+          <span class="credits-progress__stat">{{ creditsUsedPercent }}% used</span>
+        </div>
+        <div class="credits-progress__bar">
+          <div
+            class="credits-progress__fill"
+            :style="{ width: creditsUsedPercent + '%' }"
+          ></div>
+        </div>
+        <span class="credits-progress__remaining">{{ billingStore.balance }} credits remaining</span>
       </div>
       <div class="placeholder-actions">
         <button
@@ -201,6 +214,9 @@
         <button type="button" class="btn btn--danger" disabled>Delete Account</button>
       </div>
     </section>
+
+    </div><!-- /profile-grid__right -->
+    </div><!-- /profile-grid -->
   </div>
 </template>
 
@@ -216,6 +232,12 @@ definePageMeta({
 
 const profileStore = useProfileStore();
 const billingStore = useBillingStore();
+
+const PLAN_MAX_CREDITS = 500;
+const creditsUsedPercent = computed(() => {
+  const used = PLAN_MAX_CREDITS - billingStore.balance;
+  return Math.max(0, Math.min(100, Math.round((used / PLAN_MAX_CREDITS) * 100)));
+});
 
 const route = useRoute();
 const billingStatus = computed(() => route.query.billing as string | undefined);
@@ -358,11 +380,28 @@ onMounted(async () => {
 
 <style scoped>
 .profile-page {
-  max-width: 640px;
+  max-width: 1200px;
   margin: 0 auto;
+  padding: 2.5rem 2rem 4rem;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 2rem;
+  align-items: start;
+}
+
+.profile-grid__right {
   display: flex;
   flex-direction: column;
-  gap: 2.5rem;
+  gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .profile-section {
@@ -625,5 +664,44 @@ onMounted(async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Credits progress bar */
+.credits-progress-wrap {
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.credits-progress__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.credits-progress__stat {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #6366f1;
+}
+
+.credits-progress__bar {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.credits-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+.credits-progress__remaining {
+  font-size: 0.75rem;
+  color: #9ca3af;
 }
 </style>

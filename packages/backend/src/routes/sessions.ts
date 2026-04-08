@@ -68,6 +68,41 @@ sessionRoutes.get("/sessions", requireAuth, async (context) => {
   return context.json({ sessions: result });
 });
 
+// Delete session (admin only)
+sessionRoutes.delete("/sessions/:id", requireAuth, async (context) => {
+  const user = context.get("user");
+  const sessionId = context.req.param("id");
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { isAdmin: true },
+  });
+
+  if (!dbUser?.isAdmin) {
+    return context.json({ error: "Forbidden" }, 403);
+  }
+
+  const session = await prisma.chatSession.findUnique({
+    where: { id: sessionId },
+  });
+
+  if (!session) {
+    return context.json({ error: "Session not found" }, 404);
+  }
+
+  await prisma.chatMessage.deleteMany({ where: { chatSessionId: sessionId } });
+
+  const plan = await prisma.contentPlan.findUnique({ where: { chatSessionId: sessionId } });
+  if (plan) {
+    await prisma.contentIdea.deleteMany({ where: { contentPlanId: plan.id } });
+    await prisma.contentPlan.delete({ where: { id: plan.id } });
+  }
+
+  await prisma.chatSession.delete({ where: { id: sessionId } });
+
+  return context.json({ success: true });
+});
+
 // Get session detail
 sessionRoutes.get("/sessions/:id", requireAuth, async (context) => {
   const user = context.get("user");

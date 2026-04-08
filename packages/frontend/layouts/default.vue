@@ -19,10 +19,11 @@
         </nav>
       </div>
       <div class="app-header__right">
-        <NuxtLink to="/profile" class="credit-badge" title="Credits">
+        <!-- credit-badge hidden per design -->
+        <!-- <NuxtLink to="/profile" class="credit-badge" title="Credits">
           <span class="material-symbols-outlined" style="font-size:16px;">toll</span>
           <span class="credit-badge__count">{{ billingStore.balance }}</span>
-        </NuxtLink>
+        </NuxtLink> -->
         <button class="app-header__icon-btn" title="Notifications">
           <span class="material-symbols-outlined">notifications</span>
         </button>

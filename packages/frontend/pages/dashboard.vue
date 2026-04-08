@@ -4,11 +4,11 @@
     <div class="dashboard__hero">
       <div class="dashboard__greeting">
         <p class="dashboard__greeting-label">Welcome back</p>
-        <h1 class="dashboard__greeting-title">Ready to curate today?</h1>
+        <h1 class="dashboard__greeting-title">{{ greetingName ? `Hey, ${greetingName}!` : 'Ready to curate today?' }}</h1>
       </div>
 
-      <!-- Floating Command Bar (decorative — no active AI call wired up yet) -->
-      <div class="command-bar-wrap">
+      <!-- Ask AI bar hidden per design -->
+      <!-- <div class="command-bar-wrap">
         <div class="command-bar__glow"></div>
         <div class="command-bar">
           <span class="material-symbols-outlined command-bar__icon">auto_awesome</span>
@@ -19,7 +19,7 @@
           />
           <button class="command-bar__btn">Ask AI</button>
         </div>
-      </div>
+      </div> -->
     </div>
 
     <!-- ── Action Cards ── -->
@@ -135,70 +135,45 @@
       </div>
     </section>
 
-    <!-- ── Bottom Insights ── -->
-    <div class="insights-grid">
-      <div class="insight-card insight-card--recommendation">
-        <div class="insight-card__image-wrap">
-          <div class="insight-card__image-placeholder">
-            <span class="material-symbols-outlined" style="font-size:40px;color:#6366f1;opacity:0.4;">auto_fix_high</span>
-          </div>
-        </div>
-        <div class="insight-card__content">
-          <span class="insight-card__label">Recommended Action</span>
-          <h5 class="insight-card__title">Review your latest session</h5>
-          <p class="insight-card__text">AI has synthesized your latest session into actionable idea cards. Review and curate them now.</p>
-          <NuxtLink
-            v-if="dashboardStore.sessions.length > 0"
-            :to="`/sessions/${dashboardStore.sessions[dashboardStore.sessions.length - 1].id}`"
-            class="insight-card__action-link"
-          >
-            Open session
-            <span class="material-symbols-outlined" style="font-size:18px;">arrow_forward</span>
-          </NuxtLink>
-        </div>
-      </div>
-
-      <div class="insight-card insight-card--momentum">
-        <div class="insight-card__momentum-header">
-          <div class="insight-card__momentum-icon">
-            <span class="material-symbols-outlined" style="color:#fff;">bolt</span>
-          </div>
-          <h5 class="insight-card__title">Weekly Momentum</h5>
-        </div>
-        <div class="momentum-chart">
-          <div
-            v-for="(bar, i) in weeklyBars"
-            :key="i"
-            class="momentum-chart__bar"
-            :class="{ 'momentum-chart__bar--active': bar.isToday }"
-            :style="{ height: bar.height + '%' }"
-          ></div>
-        </div>
-        <div class="momentum-chart__labels">
-          <span v-for="label in weekLabels" :key="label">{{ label }}</span>
-        </div>
-      </div>
-    </div>
+    <!-- Recommended Action and Weekly Momentum hidden per design -->
+    <!-- <div class="insights-grid"> ... </div> -->
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useDashboardStore } from '~/stores/dashboard';
+import { useBillingStore } from '~/stores/billing';
+import { useProfileStore } from '~/stores/profile';
 
 definePageMeta({
   layout: 'default',
 });
 
 const dashboardStore = useDashboardStore();
+const billingStore = useBillingStore();
+const profileStore = useProfileStore();
 const router = useRouter();
 const isStarting = ref(false);
 
-onMounted(() => {
-  dashboardStore.loadSessions();
+const greetingName = computed(() => {
+  const email = profileStore.userEmail;
+  return email ? email.split('@')[0] : '';
+});
+
+onMounted(async () => {
+  await Promise.all([
+    dashboardStore.loadSessions(),
+    billingStore.loadBalance(),
+    profileStore.loadProfile(),
+  ]);
 });
 
 async function handleStartSession(): Promise<void> {
+  if (billingStore.balance === 0) {
+    router.push('/pricing');
+    return;
+  }
   isStarting.value = true;
   try {
     const sessionId = await dashboardStore.startTodaySession();
@@ -234,7 +209,6 @@ function goToNextMonth() {
 }
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const weekLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 // Store uses 0-based month (like JS Date.getMonth())
 const currentMonthLabel = computed(() => {
@@ -266,12 +240,6 @@ const daysInMonth = computed(() => {
   });
 });
 
-const weeklyBars = computed(() => {
-  const heights = [40, 60, 35, 80, 95, 20, 20];
-  const today = new Date().getDay(); // 0=Sun
-  const todayIdx = today === 0 ? 6 : today - 1; // Mon=0 in our array
-  return heights.map((h, i) => ({ height: h, isToday: i === todayIdx }));
-});
 </script>
 
 <style scoped>
@@ -621,10 +589,11 @@ const weeklyBars = computed(() => {
 .calendar-cell--today {
   background: #3525cd;
   color: #fff;
-  box-shadow: 0 16px 40px rgba(53, 37, 205, 0.35);
-  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(53, 37, 205, 0.35);
   z-index: 2;
   cursor: default;
+  outline: 3px solid rgba(53, 37, 205, 0.4);
+  outline-offset: 2px;
 }
 
 .calendar-cell__header {
