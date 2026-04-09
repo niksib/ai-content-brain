@@ -6,12 +6,10 @@ import {
   executeSaveCreatorProfile,
 } from "./creator-profile.js";
 import {
-  getSessionContextTool,
-  executeGetSessionContext,
-  getContentHistoryTool,
-  executeGetContentHistory,
   saveContentIdeaTool,
   makeSaveContentIdea,
+  updateContentIdeaTool,
+  makeUpdateContentIdea,
   saveProducedContentTool,
   executeSaveProducedContent,
 } from "./content.js";
@@ -26,6 +24,8 @@ export interface AgentToolSet {
 
 interface AgentToolOptions {
   onIdeaSaved?: (idea: ContentIdea) => void;
+  onIdeaUpdating?: (ideaId: string) => void;
+  onIdeaUpdated?: (idea: ContentIdea) => void;
 }
 
 export function getAgentTools(agentName: string, options: AgentToolOptions = {}): AgentToolSet {
@@ -41,10 +41,10 @@ export function getAgentTools(agentName: string, options: AgentToolOptions = {})
 
     case "strategist":
       return {
-        definitions: [getSessionContextTool, saveContentIdeaTool],
+        definitions: [saveContentIdeaTool, updateContentIdeaTool],
         executors: {
-          get_session_context: executeGetSessionContext,
           save_content_idea: makeSaveContentIdea(options.onIdeaSaved),
+          update_content_idea: makeUpdateContentIdea(options.onIdeaUpdating, options.onIdeaUpdated),
         },
       };
 

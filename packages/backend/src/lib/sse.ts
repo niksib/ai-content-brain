@@ -6,8 +6,11 @@ export function createSSEStream(context: Context) {
   const encoder = new TextEncoder();
 
   const send = (event: string, data: unknown) => {
-    const payload = typeof data === "string" ? data : JSON.stringify(data);
-    writer.write(encoder.encode(`event: ${event}\ndata: ${payload}\n\n`));
+    const payload =
+      typeof data === "string"
+        ? data.split("\n").map((line) => `data: ${line}`).join("\n")
+        : `data: ${JSON.stringify(data)}`;
+    writer.write(encoder.encode(`event: ${event}\n${payload}\n\n`));
   };
 
   const close = () => {

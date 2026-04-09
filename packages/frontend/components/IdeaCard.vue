@@ -1,9 +1,21 @@
 <template>
-  <div class="idea-card" :class="`idea-card--${idea.status}`" @click="emit('select', idea.id)">
+  <div
+    class="idea-card"
+    :class="[`idea-card--${idea.status}`, { 'idea-card--updating': isUpdating, 'idea-card--updated': isUpdated && !isUpdating }]"
+    @click="emit('select', idea.id)"
+    @mouseenter="isUpdated && emit('seen', idea.id)"
+  >
     <div class="idea-card__header">
       <span class="idea-card__platform">{{ platformEmoji }}</span>
       <span class="idea-card__format">{{ idea.format }}</span>
-      <span class="idea-card__status" :class="`idea-card__status--${idea.status}`">
+      <span v-if="isUpdating" class="idea-card__ai-badge idea-card__ai-badge--working">
+        <span class="idea-card__ai-dot"></span>
+        AI working
+      </span>
+      <span v-else-if="isUpdated" class="idea-card__ai-badge idea-card__ai-badge--updated">
+        Updated
+      </span>
+      <span v-else class="idea-card__status" :class="`idea-card__status--${idea.status}`">
         {{ statusLabel }}
       </span>
     </div>
@@ -37,12 +49,15 @@ import type { SessionIdea } from '~/stores/session';
 
 const props = defineProps<{
   idea: SessionIdea;
+  isUpdating?: boolean;
+  isUpdated?: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [ideaId: string];
   approve: [ideaId: string];
   reject: [ideaId: string];
+  seen: [ideaId: string];
 }>();
 
 const platformEmojiMap: Record<string, string> = {
@@ -85,6 +100,58 @@ const statusLabel = computed(() => {
 .idea-card:hover {
   border-color: #c7d2fe;
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);
+}
+
+.idea-card--updating {
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  animation: card-updating-pulse 2s ease-in-out infinite;
+}
+
+@keyframes card-updating-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12); }
+  50% { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25); }
+}
+
+.idea-card--updated {
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.idea-card__ai-badge {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.idea-card__ai-badge--working {
+  color: #4f46e5;
+  background: #eef2ff;
+}
+
+.idea-card__ai-badge--updated {
+  color: #4f46e5;
+  background: #eef2ff;
+}
+
+.idea-card__ai-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6366f1;
+  animation: dot-blink 1s ease-in-out infinite;
+}
+
+@keyframes dot-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 .idea-card__header {

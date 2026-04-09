@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import path from "path";
 import fs from "fs";
 import { getAgentTools } from "../tools/server.js";
+import { executeGetSessionContext } from "../tools/content.js";
 
 interface SSEWriter {
   send: (event: string, data: unknown) => void;
@@ -47,10 +48,18 @@ export class AgentRunnerService {
       .filter(Boolean)
       .join("\n");
 
-    const systemPrompt = `${contextLines}\n\n${baseSystemPrompt}`;
+    let sessionContextBlock = "";
+    if (agentName === "strategist") {
+      const sessionContext = await executeGetSessionContext({ userId });
+      sessionContextBlock = `\n\n## SESSION CONTEXT\n${sessionContext}`;
+    }
+
+    const systemPrompt = `${contextLines}${sessionContextBlock}\n\n${baseSystemPrompt}`;
 
     const { definitions, executors } = getAgentTools(agentName, {
       onIdeaSaved: (idea) => sse.send("idea", idea),
+      onIdeaUpdating: (ideaId) => sse.send("idea_updating", { ideaId }),
+      onIdeaUpdated: (idea) => sse.send("idea_updated", idea),
     });
 
     const messages: Anthropic.MessageParam[] = messageHistory.map((msg) => ({

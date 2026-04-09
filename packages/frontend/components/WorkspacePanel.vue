@@ -22,9 +22,12 @@
           v-for="idea in ideas"
           :key="idea.id"
           :idea="idea"
+          :is-updating="store.updatingIdeaIds.has(idea.id)"
+          :is-updated="store.recentlyUpdatedIdeaIds.has(idea.id)"
           @select="store.selectedIdeaId = $event"
           @approve="handleApprove"
           @reject="handleReject"
+          @seen="store.clearUpdatedIdea($event)"
         />
       </div>
 

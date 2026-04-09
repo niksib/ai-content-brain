@@ -39,6 +39,7 @@ export const useProfileStore = defineStore('profile', () => {
 
   const profile = ref<CreatorProfile | null>(null);
   const userEmail = ref('');
+  const userName = ref('');
   const isAdmin = ref(false);
   const isLoading = ref(false);
   const isSaving = ref(false);
@@ -46,9 +47,10 @@ export const useProfileStore = defineStore('profile', () => {
   async function loadProfile(): Promise<void> {
     isLoading.value = true;
     try {
-      const response = await apiClient.get<{ profile: CreatorProfile; email: string; isAdmin: boolean }>('/api/profile');
+      const response = await apiClient.get<{ profile: CreatorProfile; email: string; name: string; isAdmin: boolean }>('/api/profile');
       profile.value = response.profile;
       userEmail.value = response.email || '';
+      userName.value = response.name || '';
       isAdmin.value = response.isAdmin ?? false;
     } catch {
       profile.value = null;
@@ -70,6 +72,7 @@ export const useProfileStore = defineStore('profile', () => {
   return {
     profile,
     userEmail,
+    userName,
     isAdmin,
     isLoading,
     isSaving,

@@ -96,7 +96,7 @@ ideaRoutes.patch("/ideas/:id/approve", requireAuth, requireCredits(20, "content_
   );
 
   // Build prompt for the platform agent
-  const prompt = buildProductionPrompt(idea.angle, idea.description, description, idea.format);
+  const prompt = buildProductionPrompt(ideaId, idea.platform, idea.format, idea.angle, idea.description, description);
 
   // Stream agent response via SSE
   const { send, close, response } = createSSEStream(context);
@@ -165,40 +165,48 @@ ideaRoutes.get("/ideas/:id", requireAuth, async (context) => {
 });
 
 function buildProductionPrompt(
+  ideaId: string,
+  platform: string,
+  format: string,
   angle: string,
   description: string,
   platformDescription: string,
-  format: string
 ): string {
   const formatInstructions: Record<string, string> = {
-    text_post: `Write a ready-to-post text. Return the result by calling save_produced_content with a JSON body containing:
-- "text": the full post text
-- "hashtags": array of hashtag strings (without #)`,
-    video_script: `Write a full video script with shooting brief. Return the result by calling save_produced_content with a JSON body containing:
-- "script": array of objects with "timestamp" and "text" fields
-- "shootingBrief": string with camera and setup directions
-- "deliveryNotes": string with energy, pace, and style guidance
-- "caption": the video caption text
-- "hashtags": array of hashtag strings (without #)`,
-    carousel: `Write carousel slide content. Return the result by calling save_produced_content with a JSON body containing:
-- "slides": array of objects with "slideNumber", "text", and "designNotes" fields
-- "caption": the post caption
-- "hashtags": array of hashtag strings (without #)`,
-    stories: `Write an Instagram Stories sequence. Return the result by calling save_produced_content with a JSON body containing:
-- "stories": array of objects with "storyNumber", "textOverlay", "background", and optional "interactiveElement" fields
-- "notes": any delivery or timing suggestions`,
+    text_post: `Write a ready-to-post text. When done, call save_produced_content with:
+- contentIdeaId: "${ideaId}" (always use this exact value)
+- userId: the CURRENT USER ID from your system prompt
+- platform: "${platform}"
+- format: "${format}"
+- body: JSON string containing { "text": "...", "hashtags": ["tag1", "tag2"] }`,
+    video_script: `Write a full video script with shooting brief. When done, call save_produced_content with:
+- contentIdeaId: "${ideaId}" (always use this exact value)
+- userId: the CURRENT USER ID from your system prompt
+- platform: "${platform}"
+- format: "${format}"
+- body: JSON string containing { "script": [{"timestamp": "0:00", "text": "..."}], "shootingBrief": "...", "deliveryNotes": "...", "caption": "...", "hashtags": ["tag1"] }`,
+    carousel: `Write carousel slide content. When done, call save_produced_content with:
+- contentIdeaId: "${ideaId}" (always use this exact value)
+- userId: the CURRENT USER ID from your system prompt
+- platform: "${platform}"
+- format: "${format}"
+- body: JSON string containing { "slides": [{"slideNumber": 1, "text": "...", "designNotes": "..."}], "caption": "...", "hashtags": ["tag1"] }`,
+    stories: `Write an Instagram Stories sequence. When done, call save_produced_content with:
+- contentIdeaId: "${ideaId}" (always use this exact value)
+- userId: the CURRENT USER ID from your system prompt
+- platform: "${platform}"
+- format: "${format}"
+- body: JSON string containing { "stories": [{"storyNumber": 1, "textOverlay": "...", "background": "...", "interactiveElement": "..."}], "notes": "..." }`,
   };
 
   const instructions =
-    formatInstructions[format] ?? "Produce the content in the most appropriate format for this platform.";
+    formatInstructions[format] ?? `Produce the content, then call save_produced_content with contentIdeaId: "${ideaId}", userId from system prompt, platform: "${platform}", format: "${format}", and body as a JSON string.`;
 
   return `Produce a ${platformDescription} based on this approved content idea.
 
 **Angle:** ${angle}
 
 **Description:** ${description}
-
-**Format:** ${format}
 
 ${instructions}
 

@@ -3,8 +3,8 @@
     <!-- ── Greeting & AI Command Bar ── -->
     <div class="dashboard__hero">
       <div class="dashboard__greeting">
-        <p class="dashboard__greeting-label">Welcome back</p>
-        <h1 class="dashboard__greeting-title">{{ greetingName ? `Hey, ${greetingName}!` : 'Ready to curate today?' }}</h1>
+        <p class="dashboard__greeting-label">{{ greetingLabel }}</p>
+        <h1 class="dashboard__greeting-title">{{ greetingName ? `${greetingPhrase}, ${greetingName}!` : 'Ready to curate today?' }}</h1>
       </div>
 
       <!-- Ask AI bar hidden per design -->
@@ -100,9 +100,12 @@
           class="calendar-cell"
           :class="{
             'calendar-cell--today': day.isToday,
+            'calendar-cell--today-completed': day.isToday && day.sessions.length > 0 && day.sessions[0].status === 'completed',
             'calendar-cell--has-sessions': day.sessions.length > 0 && !day.isToday,
+            'calendar-cell--day-completed': day.sessions.length > 0 && !day.isToday && day.sessions[0].status === 'completed',
             'calendar-cell--empty-day': day.sessions.length === 0 && !day.isToday,
           }"
+          :style="{ cursor: day.sessions.length > 0 && !day.isToday ? 'pointer' : undefined }"
           @click="day.sessions.length > 0 ? navigateToSession(day.sessions[0].id) : null"
         >
           <div class="calendar-cell__header">
@@ -111,20 +114,33 @@
           </div>
 
           <template v-if="day.isToday">
-            <p class="calendar-cell__today-status">Session in progress...</p>
-            <div class="calendar-cell__progress-bar">
-              <div class="calendar-cell__progress-fill"></div>
-            </div>
+            <template v-if="day.sessions.length > 0 && day.sessions[0].status === 'completed'">
+              <div class="calendar-cell__done-row">
+                <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>
+                <span class="calendar-cell__done-label">Day completed</span>
+              </div>
+              <span class="calendar-cell__today-idea-count">{{ day.sessions[0].ideaCount }} ideas ready</span>
+            </template>
+            <template v-else-if="day.sessions.length > 0 && day.sessions[0].ideaCount > 0">
+              <p class="calendar-cell__today-status">{{ day.sessions[0].ideaCount }} idea{{ day.sessions[0].ideaCount > 1 ? 's' : '' }} ready</p>
+              <div class="calendar-cell__progress-bar">
+                <div class="calendar-cell__progress-fill" style="width:100%"></div>
+              </div>
+            </template>
+            <template v-else>
+              <p class="calendar-cell__today-status">Session in progress...</p>
+              <div class="calendar-cell__progress-bar">
+                <div class="calendar-cell__progress-fill"></div>
+              </div>
+            </template>
           </template>
 
           <template v-else-if="day.sessions.length > 0">
-            <div class="calendar-cell__session-lines">
-              <div class="calendar-cell__session-line"></div>
-              <div class="calendar-cell__session-line calendar-cell__session-line--light"></div>
-            </div>
             <div class="calendar-cell__session-count">
-              <span class="material-symbols-outlined" style="font-size:16px;color:#6366f1;">check_circle</span>
-              <span class="calendar-cell__count-text">{{ day.sessions.length }} session{{ day.sessions.length > 1 ? 's' : '' }}</span>
+              <span class="material-symbols-outlined" style="font-size:16px;" :style="{color: day.sessions[0].status === 'completed' ? '#16a34a' : '#6366f1'}">check_circle</span>
+              <span class="calendar-cell__count-text" :class="{'calendar-cell__count-text--green': day.sessions[0].status === 'completed'}">
+                {{ day.sessions[0].ideaCount }} idea{{ day.sessions[0].ideaCount !== 1 ? 's' : '' }}
+              </span>
             </div>
           </template>
 
@@ -157,8 +173,23 @@ const router = useRouter();
 const isStarting = ref(false);
 
 const greetingName = computed(() => {
-  const email = profileStore.userEmail;
-  return email ? email.split('@')[0] : '';
+  return profileStore.userName || profileStore.userEmail.split('@')[0];
+});
+
+const greetingPhrase = computed(() => {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'Good Morning';
+  if (hour >= 12 && hour < 17) return 'Good Afternoon';
+  if (hour >= 17 && hour < 22) return 'Good Evening';
+  return 'Good Night';
+});
+
+const greetingLabel = computed(() => {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'Morning session';
+  if (hour >= 12 && hour < 17) return 'Afternoon session';
+  if (hour >= 17 && hour < 22) return 'Evening session';
+  return 'Late night session';
 });
 
 onMounted(async () => {
@@ -234,7 +265,7 @@ const daysInMonth = computed(() => {
     const isToday = todayIsThisMonth && today.getDate() === dayNumber;
     const sessions = (dashboardStore.sessions || []).filter((s) => {
       const d = new Date(s.sessionDate);
-      return d.getFullYear() === year && d.getMonth() === month && d.getDate() === dayNumber;
+      return d.getUTCFullYear() === year && d.getUTCMonth() === month && d.getUTCDate() === dayNumber;
     });
     return { number: dayNumber, isToday, sessions };
   });
@@ -579,7 +610,7 @@ const daysInMonth = computed(() => {
 
 .calendar-cell--has-sessions {
   background: #f2f4f6;
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 .calendar-cell--has-sessions:hover {
@@ -594,6 +625,23 @@ const daysInMonth = computed(() => {
   cursor: default;
   outline: 3px solid rgba(53, 37, 205, 0.4);
   outline-offset: 2px;
+}
+
+.calendar-cell--today-completed {
+  background: #052e16;
+  box-shadow: 0 8px 24px rgba(22, 163, 74, 0.35);
+  outline: 3px solid #16a34a;
+  outline-offset: 2px;
+}
+
+.calendar-cell--day-completed {
+  background: #f0fdf4;
+  border: 2px solid #16a34a !important;
+  cursor: pointer !important;
+}
+
+.calendar-cell--day-completed:hover {
+  background: #dcfce7;
 }
 
 .calendar-cell__header {
@@ -632,6 +680,28 @@ const daysInMonth = computed(() => {
   margin-bottom: 0.375rem;
 }
 
+.calendar-cell__done-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: auto;
+  color: #4ade80;
+}
+
+.calendar-cell__done-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4ade80;
+}
+
+.calendar-cell__today-idea-count {
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 0.25rem;
+}
+
 .calendar-cell__progress-bar {
   height: 4px;
   background: rgba(255, 255, 255, 0.25);
@@ -646,30 +716,13 @@ const daysInMonth = computed(() => {
   border-radius: 9999px;
 }
 
-.calendar-cell__session-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  margin-top: 0.5rem;
-}
-
-.calendar-cell__session-line {
-  height: 4px;
-  background: #a5b4fc;
-  border-radius: 9999px;
-  width: 100%;
-}
-
-.calendar-cell__session-line--light {
-  width: 66%;
-  background: #c7d2fe;
-}
 
 .calendar-cell__session-count {
   margin-top: auto;
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  padding-top: 0.25rem;
 }
 
 .calendar-cell__count-text {
@@ -678,6 +731,10 @@ const daysInMonth = computed(() => {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #6366f1;
+}
+
+.calendar-cell__count-text--green {
+  color: #16a34a;
 }
 
 .calendar-cell__add-icon {

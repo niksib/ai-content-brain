@@ -40,7 +40,7 @@
             <span class="transcript-panel__badge">Live Session</span>
           </div>
 
-          <div class="transcript-messages">
+          <div ref="messagesContainerRef" class="transcript-messages">
             <template v-for="msg in store.messages" :key="msg.id">
               <!-- User message -->
               <div v-if="msg.role === 'user'" class="transcript-msg transcript-msg--user">
@@ -129,6 +129,18 @@
 
         <!-- Right: Ideas workspace -->
         <section class="workspace-panel">
+
+          <!-- Idea detail view -->
+          <div v-if="store.selectedIdeaId" class="workspace-detail">
+            <IdeaPage
+              :idea-id="store.selectedIdeaId"
+              @back="store.selectedIdeaId = null"
+              @approve="handleApproveIdea"
+              @reject="handleRejectIdea"
+            />
+          </div>
+
+          <template v-else>
           <div class="workspace-panel__header">
             <h3 class="workspace-panel__title">
               <span class="material-symbols-outlined" style="font-size:20px;color:#3525cd;">lightbulb</span>
@@ -171,10 +183,13 @@
               :key="idea.id"
               class="idea-card"
               :class="{
-                'idea-card--approved': idea.status === 'approved' || idea.status === 'completed',
-                'idea-card--rejected': idea.status === 'rejected',
+                'idea-card--approved': idea.status === 'approved',
                 'idea-card--producing': idea.status === 'producing',
+                'idea-card--completed': idea.status === 'completed',
+                'idea-card--rejected': idea.status === 'rejected',
+                'idea-card--updated': store.recentlyUpdatedIdeaIds.has(idea.id),
               }"
+              @mouseenter="store.recentlyUpdatedIdeaIds.has(idea.id) && store.clearUpdatedIdea(idea.id)"
             >
               <div class="idea-card__top">
                 <div class="idea-card__meta">
@@ -182,22 +197,38 @@
                   <span class="idea-card__platform-name">{{ platformLabel(idea.platform) }}</span>
                   <span class="idea-card__format-badge">{{ formatLabel(idea.format) }}</span>
                 </div>
-                <span class="material-symbols-outlined idea-card__open-icon">open_in_new</span>
+                <span v-if="store.recentlyUpdatedIdeaIds.has(idea.id)" class="idea-card__updated-badge">
+                  Updated
+                </span>
               </div>
               <h4 class="idea-card__title">{{ idea.angle }}</h4>
               <p class="idea-card__body">{{ idea.description }}</p>
 
               <div class="idea-card__actions">
-                <button
-                  class="idea-card__btn idea-card__btn--approve"
-                  :disabled="idea.status !== 'proposed'"
-                  @click="handleApproveIdea(idea.id)"
-                >Approve</button>
-                <button
-                  class="idea-card__btn idea-card__btn--reject"
-                  :disabled="idea.status !== 'proposed'"
-                  @click="handleRejectIdea(idea.id)"
-                >Reject</button>
+                <template v-if="idea.status === 'proposed'">
+                  <button
+                    class="idea-card__btn idea-card__btn--approve"
+                    @click="handleApproveIdea(idea.id)"
+                  >Approve</button>
+                  <button
+                    class="idea-card__btn idea-card__btn--reject"
+                    @click="handleRejectIdea(idea.id)"
+                  >Reject</button>
+                </template>
+
+                <template v-else-if="idea.status === 'producing'">
+                  <button class="idea-card__btn idea-card__btn--producing" disabled>
+                    <span class="idea-card__spinner"></span>
+                    AI agent working on your idea
+                  </button>
+                </template>
+
+                <template v-else-if="idea.status === 'completed'">
+                  <button
+                    class="idea-card__btn idea-card__btn--view"
+                    @click="store.selectedIdeaId = idea.id"
+                  >View content &rarr;</button>
+                </template>
               </div>
             </article>
 
@@ -223,6 +254,7 @@
             </div>
           </div>
 
+          </template>
         </section>
       </div>
 
@@ -232,10 +264,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
+import { computed, ref, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { useSessionStore } from '~/stores/session';
 import { useProfileStore } from '~/stores/profile';
 import OrbRecorder from '~/components/OrbRecorder.vue';
+import IdeaPage from '~/components/IdeaPage.vue';
 import { useMarkdown } from '~/composables/useMarkdown';
 
 definePageMeta({
@@ -302,8 +335,17 @@ function platformLabel(platform: string): string {
 function formatLabel(format: string): string {
   return FORMAT_LABELS[format] ?? format;
 }
+const messagesContainerRef = ref<HTMLElement | null>(null);
 const isUserRecording = ref(false);
 const chatInputText = ref('');
+
+function scrollToBottom() {
+  nextTick(() => {
+    if (messagesContainerRef.value) {
+      messagesContainerRef.value.scrollTop = messagesContainerRef.value.scrollHeight;
+    }
+  });
+}
 
 const sessionId = computed(() => route.params.id as string);
 
@@ -332,6 +374,14 @@ async function handleResetSession() {
   await store.deleteSession();
   router.push('/dashboard');
 }
+
+// Scroll when container mounts (handles page refresh — Transition delays DOM availability)
+watch(messagesContainerRef, (el) => {
+  if (el) scrollToBottom();
+});
+
+// Scroll when new messages arrive (user sends / AI responds)
+watch(() => store.messages.length, scrollToBottom);
 
 onMounted(async () => {
   try {
@@ -945,6 +995,23 @@ onMounted(async () => {
   background: rgba(134, 242, 228, 0.07);
 }
 
+.idea-card--updated {
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.idea-card__updated-badge {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #4f46e5;
+  background: #eef2ff;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
 .idea-card--rejected {
   opacity: 0.45;
   pointer-events: none;
@@ -953,6 +1020,11 @@ onMounted(async () => {
 .idea-card--producing {
   border-color: rgba(245, 158, 11, 0.3);
   background: rgba(255, 251, 235, 0.5);
+}
+
+.idea-card--completed {
+  border-color: rgba(53, 37, 205, 0.2);
+  background: rgba(238, 242, 255, 0.4);
 }
 
 .idea-card__top {
@@ -972,16 +1044,6 @@ onMounted(async () => {
   border-radius: 6px;
 }
 
-.idea-card__open-icon {
-  font-size: 18px !important;
-  color: #464555;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.idea-card:hover .idea-card__open-icon {
-  opacity: 1;
-}
 
 .idea-card__title {
   font-family: 'Manrope', sans-serif;
@@ -1042,6 +1104,47 @@ onMounted(async () => {
 
 .idea-card__btn--reject:hover:not(:disabled) {
   background: #d8dadc;
+}
+
+.idea-card__btn--producing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #fef3c7;
+  color: #92400e;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.idea-card__spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #f59e0b;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.idea-card__btn--view {
+  background: linear-gradient(135deg, #3525cd, #4f46e5);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(53, 37, 205, 0.2);
+}
+
+.idea-card__btn--view:hover {
+  box-shadow: 0 4px 12px rgba(53, 37, 205, 0.3);
+  transform: translateY(-1px);
+}
+
+.workspace-detail {
+  height: 100%;
+  overflow-y: auto;
 }
 
 /* ─── Skeleton card ─── */

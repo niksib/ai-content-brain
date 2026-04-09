@@ -14,6 +14,8 @@ export function useSSEStream() {
   // Incremented synchronously on idea_pending, decremented via setTimeout
   // so Vue always renders at least one frame with the skeleton visible.
   const activePendingIdeas = ref(0);
+  const updatingIdeaIds = ref<Set<string>>(new Set());
+  const updatedIdeas = ref<SSEIdea[]>([]);
   const isStreaming = ref(false);
   const error = ref<string | null>(null);
   const sdkSessionId = ref<string | null>(null);
@@ -26,6 +28,8 @@ export function useSSEStream() {
     ideas.value = [];
     pendingIdeas.value = 0;
     activePendingIdeas.value = 0;
+    updatingIdeaIds.value = new Set();
+    updatedIdeas.value = [];
     isStreaming.value = false;
     error.value = null;
     sdkSessionId.value = null;
@@ -52,7 +56,7 @@ export function useSSEStream() {
         if (line.startsWith('event:')) {
           eventType = line.slice(6).trim();
         } else if (line.startsWith('data:')) {
-          dataLines.push(line.slice(5).trim());
+          dataLines.push(line.slice(5).replace(/^ /, ''));
         }
       }
 
@@ -64,7 +68,7 @@ export function useSSEStream() {
     return events;
   }
 
-  async function streamMessage(url: string, body: object): Promise<void> {
+  async function streamMessage(url: string, body: object, method = 'POST'): Promise<void> {
     if (abortController) {
       abortController.abort();
     }
@@ -75,7 +79,7 @@ export function useSSEStream() {
 
     try {
       const response = await fetch(url, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         credentials: 'include',
@@ -138,13 +142,7 @@ export function useSSEStream() {
   function handleSSEEvent(eventType: string, data: string): void {
     switch (eventType) {
       case 'token': {
-        try {
-          const parsed = JSON.parse(data);
-          tokens.value += parsed.token ?? parsed.text ?? data;
-        } catch {
-          // Plain text token
-          tokens.value += data;
-        }
+        tokens.value += data;
         break;
       }
 
@@ -165,6 +163,31 @@ export function useSSEStream() {
           }, 600);
         } catch {
           console.warn('Failed to parse idea event:', data);
+        }
+        break;
+      }
+
+      case 'idea_updating': {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.ideaId) {
+            updatingIdeaIds.value = new Set([...updatingIdeaIds.value, parsed.ideaId]);
+          }
+        } catch {
+          // ignore
+        }
+        break;
+      }
+
+      case 'idea_updated': {
+        try {
+          const parsed = JSON.parse(data);
+          updatedIdeas.value.push(parsed);
+          updatingIdeaIds.value = new Set(
+            [...updatingIdeaIds.value].filter((id) => id !== parsed.id),
+          );
+        } catch {
+          console.warn('Failed to parse idea_updated event:', data);
         }
         break;
       }
@@ -208,6 +231,8 @@ export function useSSEStream() {
     ideas,
     pendingIdeas,
     activePendingIdeas,
+    updatingIdeaIds,
+    updatedIdeas,
     isStreaming,
     error,
     sdkSessionId,

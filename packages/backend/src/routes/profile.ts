@@ -23,7 +23,7 @@ profileRoutes.get("/profile", requireAuth, async (context) => {
 
   const [profile, dbUser] = await Promise.all([
     prisma.creatorProfile.findUnique({ where: { userId: user.id } }),
-    prisma.user.findUnique({ where: { id: user.id }, select: { isAdmin: true } }),
+    prisma.user.findUnique({ where: { id: user.id }, select: { isAdmin: true, name: true } }),
   ]);
 
   if (!profile) {
@@ -33,6 +33,7 @@ profileRoutes.get("/profile", requireAuth, async (context) => {
   return context.json({
     profile,
     email: user.email,
+    name: dbUser?.name ?? '',
     isAdmin: dbUser?.isAdmin ?? false,
   });
 });

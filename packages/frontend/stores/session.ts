@@ -77,6 +77,7 @@ export const useSessionStore = defineStore('session', () => {
   const session = ref<Session | null>(null);
   const messages = ref<SessionMessage[]>([]);
   const ideas = ref<SessionIdea[]>([]);
+  const recentlyUpdatedIdeaIds = ref<Set<string>>(new Set());
   const pageState = ref<PageState>('recording');
   const isStreaming = ref(false);
   const currentStreamText = ref('');
@@ -167,6 +168,25 @@ export const useSessionStore = defineStore('session', () => {
       { deep: true },
     );
 
+    // Watch for updated ideas and patch them in-place
+    const stopUpdatedWatcher = watch(
+      sseStream.updatedIdeas,
+      (updatedList) => {
+        for (const raw of updatedList) {
+          const idx = ideas.value.findIndex((idea) => idea.id === (raw.id as string));
+          if (idx !== -1) {
+            ideas.value[idx] = {
+              ...ideas.value[idx],
+              angle: (raw.angle as string) ?? ideas.value[idx].angle,
+              description: (raw.description as string | undefined) ?? ideas.value[idx].description,
+            };
+            recentlyUpdatedIdeaIds.value = new Set([...recentlyUpdatedIdeaIds.value, raw.id as string]);
+          }
+        }
+      },
+      { deep: true },
+    );
+
     try {
       const body: Record<string, unknown> = { content: text };
       if (session.value.sdkSessionId) {
@@ -210,6 +230,7 @@ export const useSessionStore = defineStore('session', () => {
       throw error;
     } finally {
       stopIdeaWatcher();
+      stopUpdatedWatcher();
       currentStreamText.value = '';
       isStreaming.value = false;
     }
@@ -217,15 +238,41 @@ export const useSessionStore = defineStore('session', () => {
 
   async function approveIdea(ideaId: string): Promise<void> {
     if (!session.value) return;
+
+    const idx = ideas.value.findIndex((item) => item.id === ideaId);
+    if (idx === -1) return;
+
+    // Immediately show producing state
+    ideas.value[idx] = { ...ideas.value[idx], status: 'producing' };
+
+    const productionStream = useSSEStream();
+
     try {
-      await apiClient.patch(`/api/ideas/${ideaId}/approve`);
-      const idea = ideas.value.find((item) => item.id === ideaId);
-      if (idea) {
-        idea.status = 'approved';
+      await productionStream.streamMessage(
+        `${baseURL}/api/ideas/${ideaId}/approve`,
+        {},
+        'PATCH',
+      );
+
+      // Wait briefly for backend .then() to finish writing status + content
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Reload idea with produced content
+      const freshIdea = await loadIdea(ideaId);
+      if (freshIdea) {
+        const currentIdx = ideas.value.findIndex((item) => item.id === ideaId);
+        if (currentIdx !== -1) {
+          ideas.value[currentIdx] = freshIdea;
+        }
       }
-    } catch (error) {
-      console.error('Failed to approve idea:', error);
-      throw error;
+    } catch (err) {
+      // Revert to proposed so user can retry
+      const currentIdx = ideas.value.findIndex((item) => item.id === ideaId);
+      if (currentIdx !== -1) {
+        ideas.value[currentIdx] = { ...ideas.value[currentIdx], status: 'proposed' };
+      }
+      console.error('Failed to approve idea:', err);
+      throw err;
     }
   }
 
@@ -257,10 +304,17 @@ export const useSessionStore = defineStore('session', () => {
     resetSession();
   }
 
+  function clearUpdatedIdea(ideaId: string): void {
+    recentlyUpdatedIdeaIds.value = new Set(
+      [...recentlyUpdatedIdeaIds.value].filter((id) => id !== ideaId),
+    );
+  }
+
   function resetSession(): void {
     session.value = null;
     messages.value = [];
     ideas.value = [];
+    recentlyUpdatedIdeaIds.value = new Set();
     pageState.value = 'recording';
     isStreaming.value = false;
     currentStreamText.value = '';
@@ -279,6 +333,9 @@ export const useSessionStore = defineStore('session', () => {
     streamTokens: sseStream.tokens,
     streamError: sseStream.error,
     pendingIdeasCount: sseStream.activePendingIdeas,
+    updatingIdeaIds: sseStream.updatingIdeaIds,
+    recentlyUpdatedIdeaIds,
+    clearUpdatedIdea,
     createOrLoadSession,
     loadMessages,
     loadIdeas,

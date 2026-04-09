@@ -214,7 +214,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useSessionStore, type SessionIdea, type ProducedContentBody } from '~/stores/session';
 
 const props = defineProps<{
@@ -309,6 +309,17 @@ function handleReject() {
     idea.value.status = 'rejected';
   }
 }
+
+// Sync with store when idea status changes (e.g. producing → completed)
+watch(
+  () => store.ideas.find((item) => item.id === props.ideaId),
+  (storeIdea) => {
+    if (storeIdea && idea.value) {
+      idea.value = { ...storeIdea };
+    }
+  },
+  { deep: true },
+);
 
 onMounted(async () => {
   isLoading.value = true;

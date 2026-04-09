@@ -63,6 +63,21 @@ export const saveContentIdeaTool: Anthropic.Tool = {
   },
 };
 
+export const updateContentIdeaTool: Anthropic.Tool = {
+  name: "update_content_idea",
+  description:
+    "Update an existing content idea's angle or description. Use this when the user asks to refine, adjust, or improve a specific idea. You already know each idea's ID from the save_content_idea tool results.",
+  input_schema: {
+    type: "object",
+    properties: {
+      ideaId: { type: "string", description: "The ID of the content idea to update" },
+      angle: { type: "string", description: "Updated one-line angle/hook (omit to keep unchanged)" },
+      description: { type: "string", description: "Updated description (omit to keep unchanged)" },
+    },
+    required: ["ideaId"],
+  },
+};
+
 export const saveProducedContentTool: Anthropic.Tool = {
   name: "save_produced_content",
   description:
@@ -153,6 +168,33 @@ export function makeSaveContentIdea(onIdeaSaved?: (idea: ContentIdea) => void) {
     });
 
     onIdeaSaved?.(idea);
+
+    return JSON.stringify({ success: true, ideaId: idea.id });
+  };
+}
+
+export function makeUpdateContentIdea(
+  onUpdating?: (ideaId: string) => void,
+  onUpdated?: (idea: ContentIdea) => void
+) {
+  return async (input: Record<string, unknown>): Promise<string> => {
+    const { ideaId, angle, description } = input as {
+      ideaId: string;
+      angle?: string;
+      description?: string;
+    };
+
+    onUpdating?.(ideaId);
+
+    const idea = await prisma.contentIdea.update({
+      where: { id: ideaId },
+      data: {
+        ...(angle !== undefined && { angle }),
+        ...(description !== undefined && { description }),
+      },
+    });
+
+    onUpdated?.(idea);
 
     return JSON.stringify({ success: true, ideaId: idea.id });
   };
