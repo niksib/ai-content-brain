@@ -1,12 +1,14 @@
 ---
 name: tone-of-voice-matching
-description: Use this skill when writing any content for a user — posts, scripts, captions, or any other output. This skill teaches how to match a creator's authentic voice so content never sounds AI-generated. Apply before writing any user-facing content.
+description: Use this skill before writing any Threads post. Threads is the platform closest to how someone actually talks — generic or polished voice kills authenticity. Apply to match the creator's exact voice from their profile.
 ---
 
-# Tone of Voice Matching
+# Tone of Voice Matching for Threads (2026)
 
 ## Core Principle
-The Creator Profile contains the user's tone of voice data. Your job is to write AS that person — not for that person. The output should be indistinguishable from something they wrote themselves.
+The Creator Profile contains the user's tone of voice data. Your job is to write AS that person — not for that person. On Threads specifically, the output must sound like something they'd send in a voice memo, not something they'd publish in a newsletter.
+
+Threads is the most unfiltered expression of a creator's voice. If it sounds slightly too clean — it's wrong.
 
 ## How to Extract Voice from Creator Profile
 
@@ -102,16 +104,16 @@ delve, tapestry, multifaceted, nuanced, pivotal, paramount, underscore, robust, 
 - "Not only X, but also Y" construction used repeatedly
 - Formal numbered structures when casual language would fit better
 
-## Platform-Specific Voice Adjustments
+## Threads-Specific Voice Calibration
 
-Different platforms require different expressions of the same voice:
+Threads is the most unfiltered platform. The voice calibration here is different from other platforms:
 
-**Threads** — most conversational, closest to how they actually talk, unfiltered
-**TikTok/Reels** — energetic version of their voice, punchy, hooks front-loaded
-**Instagram Carousel** — clearest, most educational expression of their voice
-**LinkedIn** — most professional expression but still unmistakably them — never corporate
+- **More raw** — incomplete thoughts are ok, mid-scene openers, reactions in real time
+- **Less structured** — no intro, no "today I want to talk about", no summary at the end
+- **More opinionated** — Threads rewards conviction; hedging ("I might be wrong, but...") only when genuinely uncertain, not as a style choice
+- **Closer to texting** — not closer to blogging or essay writing
 
-The voice doesn't change — only the register and energy level adjust.
+If the creator's voice on other platforms sounds professional and put-together, their Threads voice should sound like the same person on a less formal day. Not a different person — just less composed.
 
 ## Self-Check Before Delivering Output
 

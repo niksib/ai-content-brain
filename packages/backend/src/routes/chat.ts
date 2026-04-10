@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { agentRunner } from "../services/agent-runner.service.js";
 import { billingService } from "../services/billing.service.js";
 import { createSSEStream } from "../lib/sse.js";
+import { StrategistAgent } from "../agents/strategist/strategist.agent.js";
 import type { AppEnv } from "../types/hono.js";
 
 export const chatRoutes = new Hono<AppEnv>();
@@ -64,8 +65,10 @@ chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "conten
     close,
   };
 
+  const agent = await StrategistAgent.create(user.id, chatSession.id);
+
   agentRunner
-    .streamAgentResponse("strategist", messageHistory, user.id, wrappedSse, chatSession.id)
+    .stream(agent, messageHistory, wrappedSse)
     .then(async ({ costUsd }) => {
       // Save assistant message with accumulated text and cost
       const assistantContent = tokenChunks.join("");

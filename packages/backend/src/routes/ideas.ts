@@ -5,41 +5,30 @@ import { prisma } from "../lib/prisma.js";
 import { agentRunner } from "../services/agent-runner.service.js";
 import { billingService } from "../services/billing.service.js";
 import { createSSEStream } from "../lib/sse.js";
+import { ThreadsAgent } from "../agents/threads/threads.agent.js";
+import { LinkedInAgent } from "../agents/linkedin/linkedin.agent.js";
+import { VideoAgent } from "../agents/video/video.agent.js";
+import { InstagramAgent } from "../agents/instagram/instagram.agent.js";
 import type { AppEnv } from "../types/hono.js";
-
-interface PlatformAgentMapping {
-  agent: string;
-  description: string;
-}
-
-function resolvePlatformAgent(
-  platform: string,
-  format: string
-): PlatformAgentMapping {
-  if (platform === "threads" && format === "text_post") {
-    return { agent: "threads", description: "Threads text post" };
-  }
-  if (platform === "linkedin" && format === "text_post") {
-    return { agent: "linkedin", description: "LinkedIn text post" };
-  }
-  if (platform === "tiktok" && format === "video_script") {
-    return { agent: "video", description: "TikTok video script" };
-  }
-  if (platform === "instagram" && format === "video_script") {
-    return { agent: "video", description: "Instagram Reels video script" };
-  }
-  if (platform === "instagram" && format === "carousel") {
-    return { agent: "instagram", description: "Instagram carousel" };
-  }
-  if (platform === "instagram" && format === "stories") {
-    return { agent: "instagram", description: "Instagram stories" };
-  }
-
-  // Fallback: use platform name as agent
-  return { agent: platform, description: `${platform} ${format}` };
-}
+import type { ContentIdea } from "../generated/prisma/client.js";
+import type { PlatformAgent } from "../agents/base.agent.js";
 
 export const ideaRoutes = new Hono<AppEnv>();
+
+async function resolvePlatformAgent(idea: ContentIdea, userId: string): Promise<PlatformAgent> {
+  const { platform } = idea;
+
+  if (platform === "threads") return ThreadsAgent.create(userId, idea);
+  if (platform === "linkedin") return LinkedInAgent.create(userId, idea);
+  if (platform === "tiktok") return VideoAgent.create(userId, idea);
+  if (platform === "instagram") {
+    return idea.format === "video_script"
+      ? VideoAgent.create(userId, idea)
+      : InstagramAgent.create(userId, idea);
+  }
+
+  throw new Error(`No agent for platform=${platform}`);
+}
 
 // List ideas from session
 ideaRoutes.get("/sessions/:id/ideas", requireAuth, async (context) => {
@@ -71,58 +60,49 @@ ideaRoutes.get("/sessions/:id/ideas", requireAuth, async (context) => {
 });
 
 // Approve idea and start content production
-ideaRoutes.patch("/ideas/:id/approve", requireAuth, requireCredits(20, "content_production"), async (context) => {
-  const user = context.get("user");
-  const ideaId = context.req.param("id");
+ideaRoutes.patch(
+  "/ideas/:id/approve",
+  requireAuth,
+  requireCredits(20, "content_production"),
+  async (context) => {
+    const user = context.get("user");
+    const ideaId = context.req.param("id");
 
-  const idea = await prisma.contentIdea.findUnique({
-    where: { id: ideaId, userId: user.id },
-  });
-
-  if (!idea) {
-    return context.json({ error: "Idea not found" }, 404);
-  }
-
-  // Set status to producing — content generation starts immediately
-  const updatedIdea = await prisma.contentIdea.update({
-    where: { id: ideaId },
-    data: { status: "producing" },
-  });
-
-  // Determine which platform agent to use
-  const { agent, description } = resolvePlatformAgent(
-    idea.platform,
-    idea.format
-  );
-
-  // Build prompt for the platform agent
-  const prompt = buildProductionPrompt(ideaId, idea.platform, idea.format, idea.angle, idea.description, description);
-
-  // Stream agent response via SSE
-  const { send, close, response } = createSSEStream(context);
-
-  agentRunner
-    .streamAgentResponse(agent, [{ role: "user", content: prompt }], user.id, { send, close })
-    .then(async () => {
-      // After agent finishes, update idea status to completed
-      await prisma.contentIdea.update({
-        where: { id: ideaId },
-        data: { status: "completed" },
-      });
-
-      // Deduct credits after successful content production
-      await billingService.deductCredits(user.id, 20, "content_production", ideaId);
-    })
-    .catch(async () => {
-      // If agent fails, revert status to approved so user can retry
-      await prisma.contentIdea.update({
-        where: { id: ideaId },
-        data: { status: "approved" },
-      });
+    const idea = await prisma.contentIdea.findUnique({
+      where: { id: ideaId, userId: user.id },
     });
 
-  return response;
-});
+    if (!idea) {
+      return context.json({ error: "Idea not found" }, 404);
+    }
+
+    await prisma.contentIdea.update({
+      where: { id: ideaId },
+      data: { status: "producing" },
+    });
+
+    const agent = await resolvePlatformAgent(idea, user.id);
+    const { send, close, response } = createSSEStream(context);
+
+    agentRunner
+      .stream(agent, [{ role: "user", content: agent.buildProductionPrompt() }], { send, close })
+      .then(async () => {
+        await prisma.contentIdea.update({
+          where: { id: ideaId },
+          data: { status: "completed" },
+        });
+        await billingService.deductCredits(user.id, 20, "content_production", ideaId);
+      })
+      .catch(async () => {
+        await prisma.contentIdea.update({
+          where: { id: ideaId },
+          data: { status: "approved" },
+        });
+      });
+
+    return response;
+  }
+);
 
 // Reject idea
 ideaRoutes.patch("/ideas/:id/reject", requireAuth, async (context) => {
@@ -145,6 +125,109 @@ ideaRoutes.patch("/ideas/:id/reject", requireAuth, async (context) => {
   return context.json({ idea: updatedIdea });
 });
 
+// Chat with platform agent in the context of a completed idea
+ideaRoutes.post(
+  "/ideas/:id/message",
+  requireAuth,
+  requireCredits(10, "content_plan"),
+  async (context) => {
+    const user = context.get("user");
+    const ideaId = context.req.param("id");
+    const body = await context.req.json();
+    const { content } = body;
+
+    if (!content || typeof content !== "string") {
+      return context.json({ error: "content is required" }, 400);
+    }
+
+    const idea = await prisma.contentIdea.findUnique({
+      where: { id: ideaId, userId: user.id },
+      include: {
+        producedContent: true,
+        contentPlan: { include: { chatSession: true } },
+      },
+    });
+
+    if (!idea) return context.json({ error: "Idea not found" }, 404);
+    if (!idea.producedContent) return context.json({ error: "Idea has no produced content yet" }, 400);
+
+    const chatSession = idea.contentPlan.chatSession;
+
+    // Save user message linked to this idea
+    await prisma.chatMessage.create({
+      data: {
+        chatSessionId: chatSession.id,
+        role: "user",
+        content,
+        contentIdeaId: ideaId,
+      },
+    });
+
+    const agent = await resolvePlatformAgent(idea, user.id);
+
+    // Synthetic initial context: production prompt + what was produced
+    const syntheticHistory = [
+      { role: "user" as const, content: agent.buildProductionPrompt() },
+      {
+        role: "assistant" as const,
+        content: `I've produced and saved the content:\n\n${JSON.stringify(idea.producedContent.body, null, 2)}`,
+      },
+    ];
+
+    // Real follow-up messages for this idea (includes the just-saved user message)
+    const followUpMessages = await prisma.chatMessage.findMany({
+      where: { chatSessionId: chatSession.id, contentIdeaId: ideaId },
+      orderBy: { createdAt: "asc" },
+      select: { role: true, content: true },
+    });
+
+    const messageHistory = [...syntheticHistory, ...followUpMessages];
+
+    const { send, close, response } = createSSEStream(context);
+    const tokenChunks: string[] = [];
+
+    const wrappedSse = {
+      send: (event: string, data: unknown) => {
+        if (event === "token" && typeof data === "string") tokenChunks.push(data);
+        send(event, data);
+      },
+      close,
+    };
+
+    // Called inside the tool executor — before the SSE stream closes — so the
+    // idea_updated event is sent while the stream is still open.
+    const onContentSaved = async () => {
+      const updatedIdea = await prisma.contentIdea.findUnique({
+        where: { id: ideaId },
+        include: { producedContent: true },
+      });
+      if (updatedIdea?.producedContent) {
+        send("idea_updated", updatedIdea);
+      }
+    };
+
+    agentRunner
+      .stream(agent, messageHistory, wrappedSse, { onContentSaved })
+      .then(async ({ costUsd }) => {
+        const assistantContent = tokenChunks.join("");
+        if (assistantContent.length > 0) {
+          await prisma.chatMessage.create({
+            data: {
+              chatSessionId: chatSession.id,
+              role: "assistant",
+              content: assistantContent,
+              costUsd,
+              contentIdeaId: ideaId,
+            },
+          });
+        }
+        await billingService.deductCredits(user.id, 10, "content_plan", ideaId);
+      });
+
+    return response;
+  }
+);
+
 // Get idea detail with produced content
 ideaRoutes.get("/ideas/:id", requireAuth, async (context) => {
   const user = context.get("user");
@@ -163,52 +246,3 @@ ideaRoutes.get("/ideas/:id", requireAuth, async (context) => {
 
   return context.json({ idea });
 });
-
-function buildProductionPrompt(
-  ideaId: string,
-  platform: string,
-  format: string,
-  angle: string,
-  description: string,
-  platformDescription: string,
-): string {
-  const formatInstructions: Record<string, string> = {
-    text_post: `Write a ready-to-post text. When done, call save_produced_content with:
-- contentIdeaId: "${ideaId}" (always use this exact value)
-- userId: the CURRENT USER ID from your system prompt
-- platform: "${platform}"
-- format: "${format}"
-- body: JSON string containing { "text": "...", "hashtags": ["tag1", "tag2"] }`,
-    video_script: `Write a full video script with shooting brief. When done, call save_produced_content with:
-- contentIdeaId: "${ideaId}" (always use this exact value)
-- userId: the CURRENT USER ID from your system prompt
-- platform: "${platform}"
-- format: "${format}"
-- body: JSON string containing { "script": [{"timestamp": "0:00", "text": "..."}], "shootingBrief": "...", "deliveryNotes": "...", "caption": "...", "hashtags": ["tag1"] }`,
-    carousel: `Write carousel slide content. When done, call save_produced_content with:
-- contentIdeaId: "${ideaId}" (always use this exact value)
-- userId: the CURRENT USER ID from your system prompt
-- platform: "${platform}"
-- format: "${format}"
-- body: JSON string containing { "slides": [{"slideNumber": 1, "text": "...", "designNotes": "..."}], "caption": "...", "hashtags": ["tag1"] }`,
-    stories: `Write an Instagram Stories sequence. When done, call save_produced_content with:
-- contentIdeaId: "${ideaId}" (always use this exact value)
-- userId: the CURRENT USER ID from your system prompt
-- platform: "${platform}"
-- format: "${format}"
-- body: JSON string containing { "stories": [{"storyNumber": 1, "textOverlay": "...", "background": "...", "interactiveElement": "..."}], "notes": "..." }`,
-  };
-
-  const instructions =
-    formatInstructions[format] ?? `Produce the content, then call save_produced_content with contentIdeaId: "${ideaId}", userId from system prompt, platform: "${platform}", format: "${format}", and body as a JSON string.`;
-
-  return `Produce a ${platformDescription} based on this approved content idea.
-
-**Angle:** ${angle}
-
-**Description:** ${description}
-
-${instructions}
-
-Use the tone-of-voice-matching and anti-ai-writing skills. Make the content sound like the creator, not like AI. Apply hook-formulas for the opening and cta-patterns for the call-to-action.`;
-}

@@ -1,14 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import fs from "fs";
-import path from "path";
 import { prisma } from "../lib/prisma.js";
+import { OnboardingAgent } from "../agents/onboarding/onboarding.agent.js";
 
 const client = new Anthropic({ maxRetries: 3 });
-
-const SYSTEM_PROMPT = fs.readFileSync(
-  path.join(import.meta.dirname, "../agents/onboarding/.claude/CLAUDE.md"),
-  "utf-8"
-);
 
 export interface QuizData {
   platforms: string[];
@@ -30,58 +24,6 @@ export interface OnboardingResult {
   status: "complete" | "needs_more";
   questions?: string[];
 }
-
-const TOOLS: Anthropic.Tool[] = [
-  {
-    name: "save_creator_profile",
-    description: "Save the completed creator profile to the database.",
-    input_schema: {
-      type: "object",
-      properties: {
-        userId: { type: "string" },
-        platforms: { type: "array", items: { type: "string" } },
-        niche: { type: "string" },
-        topics: { type: "array", items: { type: "string" } },
-        audienceDescription: { type: "string" },
-        audiencePainPoints: { type: "string" },
-        stage: { type: "string", enum: ["starting", "growing", "established"] },
-        toneOfVoice: { type: "string" },
-        toneExamples: { type: "array", items: { type: "string" } },
-        goals: { type: "array", items: { type: "string" } },
-        rawNotes: { type: "string" },
-      },
-      required: [
-        "userId",
-        "platforms",
-        "niche",
-        "topics",
-        "audienceDescription",
-        "stage",
-        "toneOfVoice",
-        "toneExamples",
-        "goals",
-        "rawNotes",
-      ],
-    },
-  },
-  {
-    name: "request_clarification",
-    description:
-      "Request specific follow-up questions when the audience description or tone example is too vague. Maximum 3 questions. Do not use this if the answers are clear enough.",
-    input_schema: {
-      type: "object",
-      properties: {
-        questions: {
-          type: "array",
-          items: { type: "string" },
-          minItems: 1,
-          maxItems: 3,
-        },
-      },
-      required: ["questions"],
-    },
-  },
-];
 
 function formatSubmission(submission: OnboardingSubmission): string {
   const { quiz, followUpAnswers } = submission;
@@ -116,22 +58,19 @@ export async function processOnboardingAnswers(
   userId: string,
   submission: OnboardingSubmission
 ): Promise<OnboardingResult> {
+  const agent = await OnboardingAgent.create(userId);
+  const { definitions } = agent.getTools();
   const content = formatSubmission(submission);
 
-  const messages: Anthropic.MessageParam[] = [
-    { role: "user", content },
-  ];
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content }];
 
   while (true) {
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
-      system: [
-        { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-        { type: "text", text: `User ID: ${userId}` },
-      ],
+      system: [{ type: "text", text: agent.systemPrompt, cache_control: { type: "ephemeral" } }],
       messages,
-      tools: TOOLS,
+      tools: definitions,
     });
 
     messages.push({ role: "assistant", content: response.content });

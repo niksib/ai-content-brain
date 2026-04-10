@@ -103,7 +103,20 @@ If user selects "Other" → show a short text input: "Describe your niche in a f
 
 ---
 
-### Section 6 — Tone of Voice
+### Section 6 — Content Language
+**Question:** What language do you write your content in?
+**Type:** Single select
+**Options:**
+- Russian
+- English
+- Ukrainian
+- Other (write your language)
+
+This determines the language all platform agents will use when producing content. The user can always chat with agents in any language — this only controls the language of the final content output.
+
+---
+
+### Section 7 — Tone of Voice
 **Question:** How would you describe your communication style? Pick all that apply.
 **Type:** Multi-select
 **Options:**
@@ -173,7 +186,8 @@ Field names must match the tool schema exactly:
   "toneOfVoice": "",
   "toneExamples": [],
   "goals": [],
-  "rawNotes": ""
+  "rawNotes": "",
+  "contentLanguage": ""
 }
 ```
 
@@ -185,6 +199,7 @@ Field names must match the tool schema exactly:
 - `goals` — array, one item per selected goal
 - `rawNotes` — paste verbatim: the full tone example, the audience description, and any "Other" field text exactly as the user wrote it. Do not clean up or paraphrase. These exact words are what platform agents use to match the user's voice.
 - `stage` mapping: "Just starting" → `"starting"`, "Growing" → `"growing"`, "Established" → `"established"`
+- `contentLanguage` — the exact language name as selected (e.g. `"Russian"`, `"English"`, `"Ukrainian"`). If "Other" was selected, use the language the user typed.
 
 ---
 

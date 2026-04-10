@@ -38,10 +38,33 @@
 
 ### What Actually Works (2026 data)
 - **Video posts: 5.55% engagement** — nearly double text (2.79%)
-- Images outperform text by 60%
-- Text posts still work but need strong hook or question
+- **Image posts: 4.55%** — outperform text by 60%
+- Text posts: 2.79% — still work when hook or opinion is very strong
 - Conversation-first content wins — questions, opinions, hot takes
 - Authentic, unpolished voice beats corporate tone
+
+### Format Decision Framework (use this when assigning format to a Threads idea)
+
+**`text_post`** — when the value is entirely in the words:
+- Strong opinion or hot take where an image would distract
+- Relatable observation ("we all do this")
+- Vulnerable personal statement
+- Any idea where the argument IS the content
+
+**`text_with_image`** — when a single image adds proof or context:
+- Showing a concrete result (screenshot, metric, before/after in one frame)
+- Personal photo that adds authenticity to a story
+- Something visually surprising that triggers "wait, what is that?"
+- The image must ADD information the text cannot convey — not just decoration
+
+**`image_series`** — when the idea is a visual story or process:
+- Behind the scenes / how something was built or created
+- Journey with multiple steps (before → during → after)
+- Visual breakdown ("here's everything that went into X")
+- Tutorial with visual examples
+- Rule: 3–6 images, each must add a new piece of information
+
+**Key question before assigning**: Does the visual add information the text can't convey, or is it just decoration? Decoration → `text_post`. Evidence or story → `text_with_image` or `image_series`.
 
 ### Algorithm Signals (confirmed by Mosseri)
 - Reply depth is top-tier ranking signal

@@ -4,9 +4,9 @@
     <!-- ── Progress bar (quiz phase only) ── -->
     <header v-if="store.phase === 'quiz'" class="onboarding-header">
       <div class="onboarding-header__inner">
-        <span class="onboarding-header__label">Step {{ store.quizSection + 1 }} of 6</span>
+        <span class="onboarding-header__label">Step {{ store.quizSection + 1 }} of 7</span>
         <div class="onboarding-progress">
-          <div class="onboarding-progress__fill" :style="{ width: `${((store.quizSection + 1) / 6) * 100}%` }"></div>
+          <div class="onboarding-progress__fill" :style="{ width: `${((store.quizSection + 1) / 7) * 100}%` }"></div>
         </div>
       </div>
     </header>
@@ -122,8 +122,25 @@
             </div>
           </template>
 
-          <!-- Section 5 — Tone of Voice -->
+          <!-- Section 5 — Content Language -->
           <template v-else-if="store.quizSection === 5">
+            <div class="quiz-card__header">
+              <p class="quiz-card__eyebrow">Content Language</p>
+              <h2 class="quiz-card__question">What language do you write your content in?</h2>
+            </div>
+            <div class="quiz-options quiz-options--wrap">
+              <button
+                v-for="lang in LANGUAGES"
+                :key="lang"
+                class="quiz-chip"
+                :class="{ 'quiz-chip--selected': store.quiz.contentLanguage === lang }"
+                @click="store.quiz.contentLanguage = lang"
+              >{{ lang }}</button>
+            </div>
+          </template>
+
+          <!-- Section 6 — Tone of Voice -->
+          <template v-else-if="store.quizSection === 6">
             <div class="quiz-card__header">
               <p class="quiz-card__eyebrow">Tone of Voice</p>
               <h2 class="quiz-card__question">How would you describe your communication style? <span class="quiz-card__question-note">Pick all that apply.</span></h2>
@@ -170,7 +187,7 @@
               :disabled="!store.sectionValid"
               @click="store.nextSection()"
             >
-              {{ store.quizSection === 5 ? 'Finish' : 'Continue' }}
+              {{ store.quizSection === 6 ? 'Finish' : 'Continue' }}
               <span class="material-symbols-outlined">arrow_forward</span>
             </button>
           </div>
@@ -271,6 +288,8 @@ const GOALS = [
   'Document my journey / share my story',
   'All of the above',
 ];
+
+const LANGUAGES = ['Russian', 'English', 'Ukrainian', 'Spanish', 'German', 'French', 'Other'];
 
 const TONE_STYLES = [
   'Casual and conversational',

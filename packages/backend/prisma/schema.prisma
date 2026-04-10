@@ -75,10 +75,11 @@ model CreatorProfile {
   audiencePainPoints  String?
   stage               CreatorStage
 
-  toneOfVoice  String
-  toneExamples String[]
-  goals        String[]
-  rawNotes     String
+  toneOfVoice     String
+  toneExamples    String[]
+  goals           String[]
+  rawNotes        String
+  contentLanguage String   @default("Russian")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -185,6 +186,8 @@ enum Platform {
 
 enum ContentFormat {
   text_post
+  text_with_image
+  image_series
   video_script
   carousel
   stories

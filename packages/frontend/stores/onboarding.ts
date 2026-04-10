@@ -14,6 +14,7 @@ export interface QuizData {
   topicOther: string;
   audience: string;
   goal: string;
+  contentLanguage: string;
   toneStyles: string[];
   toneExample: string;
 }
@@ -30,6 +31,7 @@ const emptyQuiz = (): QuizData => ({
   topicOther: '',
   audience: '',
   goal: '',
+  contentLanguage: '',
   toneStyles: [],
   toneExample: '',
 });
@@ -71,7 +73,8 @@ export const useOnboardingStore = defineStore('onboarding', () => {
         );
       case 3: return quiz.value.audience.trim().length >= 15;
       case 4: return quiz.value.goal !== '';
-      case 5:
+      case 5: return quiz.value.contentLanguage !== '';
+      case 6:
         return quiz.value.toneStyles.length > 0 && quiz.value.toneExample.trim().length > 0;
       default: return false;
     }
@@ -85,7 +88,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   }
 
   function nextSection() {
-    if (quizSection.value < 5) {
+    if (quizSection.value < 6) {
       quizSection.value++;
     } else {
       submitQuiz();

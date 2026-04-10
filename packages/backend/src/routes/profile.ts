@@ -13,6 +13,7 @@ const EDITABLE_FIELDS = [
   "toneOfVoice",
   "toneExamples",
   "goals",
+  "contentLanguage",
 ] as const;
 
 export const profileRoutes = new Hono<AppEnv>();

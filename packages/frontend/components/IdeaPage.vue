@@ -23,16 +23,10 @@
       <!-- Meta badges -->
       <div class="idea-page__meta">
         <span class="idea-page__badge idea-page__badge--platform">
-          {{ platformEmoji }} {{ idea.platform }}
+          <PlatformIcon :platform="idea.platform as 'threads' | 'linkedin' | 'tiktok' | 'instagram'" :size="12" />
         </span>
         <span class="idea-page__badge idea-page__badge--format">
-          {{ idea.format }}
-        </span>
-        <span
-          class="idea-page__badge"
-          :class="`idea-page__badge--${idea.status}`"
-        >
-          {{ statusLabel }}
+          {{ formatLabel }}
         </span>
       </div>
 
@@ -62,13 +56,78 @@
 
       <!-- Produced content -->
       <div class="idea-page__section">
-        <h2 class="idea-page__section-title">Produced Content</h2>
+        <h2 v-if="!isThreadsTextPost" class="idea-page__section-title">Produced Content</h2>
 
         <!-- Show produced content when completed -->
         <div v-if="idea.status === 'completed' && idea.producedContent" class="idea-page__produced">
 
-          <!-- TEXT POST (Threads, LinkedIn) -->
-          <template v-if="idea.format === 'text_post' && contentBody">
+          <!-- THREADS POST CARD (single or multi-thread) -->
+          <template v-if="isThreadsTextPost && contentBody">
+            <div class="threads-thread">
+              <div
+                v-for="(postText, index) in threadPosts"
+                :key="`${index}-${postText.slice(0, 20)}`"
+                class="threads-thread__item"
+              >
+                <!-- Vertical connector line between posts -->
+                <div v-if="index < threadPosts.length - 1" class="threads-thread__connector-wrap">
+                  <div class="threads-thread__line" />
+                </div>
+
+                <div class="threads-card">
+                  <div class="threads-card__header">
+                    <div class="threads-card__avatar">
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                      </svg>
+                    </div>
+                    <div class="threads-card__user">
+                      <span class="threads-card__username">you</span>
+                    </div>
+                    <button
+                      type="button"
+                      class="threads-card__more"
+                      :title="copiedIndex === index ? 'Copied!' : 'Copy'"
+                      @click="copyPost(postText, index)"
+                    >
+                      <svg v-if="copiedIndex === index" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" style="color: #059669">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      <svg v-else viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="threads-card__body">{{ postText }}</div>
+                  <div class="threads-card__actions">
+                    <button type="button" class="threads-card__action">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                      </svg>
+                    </button>
+                    <button type="button" class="threads-card__action">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      </svg>
+                    </button>
+                    <button type="button" class="threads-card__action">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20">
+                        <path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/>
+                      </svg>
+                    </button>
+                    <button type="button" class="threads-card__action">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20">
+                        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- TEXT POST (LinkedIn, other platforms) -->
+          <template v-else-if="idea.format === 'text_post' && contentBody">
             <div class="idea-page__text-post">
               <div class="idea-page__text-body">{{ contentBody.text }}</div>
               <div v-if="contentBody.hashtags?.length" class="idea-page__hashtags">
@@ -215,6 +274,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import PlatformIcon from '~/components/PlatformIcon.vue';
 import { useSessionStore, type SessionIdea, type ProducedContentBody } from '~/stores/session';
 
 const props = defineProps<{
@@ -232,34 +292,25 @@ const idea = ref<SessionIdea | null>(null);
 const isLoading = ref(false);
 const loadError = ref<string | null>(null);
 const copyLabel = ref('Copy');
+const copiedIndex = ref<number | null>(null);
 
-const platformEmojiMap: Record<string, string> = {
-  threads: '\uD83E\uDDF5',
-  linkedin: '\uD83D\uDCBC',
-  tiktok: '\uD83C\uDFAC',
-  instagram: '\uD83D\uDCF8',
-  twitter: '\uD83D\uDC26',
-  youtube: '\u25B6\uFE0F',
+const FORMAT_LABELS: Record<string, string> = {
+  text_post: 'Post',
+  text_with_image: 'Post + Image',
+  image_series: 'Image Series',
+  video_script: 'Video Script',
+  carousel: 'Carousel',
+  stories: 'Stories',
 };
 
-const platformEmoji = computed(() => {
+const formatLabel = computed(() => {
   if (!idea.value) return '';
-  const key = idea.value.platform.toLowerCase();
-  return platformEmojiMap[key] ?? '\uD83D\uDCA1';
+  return FORMAT_LABELS[idea.value.format] ?? idea.value.format;
 });
 
-const statusLabels: Record<string, string> = {
-  proposed: 'Proposed',
-  approved: 'Approved',
-  rejected: 'Rejected',
-  producing: 'Producing',
-  completed: 'Completed',
-};
-
-const statusLabel = computed(() => {
-  if (!idea.value) return '';
-  return statusLabels[idea.value.status] ?? idea.value.status;
-});
+const isThreadsTextPost = computed(
+  () => idea.value?.platform === 'threads' && idea.value?.format === 'text_post',
+);
 
 const contentBody = computed<ProducedContentBody | null>(() => {
   if (!idea.value?.producedContent?.body) return null;
@@ -275,6 +326,15 @@ const contentBody = computed<ProducedContentBody | null>(() => {
   return body as ProducedContentBody;
 });
 
+// Unified array: either multi-post thread or single post wrapped in array
+// Declared after contentBody to avoid temporal dependency warning
+const threadPosts = computed<string[]>(() => {
+  if (!contentBody.value) return [];
+  if (contentBody.value.posts?.length) return contentBody.value.posts;
+  if (contentBody.value.text) return [contentBody.value.text];
+  return [];
+});
+
 async function copyTextContent() {
   if (!contentBody.value?.text) return;
 
@@ -285,14 +345,20 @@ async function copyTextContent() {
   try {
     await navigator.clipboard.writeText(contentBody.value.text + hashtagString);
     copyLabel.value = 'Copied!';
-    setTimeout(() => {
-      copyLabel.value = 'Copy';
-    }, 2000);
+    setTimeout(() => { copyLabel.value = 'Copy'; }, 2000);
   } catch {
     copyLabel.value = 'Failed';
-    setTimeout(() => {
-      copyLabel.value = 'Copy';
-    }, 2000);
+    setTimeout(() => { copyLabel.value = 'Copy'; }, 2000);
+  }
+}
+
+async function copyPost(text: string, index: number) {
+  try {
+    await navigator.clipboard.writeText(text);
+    copiedIndex.value = index;
+    setTimeout(() => { copiedIndex.value = null; }, 2000);
+  } catch {
+    // silently fail
   }
 }
 
@@ -407,8 +473,8 @@ onMounted(async () => {
 }
 
 .idea-page__badge--platform {
-  background: #eef2ff;
-  color: #4338ca;
+  background: transparent;
+  padding: 0;
 }
 
 .idea-page__badge--format {
@@ -523,9 +589,15 @@ onMounted(async () => {
 
 .idea-page__produced {
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #f9fafb;
   overflow: hidden;
+}
+
+.idea-page__produced:has(.threads-card) {
+  border: none;
+  background: transparent;
+  border-radius: 0;
 }
 
 .idea-page__produced-content {
@@ -765,5 +837,126 @@ onMounted(async () => {
   line-height: 1.6;
   color: #4b5563;
   white-space: pre-wrap;
+}
+
+/* Threads thread wrapper */
+.threads-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.threads-thread__item {
+  position: relative;
+  margin-bottom: 0;
+}
+
+.threads-thread__item + .threads-thread__item {
+  margin-top: 0;
+}
+
+.threads-thread__connector-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 0 0 0 18px; /* align with avatar center */
+  height: 16px;
+}
+
+.threads-thread__line {
+  width: 2px;
+  height: 100%;
+  background: #e5e7eb;
+  border-radius: 1px;
+}
+
+/* Threads post card */
+.threads-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.threads-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem 0.5rem;
+}
+
+.threads-card__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.threads-card__user {
+  flex: 1;
+  min-width: 0;
+}
+
+.threads-card__username {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.threads-card__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.threads-card__more:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.threads-card__body {
+  padding: 0.25rem 1rem 0.75rem;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: #111827;
+  white-space: pre-wrap;
+}
+
+.threads-card__actions {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem 0.875rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.threads-card__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: none;
+  color: #6b7280;
+  cursor: default;
+  border-radius: 8px;
+  transition: color 0.15s;
+}
+
+.threads-card__action:hover {
+  color: #111827;
 }
 </style>

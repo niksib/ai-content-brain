@@ -18,13 +18,16 @@ export interface SessionMessage {
   role: 'user' | 'assistant';
   content: string;
   costUsd?: number | null;
+  contentIdeaId?: string | null;
   createdAt: string;
 }
 
 export interface ProducedContentBody {
-  // text_post (Threads, LinkedIn)
+  // text_post (Threads, LinkedIn) — single post
   text?: string;
   hashtags?: string[];
+  // text_post (Threads) — multi-post thread
+  posts?: string[];
 
   // video_script (TikTok, Reels)
   script?: Array<{ timestamp: string; text: string }>;
@@ -122,8 +125,65 @@ export const useSessionStore = defineStore('session', () => {
     ideas.value = response.ideas;
   }
 
+  async function sendIdeaMessage(text: string, ideaId: string): Promise<void> {
+    if (!session.value) return;
+
+    const userMessage: SessionMessage = {
+      id: `temp-${Date.now()}`,
+      sessionId: session.value.id,
+      role: 'user',
+      content: text,
+      contentIdeaId: ideaId,
+      createdAt: new Date().toISOString(),
+    };
+    messages.value.push(userMessage);
+
+    sseStream.reset();
+    currentStreamText.value = '';
+    isStreaming.value = true;
+
+    try {
+      await sseStream.streamMessage(
+        `${baseURL}/api/ideas/${ideaId}/message`,
+        { content: text },
+      );
+
+      const assistantContent = sseStream.tokens.value;
+      if (assistantContent) {
+        messages.value.push({
+          id: `temp-${Date.now()}-assistant`,
+          sessionId: session.value.id,
+          role: 'assistant',
+          content: assistantContent,
+          costUsd: sseStream.costUsd.value,
+          contentIdeaId: ideaId,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      // Reload idea in case agent updated the content
+      const freshIdea = await loadIdea(ideaId);
+      if (freshIdea) {
+        const idx = ideas.value.findIndex((i) => i.id === ideaId);
+        if (idx !== -1) ideas.value[idx] = freshIdea;
+      }
+    } catch (error) {
+      const idx = messages.value.indexOf(userMessage);
+      if (idx !== -1) messages.value.splice(idx, 1);
+      throw error;
+    } finally {
+      currentStreamText.value = '';
+      isStreaming.value = false;
+    }
+  }
+
   async function sendMessage(text: string): Promise<void> {
     if (!session.value) return;
+
+    // Route to platform agent if user is viewing a completed idea
+    if (selectedIdeaId.value) {
+      return sendIdeaMessage(text, selectedIdeaId.value);
+    }
 
     // Add user message to the list immediately
     const userMessage: SessionMessage = {
@@ -341,6 +401,7 @@ export const useSessionStore = defineStore('session', () => {
     loadMessages,
     loadIdeas,
     sendMessage,
+    sendIdeaMessage,
     approveIdea,
     rejectIdea,
     loadIdea,

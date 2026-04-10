@@ -1,174 +1,171 @@
 ---
 name: threads-post-structures
-description: Use this skill when the Threads Agent is writing a post. Apply to choose the right structure and format for the content type.
+description: Use this skill when deciding how to structure a Threads post. Apply before writing — structure choice determines reply depth, which is the top algorithm signal.
 ---
 
-# Threads Post Structures
+# Threads Post Structures (2026)
 
-## Platform Context
+## What Structure Is For
 
-Threads rewards conversation. Reply depth is the top algorithm signal — content that starts genuine discussions wins. Images outperform text by 60%. Videos outperform text by nearly 2x.
+Structure on Threads serves one purpose: maximize reply depth. The algorithm ranks posts by how much conversation they generate, not by quality of writing or polish. Every structural choice should be evaluated by asking: "Does this make someone more or less likely to reply?"
 
-Key rules:
-- 500 character limit per post
-- Conversational and unpolished beats corporate and polished
-- Engagement bait is penalized — never write "like if you agree"
-- One topic tag per post
-- Reply to comments within first hour — your own replies count as engagement
-
----
-
-## Structure 1: Single Insight Post
-**Best for:** Quick observation, lesson, realization
-**Length:** 2-4 lines + optional question
-
-```
-[HOOK — first line stops the scroll]
-Bold statement, specific observation, or surprising claim
-
-[1-2 lines of substance]
-The specific detail that makes it real
-Not an explanation — a specific fact or reaction
-
-[Optional: question or invitation]
-One genuine question that has real range of answers
-```
-
-**Example:**
-> Replied to 20 comments in the first hour after posting yesterday.
->
-> That post got 3x more reach than any post I've published in the last month.
->
-> The algorithm doesn't care how good the post is. It cares what happens after.
+**Platform constraints:**
+- 500 characters per post
+- One topic tag per post (not hashtags)
+- No external links in the post body — they kill reach
+- Images add 60% more engagement than text alone — consider attaching when relevant
+- Videos under 30 seconds with captions perform well
 
 ---
 
-## Structure 2: Contrarian Take
-**Best for:** Hot takes, challenging common beliefs, industry observations
-**Length:** 3-5 lines
+## Structure 1: Opinionated Single Post
+**Best for:** Hot takes, contrarian positions, observations that invite disagreement
+**Triggers:** Replies from people who agree and want to add on, replies from people who disagree
 
 ```
-[HOOK — the challenge]
-"[Common belief] is [wrong/overrated/misunderstood]."
-Or: "Unpopular take: [position]"
+[HOOK — opinionated first line, no "I" as first word]
 
-[1-2 lines — the reason]
-Specific. Not just assertion — a real reason or experience
+[1-2 lines of specific reasoning or evidence]
+Not a generic explanation — one specific thing that makes it real
 
-[1 line — the reframe]
-What to do / think instead
-
-[Optional: invite disagreement]
-"Disagree? Tell me why."
+[Optional: invite the other side]
+"Disagree? Tell me why." or genuine question
 ```
 
 **Example:**
 > Posting every day is not the strategy.
 >
-> I posted daily for 3 months. Reach was flat. Posted 3x a week with better hooks. Reach doubled.
+> Posted daily for 3 months. Reach was flat. Cut to 3x/week with sharper hooks. Reach doubled.
 >
-> Consistency matters. But consistency of quality beats consistency of volume.
->
-> What's your experience been?
+> Volume without quality just trains the algorithm to ignore you.
+
+**What makes it work:** The opinionated first line forces a reaction. Short body with one specific detail (3 months, 3x) signals this is real, not AI-generated. No CTA needed if the opinion is strong enough.
 
 ---
 
-## Structure 3: Story Post
-**Best for:** Something that happened, personal experience, behind the scenes
-**Length:** 4-6 lines (or thread for longer stories)
+## Structure 2: Specific Personal Story
+**Best for:** Things that actually happened, lessons learned, behind-the-scenes moments
+**Triggers:** Replies from people who relate, questions about what happened, "same thing happened to me"
 
 ```
-[HOOK — mid-scene]
-Start with the interesting moment. No preamble.
+[HOOK — drop mid-scene, no preamble]
+The most interesting moment of the story, not the setup
 
 [2-3 lines — what happened]
-Specific details. Real reactions.
-Move fast — one beat per sentence
+Specific details only. One beat per sentence. Move fast.
 
 [1-2 lines — the point]
-What it means. What you took from it.
+What it means. Specific takeaway, not generic lesson.
 
 [Optional: question]
+Only if you genuinely want to know others' experience
 ```
 
 **Example:**
-> Shipped a feature at 11pm yesterday that I had rebuilt four times.
+> Lost a client over pricing today. Same objection I've heard 50 times.
 >
-> First rebuild: the logic was wrong. Second: the UX was confusing. Third: it worked but was too slow. Fourth: finally.
+> This time I just said "I know. We're not the right fit for every budget." And stopped talking.
 >
-> The thing nobody tells you about building in public is that the public sees the final version. They don't see the four versions that didn't work.
+> They came back an hour later. Signed at full price.
 >
-> That's the part worth sharing.
+> At what point did you stop defending your rates?
+
+**What makes it work:** Specific scene (pricing objection, one hour later). Real emotional beat. The question at the end has a real range of answers — people will share their own experience.
 
 ---
 
-## Structure 4: Thread (Multi-Post)
-**Best for:** Longer stories, step-by-step processes, content that needs space
-**Post count:** 4-8 posts (more than 8 loses most readers)
+## Structure 3: Conversation Starter
+**Best for:** Questions the creator genuinely wants to hear answers to, topics where opinion varies
+**Triggers:** Direct replies with answers, which compound into reply threads
+
+```
+[HOOK — the question or premise]
+State the question or the thing that makes the question interesting
+
+[1-2 lines of context]
+Why this is worth asking. Your own position if you have one.
+
+[The question]
+Clear, specific, open-ended — real range of valid answers
+```
+
+**Example:**
+> The "post consistently" advice ignores something important.
+>
+> Consistent mediocre content trains your audience to ignore you. Inconsistent great content keeps them waiting.
+>
+> Would you rather post every day with average content, or twice a week when you have something real to say?
+
+**What makes it work:** Stakes are clear. The creator has a position but doesn't force it. The question has no obviously correct answer — both sides have valid arguments.
+
+---
+
+## Structure 4: Multi-Post Thread
+**Best for:** Stories or processes that need more than 500 characters, step-by-step breakdowns
+**Length:** 4-7 posts (more than 8 loses most readers)
+**Triggers:** People reading through the whole thread increases watch time; the algorithm notices
 
 ```
 Post 1 (HOOK):
-The most interesting part of the whole thread
-Must make someone want to read the next post
-End with "🧵" or nothing — the thread visual shows automatically
+The most interesting or unexpected part of the whole thread
+Must make someone want to read Post 2
+End with nothing or "🧵" — the thread visual shows automatically
 
-Post 2-5 (BODY):
-One idea per post
-Short — never fill all 500 characters if you don't need to
-Each post should make sense on its own AND flow from the previous
+Post 2-4 (BODY):
+One specific point per post
+Short — white space is better than filled characters
+Each post should make sense alone AND build on the previous
 
-Post 6 (TENSION or TURN):
-If it's a story — the "but then" moment
-If it's a list — the most surprising or counterintuitive item
+Post 5 (TURN):
+The surprising part, the "but then", the counterintuitive item
+This is the post that gets reshared most
 
-Post 7 (RESOLUTION or LESSON):
-The takeaway
-Specific, not generic
+Post 6 (TAKEAWAY):
+The specific lesson. Not "so remember to always X" — a real, specific conclusion
 
-Post 8 (Optional CTA):
-Question, save prompt, or invitation to reply
-Never explicit engagement bait
+Post 7 (OPTIONAL — REPLY INVITE):
+Genuine question. Never "like this if you agree".
 ```
+
+**What makes it work:** Reply depth compounds across the thread. Each post is a new opportunity for someone to engage. Threads that end with a real question generate the most conversation.
 
 ---
 
 ## Structure 5: Quick Take
-**Best for:** Observations, reactions, quick thoughts worth sharing
-**Length:** 1-3 lines
+**Best for:** Observations that are complete in 1-2 lines, things that don't need explanation
+**Triggers:** Reshares, saves, people adding their own take in replies
 
 ```
-[One thought that stands on its own]
-No setup. No explanation. Just the thought.
+[One complete thought]
+No setup. No explanation. Just the observation.
 ```
 
 **Example:**
-> The best content I've ever posted came from conversations I almost didn't share because I thought they were too personal.
+> The content that aged worst is the content I overthought most.
+
+**What makes it work:** Short enough to rethread. Complete without context. Creates a curiosity gap without needing to fill it.
 
 ---
 
-## Threads-Specific Rules
+## Structure Anti-Patterns
 
-### What Gets Reach
-- Content that starts genuine discussions — questions with real range of answers
-- Specific personal observations — not generic wisdom
-- Timely commentary on things happening in the creator's world
-- Original takes — recycled content from other platforms gets penalized
-- Images added to text posts — 60% higher engagement than text alone
+**Never do this:**
+- Long unbroken paragraphs — Threads readers skip walls of text
+- "In this thread I'll cover..." — cuts reply rate significantly
+- Starting with context before the interesting thing
+- Ending with "Follow me for more" — penalized and ineffective
+- Listing 10 things in one post — break it into a thread or cut ruthlessly
+- Repeating the hook in the body ("As I said above...")
+- Generic closing lines ("Hope this helps!", "Let me know what you think!")
 
-### What Kills Reach
-- Engagement bait ("like this if you agree")
-- Copy-pasted content from X or Instagram without rewriting
-- Corporate or overly polished language
-- Posts that don't invite response
-- Explicit requests for follows
+---
 
-### Voice
-- Write how the creator talks — not how they'd write an essay
-- Contractions always
-- Fragments are fine
-- No formal transitions (Furthermore, Moreover, Additionally)
+## Choosing the Right Structure
 
-### Topic Tag
-- One tag per post, the most relevant trending topic
-- Find it by checking what's trending in the Threads topic browser
-- Generic tags (#content, #marketing) add less value than specific ones
+| Situation | Structure |
+|-----------|-----------|
+| You have a strong opinion | Opinionated Single Post |
+| Something real happened | Specific Personal Story |
+| You want to hear from your audience | Conversation Starter |
+| The content needs more than 500 chars | Multi-Post Thread |
+| You have one sharp observation | Quick Take |

@@ -101,4 +101,23 @@ button {
 input, textarea, select {
   font-family: var(--font-body);
 }
+
+/* ─── Form element normalization (replaces Tailwind Forms plugin) ─── */
+input,
+textarea,
+select {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Remove browser default focus outline — components add their own focus styles */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible,
+button:focus:not(:focus-visible) {
+  outline: none;
+}
 </style>

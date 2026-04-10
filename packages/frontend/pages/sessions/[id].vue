@@ -3,9 +3,18 @@
     <Transition name="layout-fade" mode="out-in">
 
       <!-- ══════════════════════════════════════════
+           STATE 0 — Initializing (prevents recording flash)
+      ══════════════════════════════════════════ -->
+      <div v-if="isInitializing" key="initializing" class="recording-state">
+        <div class="recording-container">
+          <div class="session-init-spinner"></div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
            STATE 1 — Recording / session start
       ══════════════════════════════════════════ -->
-      <div v-if="store.pageState === 'recording'" key="recording" class="recording-state">
+      <div v-else-if="store.pageState === 'recording'" key="recording" class="recording-state">
         <!-- Background blobs -->
         <div class="recording-bg recording-bg--tl"></div>
         <div class="recording-bg recording-bg--br"></div>
@@ -49,6 +58,11 @@
                 </div>
                 <div class="transcript-msg__body">
                   <span class="transcript-msg__label transcript-msg__label--user">You</span>
+                  <!-- Reply context: idea this message belongs to -->
+                  <div v-if="msg.contentIdeaId" class="transcript-msg__reply-context">
+                    <span class="material-symbols-outlined" style="font-size:11px;">reply</span>
+                    {{ ideaAngle(msg.contentIdeaId) }}
+                  </div>
                   <div
                     class="transcript-msg__bubble transcript-msg__bubble--user"
                     v-html="renderMarkdown(msg.content)"
@@ -58,11 +72,17 @@
 
               <!-- AI message -->
               <div v-else class="transcript-msg transcript-msg--ai">
-                <div class="transcript-msg__avatar transcript-msg__avatar--ai">
-                  <span class="material-symbols-outlined" style="font-size:14px;">smart_toy</span>
+                <div
+                  class="transcript-msg__avatar"
+                  :class="msg.contentIdeaId ? `transcript-msg__avatar--${ideaPlatform(msg.contentIdeaId)}` : 'transcript-msg__avatar--strategist'"
+                >
+                  <PlatformIcon v-if="msg.contentIdeaId && ideaPlatform(msg.contentIdeaId)" :platform="ideaPlatform(msg.contentIdeaId)!" />
+                  <span v-else class="material-symbols-outlined" style="font-size:14px;">psychology</span>
                 </div>
                 <div class="transcript-msg__body">
-                  <span class="transcript-msg__label transcript-msg__label--ai">AI Curator</span>
+                  <span class="transcript-msg__label transcript-msg__label--ai">
+                    {{ msg.contentIdeaId ? agentNameForIdea(msg.contentIdeaId) : 'Content Strategist' }}
+                  </span>
                   <div
                     class="transcript-msg__bubble transcript-msg__bubble--ai"
                     v-html="renderMarkdown(msg.content)"
@@ -76,11 +96,15 @@
 
             <!-- Thinking indicator (streaming but no tokens yet) -->
             <div v-if="store.isStreaming && !store.streamTokens" class="transcript-msg transcript-msg--ai">
-              <div class="transcript-msg__avatar transcript-msg__avatar--ai">
-                <span class="material-symbols-outlined" style="font-size:14px;">smart_toy</span>
+              <div
+                class="transcript-msg__avatar"
+                :class="activeAgent.platform ? `transcript-msg__avatar--${activeAgent.platform}` : 'transcript-msg__avatar--strategist'"
+              >
+                <PlatformIcon v-if="activeAgent.platform" :platform="activeAgent.platform" />
+                <span v-else class="material-symbols-outlined" style="font-size:14px;">psychology</span>
               </div>
               <div class="transcript-msg__body">
-                <span class="transcript-msg__label transcript-msg__label--ai">AI Curator</span>
+                <span class="transcript-msg__label transcript-msg__label--ai">{{ activeAgent.name }}</span>
                 <div class="transcript-msg__bubble transcript-msg__bubble--ai thinking-bubble">
                   <span class="thinking-dots">
                     <span></span><span></span><span></span>
@@ -92,17 +116,33 @@
 
             <!-- Streaming tokens in progress -->
             <div v-if="store.isStreaming && store.streamTokens" class="transcript-msg transcript-msg--ai">
-              <div class="transcript-msg__avatar transcript-msg__avatar--ai">
-                <span class="material-symbols-outlined" style="font-size:14px;">smart_toy</span>
+              <div
+                class="transcript-msg__avatar"
+                :class="activeAgent.platform ? `transcript-msg__avatar--${activeAgent.platform}` : 'transcript-msg__avatar--strategist'"
+              >
+                <PlatformIcon v-if="activeAgent.platform" :platform="activeAgent.platform" />
+                <span v-else class="material-symbols-outlined" style="font-size:14px;">psychology</span>
               </div>
               <div class="transcript-msg__body">
-                <span class="transcript-msg__label transcript-msg__label--ai">AI Curator</span>
+                <span class="transcript-msg__label transcript-msg__label--ai">{{ activeAgent.name }}</span>
                 <div class="transcript-msg__bubble transcript-msg__bubble--ai">
                   <!-- eslint-disable-next-line vue/no-v-html -->
                   <span v-html="renderMarkdown(store.streamTokens ?? '')"></span><span class="cursor-blink">|</span>
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Active agent indicator -->
+          <div class="agent-indicator">
+            <div
+              class="agent-indicator__avatar"
+              :class="activeAgent.platform ? `agent-indicator__avatar--${activeAgent.platform}` : 'agent-indicator__avatar--strategist'"
+            >
+              <PlatformIcon v-if="activeAgent.platform" :platform="activeAgent.platform" />
+              <span v-else class="material-symbols-outlined" style="font-size:13px;">{{ activeAgent.icon }}</span>
+            </div>
+            <span class="agent-indicator__name">{{ activeAgent.name }}</span>
           </div>
 
           <!-- Chat input -->
@@ -269,6 +309,7 @@ import { useSessionStore } from '~/stores/session';
 import { useProfileStore } from '~/stores/profile';
 import OrbRecorder from '~/components/OrbRecorder.vue';
 import IdeaPage from '~/components/IdeaPage.vue';
+import PlatformIcon from '~/components/PlatformIcon.vue';
 import { useMarkdown } from '~/composables/useMarkdown';
 
 definePageMeta({
@@ -316,6 +357,36 @@ watch(
 );
 onUnmounted(() => { if (thinkingTimer) clearInterval(thinkingTimer); });
 
+// ─── Active agent ───
+interface AgentInfo {
+  name: string;
+  platform: 'threads' | 'linkedin' | 'tiktok' | 'instagram' | null;
+  icon: string; // material symbol, used when platform is null
+}
+
+const PLATFORM_AGENT_NAMES: Record<string, string> = {
+  threads: 'Threads Agent',
+  linkedin: 'LinkedIn Agent',
+  tiktok: 'TikTok Agent',
+  instagram: 'Instagram Agent',
+};
+
+const activeAgent = computed<AgentInfo>(() => {
+  if (!store.selectedIdeaId) {
+    return { name: 'Content Strategist', platform: null, icon: 'psychology' };
+  }
+  const idea = store.ideas.find((i) => i.id === store.selectedIdeaId);
+  if (!idea) {
+    return { name: 'Content Strategist', platform: null, icon: 'psychology' };
+  }
+  const platform = idea.platform as AgentInfo['platform'];
+  return {
+    name: PLATFORM_AGENT_NAMES[idea.platform] ?? `${idea.platform} Agent`,
+    platform,
+    icon: '',
+  };
+});
+
 // ─── Platform helpers ───
 const PLATFORM_LABELS: Record<string, string> = {
   threads: 'Threads',
@@ -325,16 +396,33 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 const FORMAT_LABELS: Record<string, string> = {
   text_post: 'Post',
+  text_with_image: 'Post + Image',
+  image_series: 'Image Series',
   video_script: 'Video',
   carousel: 'Carousel',
   stories: 'Story',
 };
+
+// ─── Idea context helpers ───
+function ideaAngle(ideaId: string): string {
+  return store.ideas.find((i) => i.id === ideaId)?.angle ?? '';
+}
+function ideaPlatform(ideaId: string): AgentInfo['platform'] {
+  const idea = store.ideas.find((i) => i.id === ideaId);
+  return (idea?.platform ?? null) as AgentInfo['platform'];
+}
+function agentNameForIdea(ideaId: string): string {
+  const idea = store.ideas.find((i) => i.id === ideaId);
+  if (!idea) return 'Platform Agent';
+  return PLATFORM_AGENT_NAMES[idea.platform] ?? `${idea.platform} Agent`;
+}
 function platformLabel(platform: string): string {
   return PLATFORM_LABELS[platform] ?? platform;
 }
 function formatLabel(format: string): string {
   return FORMAT_LABELS[format] ?? format;
 }
+const isInitializing = ref(true);
 const messagesContainerRef = ref<HTMLElement | null>(null);
 const isUserRecording = ref(false);
 const chatInputText = ref('');
@@ -392,6 +480,8 @@ onMounted(async () => {
     await Promise.all([store.loadMessages(), store.loadIdeas()]);
   } catch (error) {
     console.error('Session initialization failed:', error);
+  } finally {
+    isInitializing.value = false;
   }
 });
 </script>
@@ -412,6 +502,18 @@ onMounted(async () => {
 }
 .layout-fade-enter-from { opacity: 0; transform: translateY(12px); }
 .layout-fade-leave-to   { opacity: 0; transform: translateY(-12px); }
+
+/* ─── Session init spinner ─── */
+.session-init-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(53, 37, 205, 0.15);
+  border-top-color: #3525cd;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ══════════════════════════════════════════
    STATE 1 — Recording
@@ -747,6 +849,11 @@ onMounted(async () => {
   color: #3525cd;
 }
 
+.transcript-msg__avatar--strategist {
+  background: #e2dfff;
+  color: #3525cd;
+}
+
 .transcript-msg__body {
   display: flex;
   flex-direction: column;
@@ -854,6 +961,45 @@ onMounted(async () => {
   background: transparent;
   padding: 0;
   color: #191c1e;
+}
+
+/* Agent indicator */
+.agent-indicator {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 1rem 0;
+}
+
+.agent-indicator__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+.agent-indicator__avatar--strategist {
+  background: #e2dfff;
+  color: #3525cd;
+}
+
+.agent-indicator__avatar--threads  { background: #000; }
+.agent-indicator__avatar--linkedin { background: #0077b5; }
+.agent-indicator__avatar--tiktok   { background: #000; }
+.agent-indicator__avatar--instagram {
+  background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+}
+
+.agent-indicator__name {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 /* Chat input */
@@ -1487,6 +1633,21 @@ onMounted(async () => {
   font-weight: 500;
   color: #9b8fbb;
   letter-spacing: 0.02em;
+}
+
+.transcript-msg__reply-context {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #3525cd;
+  opacity: 0.7;
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
 }
 
 /* ─── Status bar ─── */

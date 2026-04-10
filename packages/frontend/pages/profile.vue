@@ -1,8 +1,69 @@
 <template>
   <div class="profile-page">
-    <div class="profile-grid">
-    <!-- Section 1: Creator Profile -->
-    <section class="profile-section profile-grid__left">
+
+    <!-- ── Row 1: Connected Platforms + Subscription ── -->
+    <div class="profile-row profile-row--top">
+
+      <!-- Connected Platforms -->
+      <section class="profile-section profile-section--platforms">
+        <h2 class="section-title">Connected Platforms</h2>
+        <p class="section-subtitle">Platforms you create content for and social accounts you've connected.</p>
+        <div class="platforms-grid">
+          <div
+            v-for="platform in ALL_PLATFORMS"
+            :key="platform"
+            class="platform-card"
+            :class="[`platform-card--${platform}`, { 'platform-card--active': isActivePlatform(platform) }]"
+          >
+            <div class="platform-card__top">
+              <div class="platform-card__icon-wrap" :class="`platform-card__icon-wrap--${platform}`">
+                <PlatformIcon :platform="platform" />
+              </div>
+              <span v-if="isActivePlatform(platform)" class="platform-badge">Active</span>
+            </div>
+            <p class="platform-card__name">{{ PLATFORM_NAMES[platform] }}</p>
+            <div class="platform-card__social">
+              <span class="platform-card__not-connected">Not connected</span>
+            </div>
+            <button class="platform-card__connect-btn" type="button" disabled>
+              Connect
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Subscription -->
+      <section class="profile-section profile-section--subscription">
+        <h2 class="section-title">Subscription</h2>
+        <div class="info-row">
+          <span class="info-label">Plan</span>
+          <span class="info-value">Free (Beta)</span>
+        </div>
+        <div class="credits-progress-wrap">
+          <div class="credits-progress__header">
+            <span class="info-label">Credits Used</span>
+            <span class="credits-progress__stat">{{ creditsUsedPercent }}%</span>
+          </div>
+          <div class="credits-progress__bar">
+            <div
+              class="credits-progress__fill"
+              :style="{ width: creditsUsedPercent + '%' }"
+            ></div>
+          </div>
+        </div>
+        <div class="placeholder-actions">
+          <button type="button" class="btn btn--primary" @click="handleBuyCredits">
+            Buy Credits
+          </button>
+        </div>
+        <p v-if="billingStatus === 'success'" class="save-message">Payment successful! Credits have been added.</p>
+        <p v-if="billingStatus === 'cancel'" class="save-message save-message--error">Payment was cancelled.</p>
+      </section>
+
+    </div>
+
+    <!-- ── Row 2: Creator Profile ── -->
+    <section class="profile-section">
       <h2 class="section-title">Creator Profile</h2>
 
       <div v-if="profileStore.isLoading" class="loading-state">Loading profile...</div>
@@ -18,14 +79,14 @@
           <label class="form-label">Platforms</label>
           <div class="chip-selector">
             <button
-              v-for="platform in availablePlatforms"
+              v-for="platform in ALL_PLATFORMS"
               :key="platform"
               type="button"
               class="chip"
               :class="{ 'chip--active': form.platforms.includes(platform) }"
               @click="togglePlatform(platform)"
             >
-              {{ platform }}
+              {{ PLATFORM_NAMES[platform] }}
             </button>
           </div>
         </div>
@@ -96,6 +157,23 @@
           </select>
         </div>
 
+        <!-- Content Language -->
+        <div class="form-group">
+          <label class="form-label">Content Language</label>
+          <div class="chip-selector">
+            <button
+              v-for="lang in LANGUAGES"
+              :key="lang"
+              type="button"
+              class="chip"
+              :class="{ 'chip--active': form.contentLanguage === lang }"
+              @click="form.contentLanguage = lang"
+            >
+              {{ lang }}
+            </button>
+          </div>
+        </div>
+
         <!-- Tone of Voice -->
         <div class="form-group">
           <label class="form-label" for="toneOfVoice">Tone of Voice</label>
@@ -128,7 +206,6 @@
           </div>
         </div>
 
-        <!-- Save -->
         <button type="submit" class="btn btn--primary" :disabled="profileStore.isSaving">
           {{ profileStore.isSaving ? 'Saving...' : 'Save Profile' }}
         </button>
@@ -139,84 +216,101 @@
       </form>
     </section>
 
-    <!-- Right column: Subscription + Account -->
-    <div class="profile-grid__right">
-
-    <!-- Section 2: Subscription & Credits -->
-    <section class="profile-section">
-      <h2 class="section-title">Subscription</h2>
-      <div class="info-row">
-        <span class="info-label">Plan</span>
-        <span class="info-value">Free (Beta)</span>
-      </div>
-      <div class="credits-progress-wrap">
-        <div class="credits-progress__header">
-          <span class="info-label">Credits Used</span>
-          <span class="credits-progress__stat">{{ creditsUsedPercent }}% used</span>
-        </div>
-        <div class="credits-progress__bar">
-          <div
-            class="credits-progress__fill"
-            :style="{ width: creditsUsedPercent + '%' }"
-          ></div>
-        </div>
-        <span class="credits-progress__remaining">{{ billingStore.balance }} credits remaining</span>
-      </div>
-      <div class="placeholder-actions">
-        <button
-          type="button"
-          class="btn btn--primary"
-          @click="handleBuyCredits"
-        >
-          Buy Credits
-        </button>
-      </div>
-
-      <!-- Billing status messages -->
-      <p v-if="billingStatus === 'success'" class="save-message">Payment successful! Credits have been added.</p>
-      <p v-if="billingStatus === 'cancel'" class="save-message save-message--error">Payment was cancelled.</p>
-
-      <!-- Transaction History -->
-      <div v-if="billingStore.transactions.length > 0" class="transactions-section">
-        <h3 class="subsection-title">Transaction History</h3>
-        <table class="transactions-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Amount</th>
-              <th>Reference</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="transaction in billingStore.transactions" :key="transaction.id">
-              <td>{{ formatDate(transaction.createdAt) }}</td>
-              <td>{{ formatType(transaction.type) }}</td>
-              <td :class="transaction.amount > 0 ? 'amount-positive' : 'amount-negative'">
-                {{ transaction.amount > 0 ? '+' : '' }}{{ transaction.amount }}
-              </td>
-              <td class="reference-cell">{{ transaction.reference || '---' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Section 3: Account -->
+    <!-- ── Row 3: Account ── -->
     <section class="profile-section">
       <h2 class="section-title">Account</h2>
+
       <div class="info-row">
         <span class="info-label">Email</span>
-        <span class="info-value">{{ userEmail || '---' }}</span>
+        <span class="info-value">{{ profileStore.userEmail || '---' }}</span>
       </div>
-      <div class="placeholder-actions">
-        <button type="button" class="btn btn--secondary" disabled>Change Password</button>
-        <button type="button" class="btn btn--danger" disabled>Delete Account</button>
+
+      <!-- Change Password -->
+      <div class="account-action">
+        <div class="account-action__header">
+          <div>
+            <p class="account-action__title">Password</p>
+            <p class="account-action__desc">Update your account password</p>
+          </div>
+          <button
+            type="button"
+            class="btn btn--secondary"
+            @click="showPasswordForm = !showPasswordForm"
+          >
+            {{ showPasswordForm ? 'Cancel' : 'Change Password' }}
+          </button>
+        </div>
+
+        <form v-if="showPasswordForm" class="account-subform" @submit.prevent="handleChangePassword">
+          <div class="form-group">
+            <label class="form-label" for="currentPassword">Current Password</label>
+            <input
+              id="currentPassword"
+              v-model="passwordForm.current"
+              type="password"
+              class="form-input"
+              autocomplete="current-password"
+              placeholder="Enter current password"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="newPassword">New Password</label>
+            <input
+              id="newPassword"
+              v-model="passwordForm.next"
+              type="password"
+              class="form-input"
+              autocomplete="new-password"
+              placeholder="At least 8 characters"
+              minlength="8"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="confirmPassword">Confirm New Password</label>
+            <input
+              id="confirmPassword"
+              v-model="passwordForm.confirm"
+              type="password"
+              class="form-input"
+              autocomplete="new-password"
+              placeholder="Repeat new password"
+              required
+            />
+          </div>
+          <p v-if="passwordError" class="save-message save-message--error">{{ passwordError }}</p>
+          <p v-if="passwordSuccess" class="save-message">{{ passwordSuccess }}</p>
+          <button
+            type="submit"
+            class="btn btn--primary"
+            :disabled="isChangingPassword"
+          >
+            {{ isChangingPassword ? 'Saving...' : 'Save New Password' }}
+          </button>
+        </form>
+      </div>
+
+      <!-- Delete Account -->
+      <div class="account-action account-action--danger">
+        <div class="account-action__header">
+          <div>
+            <p class="account-action__title account-action__title--danger">Delete Account</p>
+            <p class="account-action__desc">Permanently delete your account and all data</p>
+          </div>
+          <button
+            type="button"
+            class="btn btn--danger"
+            :disabled="isDeletingAccount"
+            @click="handleDeleteAccount"
+          >
+            {{ isDeletingAccount ? 'Deleting...' : 'Delete Account' }}
+          </button>
+        </div>
+        <p v-if="deleteError" class="save-message save-message--error">{{ deleteError }}</p>
       </div>
     </section>
 
-    </div><!-- /profile-grid__right -->
-    </div><!-- /profile-grid -->
   </div>
 </template>
 
@@ -224,7 +318,10 @@
 import { ref, reactive, watch, onMounted, computed } from 'vue';
 import { useProfileStore, type ProfileUpdateData } from '~/stores/profile';
 import { useBillingStore } from '~/stores/billing';
-import { useApiClient } from '~/services/api';
+import PlatformIcon from '~/components/PlatformIcon.vue';
+
+const config = useRuntimeConfig();
+const router = useRouter();
 
 definePageMeta({
   layout: 'default',
@@ -232,6 +329,20 @@ definePageMeta({
 
 const profileStore = useProfileStore();
 const billingStore = useBillingStore();
+
+const ALL_PLATFORMS = ['threads', 'linkedin', 'tiktok', 'instagram'] as const;
+type Platform = (typeof ALL_PLATFORMS)[number];
+
+const PLATFORM_NAMES: Record<Platform, string> = {
+  threads: 'Threads',
+  linkedin: 'LinkedIn',
+  tiktok: 'TikTok',
+  instagram: 'Instagram',
+};
+
+function isActivePlatform(platform: Platform): boolean {
+  return (form.platforms as string[]).includes(platform);
+}
 
 const PLAN_MAX_CREDITS = 500;
 const creditsUsedPercent = computed(() => {
@@ -242,7 +353,7 @@ const creditsUsedPercent = computed(() => {
 const route = useRoute();
 const billingStatus = computed(() => route.query.billing as string | undefined);
 
-const availablePlatforms = ['threads', 'linkedin', 'tiktok', 'instagram'] as const;
+const LANGUAGES = ['Russian', 'English', 'Ukrainian', 'Spanish', 'German', 'French', 'Other'];
 
 const form = reactive({
   platforms: [] as string[],
@@ -251,31 +362,43 @@ const form = reactive({
   audienceDescription: '',
   audiencePainPoints: '',
   stage: 'starting' as 'starting' | 'growing' | 'established',
+  contentLanguage: '',
   toneOfVoice: '',
   goals: [] as string[],
 });
 
 const newTopic = ref('');
 const newGoal = ref('');
-const userEmail = ref('');
 const saveMessage = ref('');
 const saveError = ref(false);
+
+// ── Change Password ──
+const showPasswordForm = ref(false);
+const isChangingPassword = ref(false);
+const passwordError = ref('');
+const passwordSuccess = ref('');
+const passwordForm = reactive({ current: '', next: '', confirm: '' });
+
+// ── Delete Account ──
+const isDeletingAccount = ref(false);
+const deleteError = ref('');
 
 function populateForm() {
   const profile = profileStore.profile;
   if (!profile) return;
 
-  form.platforms = [...profile.platforms];
+  form.platforms = profile.platforms.map((p) => p.toLowerCase());
   form.niche = profile.niche;
   form.topics = [...profile.topics];
   form.audienceDescription = profile.audienceDescription;
   form.audiencePainPoints = profile.audiencePainPoints || '';
   form.stage = profile.stage;
+  form.contentLanguage = profile.contentLanguage || '';
   form.toneOfVoice = profile.toneOfVoice;
   form.goals = [...profile.goals];
 }
 
-watch(() => profileStore.profile, populateForm);
+watch(() => profileStore.profile, populateForm, { immediate: true });
 
 function togglePlatform(platform: string) {
   const index = form.platforms.indexOf(platform);
@@ -321,6 +444,7 @@ async function handleSave() {
     audienceDescription: form.audienceDescription,
     audiencePainPoints: form.audiencePainPoints || null,
     stage: form.stage,
+    contentLanguage: form.contentLanguage,
     toneOfVoice: form.toneOfVoice,
     goals: form.goals,
   };
@@ -335,46 +459,78 @@ async function handleSave() {
 }
 
 function handleBuyCredits() {
-  // Use a placeholder price ID — will be replaced with real Stripe price
   billingStore.createCheckout('price_credits_500', 'payment');
 }
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+async function handleChangePassword() {
+  passwordError.value = '';
+  passwordSuccess.value = '';
+
+  if (passwordForm.next !== passwordForm.confirm) {
+    passwordError.value = 'New passwords do not match.';
+    return;
+  }
+  if (passwordForm.next.length < 8) {
+    passwordError.value = 'New password must be at least 8 characters.';
+    return;
+  }
+
+  isChangingPassword.value = true;
+  try {
+    await $fetch(`${config.public.apiBaseUrl}/api/auth/change-password`, {
+      method: 'POST',
+      credentials: 'include',
+      body: {
+        currentPassword: passwordForm.current,
+        newPassword: passwordForm.next,
+      },
+    });
+    passwordSuccess.value = 'Password updated successfully.';
+    passwordForm.current = '';
+    passwordForm.next = '';
+    passwordForm.confirm = '';
+    setTimeout(() => {
+      showPasswordForm.value = false;
+      passwordSuccess.value = '';
+    }, 2000);
+  } catch (error: unknown) {
+    const apiError = error as { data?: { message?: string } };
+    passwordError.value = apiError?.data?.message ?? 'Failed to change password. Check your current password and try again.';
+  } finally {
+    isChangingPassword.value = false;
+  }
 }
 
-function formatType(type: string): string {
-  const typeLabels: Record<string, string> = {
-    subscription_grant: 'Subscription',
-    topup_purchase: 'Top-up',
-    voice_processing: 'Voice',
-    content_plan: 'Content Plan',
-    content_production: 'Production',
-  };
-  return typeLabels[type] || type;
+async function handleDeleteAccount() {
+  const confirmed = confirm(
+    'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.'
+  );
+  if (!confirmed) return;
+
+  deleteError.value = '';
+  isDeletingAccount.value = true;
+  try {
+    await $fetch(`${config.public.apiBaseUrl}/api/auth/delete-user`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    const isAuthenticated = useState<boolean | null>('auth:authenticated');
+    isAuthenticated.value = false;
+    router.replace('/');
+  } catch (error: unknown) {
+    const apiError = error as { data?: { message?: string } };
+    deleteError.value = apiError?.data?.message ?? 'Failed to delete account. Please try again.';
+  } finally {
+    isDeletingAccount.value = false;
+  }
 }
 
 onMounted(async () => {
   await Promise.all([
     profileStore.loadProfile(),
     billingStore.loadBalance(),
-    billingStore.loadTransactions(),
   ]);
   populateForm();
-
-  // Extract email from the API response (stored alongside profile)
-  // The GET /api/profile endpoint returns { profile, email }
-  try {
-    const apiClient = useApiClient();
-    const response = await apiClient.get<{ profile: unknown; email: string }>('/api/profile');
-    userEmail.value = response.email || '';
-  } catch {
-    // Profile may not exist yet; email will show as placeholder
-  }
 });
 </script>
 
@@ -383,41 +539,213 @@ onMounted(async () => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2.5rem 2rem 4rem;
-}
-
-.profile-grid {
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  gap: 2rem;
-  align-items: start;
-}
-
-.profile-grid__right {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
+/* ── Row 1: Platforms + Subscription ── */
+.profile-row--top {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
 @media (max-width: 900px) {
-  .profile-grid {
+  .profile-row--top {
     grid-template-columns: 1fr;
   }
 }
 
+/* ── Section base ── */
 .profile-section {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 1.5rem;
+  border-radius: 16px;
+  padding: 1.75rem;
 }
 
 .section-title {
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1.125rem;
+  font-weight: 700;
   color: #111827;
+  margin: 0 0 0.375rem;
+}
+
+.section-subtitle {
+  font-size: 0.8125rem;
+  color: #9ca3af;
   margin: 0 0 1.25rem;
 }
 
+/* ── Connected Platforms ── */
+.platforms-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.875rem;
+}
+
+@media (max-width: 700px) {
+  .platforms-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.platform-card {
+  border: 1.5px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.platform-card--active {
+  border-color: #c7d2fe;
+  background: #fafbff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.06);
+}
+
+.platform-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.platform-card__icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.platform-card__icon-wrap--threads { background: #000; }
+.platform-card__icon-wrap--linkedin { background: #0077b5; }
+.platform-card__icon-wrap--tiktok { background: #000; }
+.platform-card__icon-wrap--instagram {
+  background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+}
+
+.platform-card__icon-wrap :deep(.platform-icon) {
+  width: 40px;
+  height: 40px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.platform-card__icon-wrap :deep(.platform-icon svg) {
+  width: 20px;
+  height: 20px;
+}
+
+.platform-badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: #dcfce7;
+  color: #16a34a;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.platform-card__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.platform-card__social {
+  flex: 1;
+}
+
+.platform-card__not-connected {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.platform-card__connect-btn {
+  width: 100%;
+  padding: 0.4rem 0;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: not-allowed;
+  opacity: 0.6;
+  transition: all 0.15s;
+}
+
+/* ── Subscription ── */
+.profile-section--subscription {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.375rem 0;
+}
+
+.info-row + .info-row {
+  border-top: 1px solid #f3f4f6;
+}
+
+.info-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.info-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.credits-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.credits-progress__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.credits-progress__stat {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #6366f1;
+}
+
+.credits-progress__bar {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.credits-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+/* ── Creator Profile form ── */
 .loading-state,
 .empty-state {
   color: #6b7280;
@@ -467,7 +795,6 @@ onMounted(async () => {
   resize: vertical;
 }
 
-/* Chip selector */
 .chip-selector {
   display: flex;
   flex-wrap: wrap;
@@ -495,7 +822,6 @@ onMounted(async () => {
   color: #fff;
 }
 
-/* Tag input */
 .tag-input-wrapper {
   display: flex;
   flex-direction: column;
@@ -533,7 +859,7 @@ onMounted(async () => {
   color: #ef4444;
 }
 
-/* Buttons */
+/* ── Buttons ── */
 .btn {
   padding: 0.5rem 1rem;
   border: none;
@@ -569,33 +895,9 @@ onMounted(async () => {
   border: 1px solid #fecaca;
 }
 
-/* Info rows */
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-}
-
-.info-row + .info-row {
-  border-top: 1px solid #f3f4f6;
-}
-
-.info-label {
-  font-size: 0.875rem;
-  color: #6b7280;
-}
-
-.info-value {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #111827;
-}
-
 .placeholder-actions {
   display: flex;
   gap: 0.75rem;
-  margin-top: 1rem;
 }
 
 .save-message {
@@ -608,100 +910,50 @@ onMounted(async () => {
   color: #dc2626;
 }
 
-/* Credits highlight */
-.info-value--credits {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #6366f1;
-}
-
-/* Transactions */
-.transactions-section {
-  margin-top: 1.5rem;
-}
-
-.subsection-title {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #374151;
-  margin: 0 0 0.75rem;
-}
-
-.transactions-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8125rem;
-}
-
-.transactions-table th {
-  text-align: left;
-  padding: 0.5rem 0.5rem;
-  border-bottom: 1px solid #e5e7eb;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.transactions-table td {
-  padding: 0.5rem 0.5rem;
-  border-bottom: 1px solid #f3f4f6;
-  color: #111827;
-}
-
-.amount-positive {
-  color: #059669;
-  font-weight: 500;
-}
-
-.amount-negative {
-  color: #dc2626;
-  font-weight: 500;
-}
-
-.reference-cell {
-  color: #9ca3af;
-  font-size: 0.75rem;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Credits progress bar */
-.credits-progress-wrap {
-  padding: 0.5rem 0;
+/* ── Account actions ── */
+.account-action {
+  border-top: 1px solid #f3f4f6;
+  padding-top: 1.25rem;
+  margin-top: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1rem;
 }
 
-.credits-progress__header {
+.account-action--danger {
+  border-top-color: #fee2e2;
+}
+
+.account-action__header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.credits-progress__stat {
+.account-action__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.125rem;
+}
+
+.account-action__title--danger {
+  color: #dc2626;
+}
+
+.account-action__desc {
   font-size: 0.8125rem;
-  font-weight: 700;
-  color: #6366f1;
-}
-
-.credits-progress__bar {
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.credits-progress__fill {
-  height: 100%;
-  background: linear-gradient(90deg, #6366f1, #818cf8);
-  border-radius: 9999px;
-  transition: width 0.4s ease;
-}
-
-.credits-progress__remaining {
-  font-size: 0.75rem;
   color: #9ca3af;
+}
+
+.account-subform {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
 }
 </style>

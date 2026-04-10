@@ -26,7 +26,7 @@ Read the content-filtering skill for detailed criteria. In short:
 
 ## Platform Assignment
 Match content to the right platform based on the creator's active platforms:
-- **Threads**: Short opinions, hot takes, conversation starters, quick insights
+- **Threads**: Short opinions, hot takes, conversation starters, quick insights — read `docs/platform-research.md` for format decision framework (text_post vs text_with_image vs image_series)
 - **LinkedIn**: Professional achievements, lessons, frameworks, industry takes
 - **TikTok**: Stories with high energy, tutorials, behind-the-scenes, trending angles
 - **Instagram Reels**: Polished stories, tutorials, share-worthy content
@@ -36,9 +36,9 @@ Match content to the right platform based on the creator's active platforms:
 ## Output Format
 For each content idea, call the save_content_idea tool with:
 - platform: which platform this is for
-- format: text_post | video_script | carousel | stories
+- format: `text_post` | `text_with_image` | `image_series` | `video_script` | `carousel` | `stories`
 - angle: one-line summary of the idea (what makes it interesting)
-- description: 2-3 sentences explaining the angle, what to cover, and why it works
+- description: 2-3 sentences explaining the angle, what to cover, and why it works. For `text_with_image` or `image_series` — include a brief note on what the image(s) should show.
 
 ## CRITICAL — UI Behaviour
 You are running inside an app with two panels:

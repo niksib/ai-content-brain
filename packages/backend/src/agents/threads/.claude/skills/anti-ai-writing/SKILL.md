@@ -1,9 +1,19 @@
 ---
 name: anti-ai-writing
-description: Use this skill when finalizing any written content output — posts, captions, scripts, or any text delivered to the user. Apply as a final quality check to ensure the writing sounds human and authentic, not AI-generated.
+description: Use this skill after writing any Threads post draft. In 2026, Threads audiences actively detect and reject AI-generated content — apply before saving every post.
 ---
 
-# Anti-AI Writing
+# Anti-AI Writing for Threads (2026)
+
+## Why This Is Critical on Threads
+
+In 2026, only 26% of users prefer AI-generated creator content — down from 60% in 2023. Threads users have developed pattern recognition. When they detect AI writing, they scroll past. When they don't, they engage.
+
+Threads specifically rewards "yap" style — raw, unedited, in-the-moment voice. The platform penalizes polished, corporate content. AI writing leans polished. That's the core problem.
+
+Apply this skill to every post before saving.
+
+---
 
 ## What Makes Writing Sound AI-Generated
 

@@ -53,7 +53,7 @@ export const saveContentIdeaTool: Anthropic.Tool = {
       },
       format: {
         type: "string",
-        enum: ["text_post", "video_script", "carousel", "stories"],
+        enum: ["text_post", "text_with_image", "image_series", "video_script", "carousel", "stories"],
         description: "Content format",
       },
       angle: { type: "string", description: "The angle or hook of the content idea" },
@@ -200,6 +200,18 @@ export function makeUpdateContentIdea(
   };
 }
 
+export function makeSaveProducedContent(onContentSaved?: (contentIdeaId: string) => Promise<void> | void) {
+  return async (input: Record<string, unknown>): Promise<string> => {
+    const result = await executeSaveProducedContent(input);
+    try {
+      await onContentSaved?.(input.contentIdeaId as string);
+    } catch (err) {
+      console.error("[makeSaveProducedContent] onContentSaved callback failed:", err);
+    }
+    return result;
+  };
+}
+
 export async function executeSaveProducedContent(input: Record<string, unknown>): Promise<string> {
   const { contentIdeaId, userId, platform, format, body } = input as {
     contentIdeaId: string;
@@ -212,10 +224,16 @@ export async function executeSaveProducedContent(input: Record<string, unknown>)
   const parsedBody = JSON.parse(body);
 
   await prisma.$transaction([
-    prisma.producedContent.create({
-      data: {
+    prisma.producedContent.upsert({
+      where: { contentIdeaId },
+      create: {
         contentIdeaId,
         userId,
+        platform: platform as Platform,
+        format: format as ContentFormat,
+        body: parsedBody,
+      },
+      update: {
         platform: platform as Platform,
         format: format as ContentFormat,
         body: parsedBody,

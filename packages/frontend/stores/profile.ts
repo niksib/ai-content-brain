@@ -15,6 +15,7 @@ export interface CreatorProfile {
   toneExamples: string[];
   goals: string[];
   rawNotes: string;
+  contentLanguage: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +32,7 @@ export type ProfileUpdateData = Partial<
     | 'toneOfVoice'
     | 'toneExamples'
     | 'goals'
+    | 'contentLanguage'
   >
 >;
 

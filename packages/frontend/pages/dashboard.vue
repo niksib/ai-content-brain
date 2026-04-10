@@ -105,8 +105,8 @@
             'calendar-cell--day-completed': day.sessions.length > 0 && !day.isToday && day.sessions[0].status === 'completed',
             'calendar-cell--empty-day': day.sessions.length === 0 && !day.isToday,
           }"
-          :style="{ cursor: day.sessions.length > 0 && !day.isToday ? 'pointer' : undefined }"
-          @click="day.sessions.length > 0 ? navigateToSession(day.sessions[0].id) : null"
+          :style="{ cursor: day.sessions.length > 0 || day.isToday ? 'pointer' : undefined }"
+          @click="handleCellClick(day)"
         >
           <div class="calendar-cell__header">
             <span class="calendar-cell__number">{{ day.number }}</span>
@@ -128,9 +128,9 @@
               </div>
             </template>
             <template v-else>
-              <p class="calendar-cell__today-status">Session in progress...</p>
-              <div class="calendar-cell__progress-bar">
-                <div class="calendar-cell__progress-fill"></div>
+              <div class="calendar-cell__start-session">
+                <span class="material-symbols-outlined calendar-cell__mic-icon">mic</span>
+                <span class="calendar-cell__start-label">Start Session</span>
               </div>
             </template>
           </template>
@@ -158,7 +158,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useDashboardStore } from '~/stores/dashboard';
+import { useDashboardStore, type CalendarSession } from '~/stores/dashboard';
 import { useBillingStore } from '~/stores/billing';
 import { useProfileStore } from '~/stores/profile';
 
@@ -216,6 +216,14 @@ async function handleStartSession(): Promise<void> {
 
 function navigateToSession(sessionId: string): void {
   router.push(`/sessions/${sessionId}`);
+}
+
+function handleCellClick(day: { number: number; isToday: boolean; sessions: CalendarSession[] }): void {
+  if (day.sessions.length > 0) {
+    navigateToSession(day.sessions[0].id);
+  } else if (day.isToday) {
+    handleStartSession();
+  }
 }
 
 // Store uses 0-based month values
@@ -622,9 +630,13 @@ const daysInMonth = computed(() => {
   color: #fff;
   box-shadow: 0 8px 24px rgba(53, 37, 205, 0.35);
   z-index: 2;
-  cursor: default;
+  cursor: pointer;
   outline: 3px solid rgba(53, 37, 205, 0.4);
   outline-offset: 2px;
+}
+
+.calendar-cell--today:hover {
+  background: #2f1fb5;
 }
 
 .calendar-cell--today-completed {
@@ -747,6 +759,28 @@ const daysInMonth = computed(() => {
   color: #d1d5db;
   font-size: 24px !important;
   margin: auto;
+}
+
+.calendar-cell__start-session {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  margin-top: auto;
+}
+
+.calendar-cell__mic-icon {
+  font-size: 28px !important;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.calendar-cell__start-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 /* ─── Insights Grid ─── */

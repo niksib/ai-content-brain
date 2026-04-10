@@ -57,6 +57,10 @@ export const saveCreatorProfileTool: Anthropic.Tool = {
         description: "The creator's content goals",
       },
       rawNotes: { type: "string", description: "Raw notes from the onboarding conversation" },
+      contentLanguage: {
+        type: "string",
+        description: "The primary language for all produced content (e.g. 'Russian', 'English', 'Ukrainian')",
+      },
     },
     required: [
       "userId",
@@ -69,6 +73,7 @@ export const saveCreatorProfileTool: Anthropic.Tool = {
       "toneExamples",
       "goals",
       "rawNotes",
+      "contentLanguage",
     ],
   },
 };
@@ -100,6 +105,7 @@ export async function executeSaveCreatorProfile(input: Record<string, unknown>):
     toneExamples: string[];
     goals: string[];
     rawNotes: string;
+    contentLanguage: string;
   };
 
   await prisma.creatorProfile.upsert({

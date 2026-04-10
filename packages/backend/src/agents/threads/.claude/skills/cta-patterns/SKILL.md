@@ -1,21 +1,51 @@
 ---
 name: cta-patterns
-description: Use this skill when adding a call-to-action to any content — posts, videos, carousels, or stories. Apply to choose the right CTA type and placement for each platform and content goal.
+description: Use this skill when ending a Threads post. Threads CTAs work differently from other platforms — replies beat likes, links kill reach, follow CTAs backfire. Apply before writing the last line of any post.
 ---
 
-# CTA Patterns
+# CTA Patterns for Threads (2026)
 
-## Core Principle
+## How Threads CTAs Work Differently
 
-A CTA (call-to-action) tells the reader what to do next. Bad CTAs are generic commands ("follow me for more"). Good CTAs feel like a natural extension of the content and give the reader a specific, low-friction action that makes sense given what they just read or watched.
+On Threads, the algorithm ranks by **reply depth** — the number and quality of replies a post generates. This changes everything about what a CTA should do.
 
-One CTA per piece of content. Never two. More than one dilutes both.
+- **Replies > likes** — a CTA that generates a reply is worth 5x a CTA that generates a like
+- **External links in post body kill reach** — never include a URL in the post itself (put in first reply if needed)
+- **Engagement bait is penalized** — "like if you agree", "drop a ❤️" actively suppress reach
+- **Follow CTAs backfire** — they signal desperation and low-quality content; Threads followers come from being interesting, not from asking
+
+One CTA per post. No exceptions. More than one dilutes both and reads as AI.
 
 ---
 
-## CTA Types
+## The 3 CTAs That Actually Work on Threads
 
-### 1. Save CTA
+---
+
+### 1. Reply Invitation (Highest Priority)
+**Why it works:** Replies are the #1 algorithm signal on Threads. A post that generates 10 replies outperforms a post with 200 likes.
+
+**Formula:**
+> "[Question that has a real range of valid answers]?"
+> "Disagree? Tell me why."
+> "What's your experience been with [specific thing]?"
+> "Reply with [specific thing] — genuinely curious."
+
+**Examples:**
+> "At what point did you stop explaining your prices?"
+> "Disagree? I've heard the counter-argument. Make your case."
+> "What's the thing you wish someone had told you in month 1?"
+> "Reply with your niche — I want to see if this pattern holds."
+
+**Rules:**
+- The question must have a real range of valid answers. "Agree?" is not a question — it's bait.
+- "What do you think?" is too vague — always ask something specific
+- The question should be something the creator genuinely wants to hear answered
+- Questions that invite disagreement generate more replies than questions that invite agreement
+
+---
+
+### 2. Save CTA
 **When to use:** Content is educational, a framework, a checklist, or a reference the person will want to return to.
 **Best for:** Carousels, LinkedIn posts with frameworks, Threads posts with step-by-step processes
 
@@ -125,38 +155,33 @@ One CTA per piece of content. Never two. More than one dilutes both.
 
 ---
 
-## Platform-Specific CTA Priority
+## CTA Placement on Threads
 
-| Platform | Best CTAs | Avoid |
-|---|---|---|
-| TikTok | Comment, Follow, Save | External links in caption |
-| Instagram Reels | Save, Send, Follow | Generic "follow me" |
-| Instagram Carousel | Save, Send, DM | Multiple CTAs on last slide |
-| Instagram Stories | DM, Poll/Question, Swipe | Long text CTAs |
-| Threads | Comment, Save | Explicit engagement bait |
-| LinkedIn | Save, Comment, DM | Links in post body |
+Always the last line of the post. One CTA only.
+
+For threads (multi-post): CTA on the final post only. Earlier posts should end with a natural transition to the next post, not a CTA.
 
 ---
 
-## CTA Placement Rules
+## When to Use No CTA
 
-**Video (TikTok / Reels):** CTA in the last 3-5 seconds AND in the caption. Two touches.
+Some posts don't need a CTA. A strong opinion or sharp observation can stand alone — ending with a question weakens it.
 
-**Carousel:** CTA only on the last slide. One clear action, no alternatives.
+Use no CTA when:
+- The post ends with a clear conclusion that speaks for itself
+- The post is a quick take (1-3 lines) — adding a question makes it feel forced
+- The question you'd ask is too obvious or doesn't have a real range of answers
 
-**Threads:** CTA as the last line of the post. One question or save prompt.
-
-**LinkedIn:** CTA as the last 1-2 lines. One question or specific prompt.
-
-**Stories:** CTA on the last story in a sequence. Interactive element (poll/question) mid-sequence.
+Let the post breathe. Not every post needs explicit engagement prompting.
 
 ---
 
-## What Never Works as a CTA
+## What Never Works on Threads
 
-- "Like and subscribe if you enjoyed this" — transactional, no reason given
-- "Follow for more content" — too vague
-- "Let me know your thoughts in the comments" — too generic
-- "Hope this was helpful!" — not a CTA
-- "Drop a ❤️ if this resonated" — engagement bait, penalized on most platforms
-- Multiple CTAs in one post — dilutes both
+- "Like if you agree" — algorithmically penalized, actively reduces reach
+- "Drop a ❤️ if this resonated" — same, penalized
+- "Follow me for more" — signals desperation, rarely converts
+- "Let me know your thoughts in the comments below!" — reads as AI, too generic
+- "Hope this was helpful!" — not a CTA at all
+- Any URL in the post body — kills reach; if linking is needed, put it in the first reply
+- Multiple CTAs — dilutes both, reads as AI-generated
