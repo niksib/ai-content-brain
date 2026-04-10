@@ -137,9 +137,9 @@
 
           <template v-else-if="day.sessions.length > 0">
             <div class="calendar-cell__session-count">
-              <span class="material-symbols-outlined" style="font-size:16px;" :style="{color: day.sessions[0].status === 'completed' ? '#16a34a' : '#6366f1'}">check_circle</span>
+              <span class="material-symbols-outlined calendar-cell__session-icon" :style="{color: day.sessions[0].status === 'completed' ? '#16a34a' : '#6366f1'}">check_circle</span>
               <span class="calendar-cell__count-text" :class="{'calendar-cell__count-text--green': day.sessions[0].status === 'completed'}">
-                {{ day.sessions[0].ideaCount }} idea{{ day.sessions[0].ideaCount !== 1 ? 's' : '' }}
+                {{ day.sessions[0].ideaCount }} idea{{ day.sessions[0].ideaCount !== 1 ? 's' : '' }} completed
               </span>
             </div>
           </template>
@@ -718,11 +718,16 @@ const daysInMonth = computed(() => {
 
 
 .calendar-cell__session-count {
-  margin-top: auto;
+  flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  padding-top: 0.25rem;
+  justify-content: center;
+  gap: 0.375rem;
+}
+
+.calendar-cell__session-icon {
+  font-size: 32px !important;
 }
 
 .calendar-cell__count-text {
@@ -731,6 +736,7 @@ const daysInMonth = computed(() => {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #6366f1;
+  text-align: center;
 }
 
 .calendar-cell__count-text--green {

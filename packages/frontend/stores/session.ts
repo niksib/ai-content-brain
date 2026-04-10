@@ -86,6 +86,7 @@ export const useSessionStore = defineStore('session', () => {
   const sseStream = useSSEStream();
 
   async function createOrLoadSession(sessionId?: string): Promise<void> {
+    resetSession();
     try {
       if (sessionId) {
         const response = await apiClient.get<{ session: Session }>(`/api/sessions/${sessionId}`);
