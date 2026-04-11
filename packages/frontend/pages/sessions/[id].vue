@@ -363,7 +363,7 @@ watch(
     }
   },
 );
-onUnmounted(() => { if (thinkingTimer) clearInterval(thinkingTimer); });
+onUnmounted(() => { if (thinkingTimer) clearInterval(thinkingTimer); transcriptionAbort?.abort(); });
 
 // ─── Active agent ───
 interface AgentInfo {
@@ -446,18 +446,24 @@ async function toggleMicRecording(): Promise<void> {
   }
 }
 
+let transcriptionAbort: AbortController | null = null;
+
 watch(micAudioBlob, async (blob) => {
   if (!blob) return;
+  transcriptionAbort?.abort();
+  transcriptionAbort = new AbortController();
   const formData = new FormData();
   formData.append('audio', blob, 'recording.webm');
   try {
     const response = await $fetch<{ transcript: string }>('/api/voice/transcribe', {
       method: 'POST',
       body: formData,
+      signal: transcriptionAbort.signal,
     });
     chatInputText.value = response.transcript;
-  } catch {
-    // transcription failed silently — user can type manually
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') return;
+    console.warn('[voice] Transcription failed:', err);
   }
 });
 
