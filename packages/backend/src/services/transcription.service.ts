@@ -1,6 +1,6 @@
-import OpenAI, { toFile } from "openai";
+import Groq, { toFile } from "groq-sdk";
 
-const openai = new OpenAI();
+const groq = new Groq();
 
 export class TranscriptionService {
   async transcribe(
@@ -12,8 +12,8 @@ export class TranscriptionService {
 
     const file = await toFile(audioBuffer, fileName, { type: mimeType });
 
-    const response = await openai.audio.transcriptions.create({
-      model: "whisper-1",
+    const response = await groq.audio.transcriptions.create({
+      model: "whisper-large-v3-turbo",
       file,
     });
 
