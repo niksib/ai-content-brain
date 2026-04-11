@@ -14,6 +14,7 @@ import { ideaRoutes } from "./routes/ideas.js";
 import { libraryRoutes } from "./routes/library.js";
 import { billingRoutes } from "./routes/billing.js";
 import { threadsRoutes } from "./routes/threads.js";
+import { threadsSchedulerService } from "./services/threads-scheduler.service.js";
 
 const app = new Hono();
 
@@ -46,5 +47,7 @@ serve({
   fetch: app.fetch,
   port,
 });
+
+threadsSchedulerService.start();
 
 export { app };
