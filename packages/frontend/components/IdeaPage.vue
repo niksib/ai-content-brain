@@ -63,14 +63,22 @@
 
           <!-- THREADS POST CARD (single or multi-thread) -->
           <template v-if="isThreadsTextPost && contentBody">
+            <div class="edit-status-bar">
+              <span class="edit-hint">Click on any post to edit</span>
+              <span v-if="saveStatus === 'saving'" class="edit-saving">Saving...</span>
+              <span v-else-if="saveStatus === 'saved'" class="edit-saved">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
+                Saved
+              </span>
+            </div>
             <div class="threads-thread">
               <div
-                v-for="(postText, index) in threadPosts"
+                v-for="(postText, index) in editableThreadPosts"
                 :key="`${index}-${postText.slice(0, 20)}`"
                 class="threads-thread__item"
               >
                 <!-- Vertical connector line between posts -->
-                <div v-if="index < threadPosts.length - 1" class="threads-thread__connector-wrap">
+                <div v-if="index < editableThreadPosts.length - 1" class="threads-thread__connector-wrap">
                   <div class="threads-thread__line" />
                 </div>
 
@@ -98,7 +106,14 @@
                       </svg>
                     </button>
                   </div>
-                  <div class="threads-card__body">{{ postText }}</div>
+                  <div
+                    :ref="(el) => { if (el) postBodyEls[index] = el as HTMLElement }"
+                    class="threads-card__body"
+                    contenteditable="true"
+                    @input="onThreadPostInput(index, $event)"
+                    @blur="flushThreadPostEdit(index, $event)"
+                    @keydown.enter.exact.prevent="($event.target as HTMLElement).blur()"
+                  />
                   <div class="threads-card__actions">
                     <button type="button" class="threads-card__action">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20">
@@ -126,10 +141,31 @@
             </div>
           </template>
 
+          <!-- THREADS PUBLISH ACTIONS -->
+          <ThreadsPublish
+            v-if="isThreadsTextPost && idea.producedContent"
+            :text="threadsPublishText"
+            :content-idea-id="idea.id"
+          />
+
           <!-- TEXT POST (LinkedIn, other platforms) -->
           <template v-else-if="idea.format === 'text_post' && contentBody">
             <div class="idea-page__text-post">
-              <div class="idea-page__text-body">{{ contentBody.text }}</div>
+              <div class="edit-status-bar">
+                <span class="edit-hint">Click to edit</span>
+                <span v-if="saveStatus === 'saving'" class="edit-saving">Saving...</span>
+                <span v-else-if="saveStatus === 'saved'" class="edit-saved">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
+                  Saved
+                </span>
+              </div>
+              <div
+                ref="textBodyEl"
+                class="idea-page__text-body"
+                contenteditable="true"
+                @input="onTextBodyInput($event)"
+                @blur="flushTextBodyEdit($event)"
+              />
               <div v-if="contentBody.hashtags?.length" class="idea-page__hashtags">
                 <span
                   v-for="tag in contentBody.hashtags"
@@ -273,9 +309,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import PlatformIcon from '~/components/PlatformIcon.vue';
+import ThreadsPublish from '~/components/threads/ThreadsPublish.vue';
 import { useSessionStore, type SessionIdea, type ProducedContentBody } from '~/stores/session';
+import { useApiClient } from '~/services/api';
 
 const props = defineProps<{
   ideaId: string;
@@ -288,11 +326,28 @@ const emit = defineEmits<{
 }>();
 
 const store = useSessionStore();
+const apiClient = useApiClient();
 const idea = ref<SessionIdea | null>(null);
 const isLoading = ref(false);
 const loadError = ref<string | null>(null);
 const copyLabel = ref('Copy');
 const copiedIndex = ref<number | null>(null);
+const editableThreadPosts = ref<string[]>([]);
+const editableTextBody = ref('');
+const saveStatus = ref<'idle' | 'saving' | 'saved'>('idle');
+const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+const savedTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+const showSavingTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+
+// Template refs for contenteditable elements — content is set imperatively,
+// never via reactive binding, to avoid cursor-reset on re-render.
+const postBodyEls = ref<HTMLElement[]>([]);
+const textBodyEl = ref<HTMLElement | null>(null);
+
+// Plain (non-reactive) drafts written during typing.
+// Reactive state is only updated at save time (blur / debounce fire).
+const draftPosts: Record<number, string> = {};
+let draftTextBody = '';
 
 const FORMAT_LABELS: Record<string, string> = {
   text_post: 'Post',
@@ -311,6 +366,18 @@ const formatLabel = computed(() => {
 const isThreadsTextPost = computed(
   () => idea.value?.platform === 'threads' && idea.value?.format === 'text_post',
 );
+
+const threadsPublishText = computed((): string => {
+  if (!idea.value?.producedContent) return '';
+  const body = idea.value.producedContent.body as Record<string, unknown>;
+  if (Array.isArray(body.posts)) {
+    return (body.posts as string[]).join('\n\n');
+  }
+  if (typeof body.text === 'string') {
+    return body.text;
+  }
+  return '';
+});
 
 const contentBody = computed<ProducedContentBody | null>(() => {
   if (!idea.value?.producedContent?.body) return null;
@@ -334,6 +401,112 @@ const threadPosts = computed<string[]>(() => {
   if (contentBody.value.text) return [contentBody.value.text];
   return [];
 });
+
+// Initialise editable copies on first load.
+// After setting the ref values, push text into DOM imperatively so Vue never
+// re-renders contenteditable elements and the cursor is never reset.
+watch(threadPosts, (posts) => {
+  if (editableThreadPosts.value.length === 0) {
+    editableThreadPosts.value = [...posts];
+    nextTick(() => {
+      posts.forEach((text, i) => {
+        const el = postBodyEls.value[i];
+        if (el) el.innerText = text;
+      });
+    });
+  }
+}, { immediate: true });
+
+watch(contentBody, (body) => {
+  if (body?.text && !editableTextBody.value) {
+    editableTextBody.value = body.text;
+    nextTick(() => {
+      if (textBodyEl.value) textBodyEl.value.innerText = body.text!;
+    });
+  }
+}, { immediate: true });
+
+// --- Auto-save helpers ---
+
+function scheduleAutoSave(persistFn: () => Promise<void>): void {
+  // User is typing — clear everything and hide indicators
+  if (showSavingTimer.value !== null) { clearTimeout(showSavingTimer.value); showSavingTimer.value = null; }
+  if (saveTimer.value !== null) { clearTimeout(saveTimer.value); saveTimer.value = null; }
+  if (savedTimer.value !== null) { clearTimeout(savedTimer.value); savedTimer.value = null; }
+  saveStatus.value = 'idle';
+
+  // After 500ms of inactivity: show "Saving..."
+  showSavingTimer.value = setTimeout(() => {
+    saveStatus.value = 'saving';
+    showSavingTimer.value = null;
+  }, 500);
+
+  // After 5s of inactivity: persist to backend
+  saveTimer.value = setTimeout(() => {
+    persistFn();
+    saveStatus.value = 'saved';
+    saveTimer.value = null;
+    savedTimer.value = setTimeout(() => { saveStatus.value = 'idle'; }, 2000);
+  }, 5000);
+}
+
+function flushSave(persistFn: () => Promise<void>): void {
+  if (showSavingTimer.value !== null) { clearTimeout(showSavingTimer.value); showSavingTimer.value = null; }
+  if (saveTimer.value !== null) { clearTimeout(saveTimer.value); saveTimer.value = null; }
+  if (savedTimer.value !== null) { clearTimeout(savedTimer.value); savedTimer.value = null; }
+  persistFn();
+  saveStatus.value = 'saved';
+  savedTimer.value = setTimeout(() => { saveStatus.value = 'idle'; }, 2000);
+}
+
+async function persistThreadEdits(): Promise<void> {
+  if (!idea.value?.producedContent) return;
+  Object.entries(draftPosts).forEach(([i, text]) => {
+    editableThreadPosts.value[Number(i)] = text;
+  });
+  const posts = editableThreadPosts.value;
+  const updatedBody: ProducedContentBody = {
+    ...contentBody.value,
+    posts: posts.length > 1 ? [...posts] : undefined,
+    text: posts.length === 1 ? posts[0] : undefined,
+  };
+  idea.value.producedContent.body = updatedBody;
+  store.markContentUpdatedByUser(updatedBody);
+  await apiClient.patch(`/api/ideas/${props.ideaId}/content`, updatedBody).catch(() => {});
+}
+
+async function persistTextBodyEdit(): Promise<void> {
+  if (!idea.value?.producedContent) return;
+  if (draftTextBody) editableTextBody.value = draftTextBody;
+  const updatedBody: ProducedContentBody = { ...contentBody.value, text: editableTextBody.value };
+  idea.value.producedContent.body = updatedBody;
+  store.markContentUpdatedByUser(updatedBody);
+  await apiClient.patch(`/api/ideas/${props.ideaId}/content`, updatedBody).catch(() => {});
+}
+
+// Called on every keystroke — reads from DOM but does NOT write to reactive
+// state (that would trigger re-render and reset the cursor).
+// The actual reactive update happens only in persistThreadEdits / flushSave.
+function onThreadPostInput(index: number, event: Event): void {
+  draftPosts[index] = (event.target as HTMLElement).innerText;
+  scheduleAutoSave(persistThreadEdits);
+}
+
+function onTextBodyInput(event: Event): void {
+  draftTextBody = (event.target as HTMLElement).innerText;
+  scheduleAutoSave(persistTextBodyEdit);
+}
+
+// Called on blur — focus is already gone, safe to update reactive state
+function flushThreadPostEdit(index: number, event: Event): void {
+  draftPosts[index] = (event.target as HTMLElement).innerText;
+  flushSave(persistThreadEdits);
+}
+
+function flushTextBodyEdit(event: Event): void {
+  draftTextBody = (event.target as HTMLElement).innerText;
+  flushSave(persistTextBodyEdit);
+}
 
 async function copyTextContent() {
   if (!contentBody.value?.text) return;
@@ -958,5 +1131,60 @@ onMounted(async () => {
 
 .threads-card__action:hover {
   color: #111827;
+}
+
+/* Inline editing */
+.threads-card__body {
+  cursor: text;
+  outline: none;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.threads-card__body:focus {
+  background: #f5f3ff;
+  outline: 2px solid #6366f1;
+  outline-offset: -2px;
+}
+
+.idea-page__text-body {
+  cursor: text;
+  outline: none;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.idea-page__text-body:focus {
+  background: #f5f3ff;
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Edit status bar */
+.edit-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0 0.5rem;
+}
+
+.edit-hint {
+  font-size: 0.6875rem;
+  color: #9ca3af;
+  flex: 1;
+}
+
+.edit-saving {
+  font-size: 0.6875rem;
+  color: #9ca3af;
+}
+
+.edit-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  color: #059669;
+  font-weight: 500;
 }
 </style>
