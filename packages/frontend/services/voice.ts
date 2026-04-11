@@ -7,7 +7,7 @@ export function useVoiceService() {
     formData.append("audio", audioBlob, "recording.webm");
 
     const response = await $fetch<{ transcript: string }>(
-      `${baseURL}/voice/transcribe`,
+      `${baseURL}/api/voice/transcribe`,
       {
         method: "POST",
         body: formData,

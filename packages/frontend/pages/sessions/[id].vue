@@ -328,6 +328,8 @@ const route = useRoute();
 const router = useRouter();
 const store = useSessionStore();
 const profileStore = useProfileStore();
+const config = useRuntimeConfig();
+const apiBaseUrl = config.public.apiBaseUrl as string;
 const { renderMarkdown } = useMarkdown();
 
 // ─── Skeleton count ───
@@ -455,7 +457,7 @@ watch(micAudioBlob, async (blob) => {
   const formData = new FormData();
   formData.append('audio', blob, 'recording.webm');
   try {
-    const response = await $fetch<{ transcript: string }>('/api/voice/transcribe', {
+    const response = await $fetch<{ transcript: string }>(`${apiBaseUrl}/api/voice/transcribe`, {
       method: 'POST',
       body: formData,
       signal: transcriptionAbort.signal,
