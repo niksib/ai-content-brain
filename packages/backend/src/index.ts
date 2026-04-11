@@ -13,6 +13,7 @@ import { chatRoutes } from "./routes/chat.js";
 import { ideaRoutes } from "./routes/ideas.js";
 import { libraryRoutes } from "./routes/library.js";
 import { billingRoutes } from "./routes/billing.js";
+import { threadsRoutes } from "./routes/threads.js";
 
 const app = new Hono();
 
@@ -35,6 +36,7 @@ app.route("/api", chatRoutes);
 app.route("/api", ideaRoutes);
 app.route("/api", libraryRoutes);
 app.route("/api", billingRoutes);
+app.route("/api", threadsRoutes);
 
 const port = 3001;
 
