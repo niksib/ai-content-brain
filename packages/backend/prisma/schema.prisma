@@ -243,3 +243,54 @@ enum CreditTransactionType {
   content_plan
   content_production
 }
+
+// ==================== THREADS INTEGRATION ====================
+
+model ThreadsAccount {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  threadsUserId    String
+  accessToken      String
+  tokenExpiresAt   DateTime
+  scopes           String
+  isPrivateProfile Boolean  @default(false)
+  postsCount       Int      @default(0)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  scheduledPosts   ScheduledPost[]
+}
+
+model ScheduledPost {
+  id               String                 @id @default(cuid())
+  userId           String
+  threadsAccountId String
+  threadsAccount   ThreadsAccount         @relation(fields: [threadsAccountId], references: [id])
+
+  contentIdeaId    String?
+  text             String
+  mediaType        ScheduledPostMediaType @default(TEXT)
+  mediaUrl         String?
+
+  scheduledAt      DateTime
+  status           ScheduledPostStatus    @default(pending)
+  threadsPostId    String?
+  errorMessage     String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+enum ScheduledPostMediaType {
+  TEXT
+  IMAGE
+  VIDEO
+}
+
+enum ScheduledPostStatus {
+  pending
+  publishing
+  published
+  failed
+}
