@@ -1,8 +1,24 @@
+import { createHmac } from "node:crypto";
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { threadsApiService } from "../services/threads-api.service.js";
 import type { AppEnv } from "../types/hono.js";
+
+function signOAuthState(userId: string): string {
+  const secret = process.env.THREADS_APP_SECRET!;
+  const sig = createHmac("sha256", secret).update(userId).digest("hex").slice(0, 16);
+  return `${userId}:${sig}`;
+}
+
+function verifyOAuthState(state: string): string | null {
+  const parts = state.split(":");
+  if (parts.length !== 2) return null;
+  const [userId, sig] = parts;
+  const expected = createHmac("sha256", process.env.THREADS_APP_SECRET!).update(userId).digest("hex").slice(0, 16);
+  if (sig !== expected) return null;
+  return userId;
+}
 
 export const threadsRoutes = new Hono<AppEnv>();
 
@@ -28,7 +44,7 @@ threadsRoutes.get("/threads/account", requireAuth, async (context) => {
 // GET /threads/auth — redirect user to Threads OAuth
 threadsRoutes.get("/threads/auth", requireAuth, async (context) => {
   const user = context.get("user");
-  const authUrl = threadsApiService.buildAuthorizationUrl(user.id);
+  const authUrl = threadsApiService.buildAuthorizationUrl(signOAuthState(user.id));
   return context.redirect(authUrl);
 });
 
@@ -44,6 +60,11 @@ threadsRoutes.get("/threads/callback", async (context) => {
     return context.redirect(`${frontendUrl}/settings?threads_error=access_denied`);
   }
 
+  const verifiedUserId = verifyOAuthState(state);
+  if (!verifiedUserId) {
+    return context.redirect(`${frontendUrl}/settings?threads_error=invalid_state`);
+  }
+
   try {
     const shortLivedToken = await threadsApiService.exchangeCodeForShortLivedToken(code);
     const tokenData = await threadsApiService.exchangeForLongLivedToken(shortLivedToken);
@@ -51,9 +72,9 @@ threadsRoutes.get("/threads/callback", async (context) => {
     const tokenExpiresAt = new Date(Date.now() + tokenData.expiresInSeconds * 1000);
 
     await prisma.threadsAccount.upsert({
-      where: { userId: state },
+      where: { userId: verifiedUserId },
       create: {
-        userId: state,
+        userId: verifiedUserId,
         threadsUserId: userInfo.id,
         accessToken: tokenData.accessToken,
         tokenExpiresAt,
@@ -91,7 +112,7 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
   const user = context.get("user");
   const body = await context.req.json() as { text: string; contentIdeaId?: string };
 
-  if (!body.text || typeof body.text !== "string") {
+  if (!body.text?.trim() || typeof body.text !== "string") {
     return context.json({ error: "text is required" }, 400);
   }
 
@@ -105,6 +126,10 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
 
   if (!account) {
     return context.json({ error: "Threads account not connected" }, 400);
+  }
+
+  if (account.tokenExpiresAt <= new Date()) {
+    return context.json({ error: "Threads token expired. Please reconnect your account in Settings." }, 401);
   }
 
   try {
@@ -131,7 +156,7 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
   const user = context.get("user");
   const body = await context.req.json() as { text: string; scheduledAt: string; contentIdeaId?: string };
 
-  if (!body.text || typeof body.text !== "string") {
+  if (!body.text?.trim() || typeof body.text !== "string") {
     return context.json({ error: "text is required" }, 400);
   }
 
@@ -213,6 +238,10 @@ threadsRoutes.get("/threads/insights", requireAuth, async (context) => {
 
   if (!account) {
     return context.json({ error: "Threads account not connected" }, 400);
+  }
+
+  if (account.tokenExpiresAt <= new Date()) {
+    return context.json({ error: "Threads token expired. Please reconnect your account in Settings." }, 401);
   }
 
   const now = new Date();

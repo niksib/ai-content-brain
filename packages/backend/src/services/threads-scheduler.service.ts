@@ -12,25 +12,31 @@ export class ThreadsSchedulerService {
   }
 
   private async processDuePosts(): Promise<void> {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
     const duePosts = await prisma.scheduledPost.findMany({
       where: {
-        status: "pending",
-        scheduledAt: { lte: new Date() },
+        OR: [
+          { status: "pending", scheduledAt: { lte: new Date() } },
+          { status: "publishing", updatedAt: { lte: fiveMinutesAgo } },
+        ],
       },
       include: {
         threadsAccount: true,
       },
     });
 
-    for (const post of duePosts) {
-      await this.publishScheduledPost(
-        post.id,
-        post.threadsAccountId,
-        post.threadsAccount.threadsUserId,
-        post.threadsAccount.accessToken,
-        post.text
-      );
-    }
+    await Promise.allSettled(
+      duePosts.map((post) =>
+        this.publishScheduledPost(
+          post.id,
+          post.threadsAccountId,
+          post.threadsAccount.threadsUserId,
+          post.threadsAccount.accessToken,
+          post.text
+        )
+      )
+    );
   }
 
   private async publishScheduledPost(
