@@ -147,8 +147,15 @@
 
           <!-- Chat input -->
           <div class="transcript-input">
-            <button class="transcript-input__mic" title="Voice input">
-              <span class="material-symbols-outlined" style="font-size:20px;">mic</span>
+            <button
+              class="transcript-input__mic"
+              :class="{ 'transcript-input__mic--recording': isMicRecording }"
+              title="Voice input"
+              @click="toggleMicRecording"
+            >
+              <span class="material-symbols-outlined" style="font-size:20px;">
+                {{ isMicRecording ? 'stop_circle' : 'mic' }}
+              </span>
             </button>
             <input
               v-model="chatInputText"
@@ -311,6 +318,7 @@ import OrbRecorder from '~/components/OrbRecorder.vue';
 import IdeaPage from '~/components/IdeaPage.vue';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 import { useMarkdown } from '~/composables/useMarkdown';
+import { useVoiceRecorder } from '~/composables/useVoiceRecorder';
 
 definePageMeta({
   layout: 'default',
@@ -426,6 +434,32 @@ const isInitializing = ref(true);
 const messagesContainerRef = ref<HTMLElement | null>(null);
 const isUserRecording = ref(false);
 const chatInputText = ref('');
+
+// ─── Voice recorder (mic button in chat panel) ───
+const { isRecording: isMicRecording, audioBlob: micAudioBlob, startRecording: startMicRecording, stopRecording: stopMicRecording } = useVoiceRecorder();
+
+async function toggleMicRecording(): Promise<void> {
+  if (isMicRecording.value) {
+    stopMicRecording();
+  } else {
+    await startMicRecording();
+  }
+}
+
+watch(micAudioBlob, async (blob) => {
+  if (!blob) return;
+  const formData = new FormData();
+  formData.append('audio', blob, 'recording.webm');
+  try {
+    const response = await $fetch<{ transcript: string }>('/api/voice/transcribe', {
+      method: 'POST',
+      body: formData,
+    });
+    chatInputText.value = response.transcript;
+  } catch {
+    // transcription failed silently — user can type manually
+  }
+});
 
 function scrollToBottom() {
   nextTick(() => {
@@ -1033,6 +1067,16 @@ onMounted(async () => {
 .transcript-input__mic:hover {
   color: #3525cd;
   background: rgba(53, 37, 205, 0.07);
+}
+
+.transcript-input__mic--recording {
+  color: #ef4444;
+  animation: mic-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .transcript-input__field {
