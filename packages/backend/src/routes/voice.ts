@@ -16,10 +16,18 @@ voiceRoutes.post("/voice/transcribe", requireAuth, async (context) => {
   const audioBuffer = Buffer.from(arrayBuffer);
   const mimeType = audioFile.type || "audio/webm";
 
-  const transcript = await transcriptionService.transcribe(
-    audioBuffer,
-    mimeType
-  );
+  try {
+    const transcript = await transcriptionService.transcribe(
+      audioBuffer,
+      mimeType
+    );
 
-  return context.json({ transcript });
+    return context.json({ transcript });
+  } catch (error) {
+    console.error("Transcription error:", error);
+    return context.json(
+      { error: "Transcription failed. Please try again." },
+      500
+    );
+  }
 });
