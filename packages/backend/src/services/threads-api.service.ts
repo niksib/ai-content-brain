@@ -108,14 +108,15 @@ export class ThreadsApiService {
 
   async getUserInfo(accessToken: string): Promise<ThreadsUserInfo> {
     const params = new URLSearchParams({
-      fields: "id,username,name,biography,is_private",
+      fields: "id,username,name,biography",
       access_token: accessToken,
     });
 
     const response = await fetch(`${THREADS_BASE_URL}/me?${params.toString()}`);
 
     if (!response.ok) {
-      throw new Error(`Threads user info fetch failed: ${response.status}`);
+      const errorBody = await response.text();
+      throw new Error(`Threads user info fetch failed: ${response.status} — ${errorBody}`);
     }
 
     const data = await response.json() as {
@@ -123,7 +124,6 @@ export class ThreadsApiService {
       username: string;
       name: string;
       biography?: string;
-      is_private: boolean;
     };
 
     return {
@@ -131,7 +131,7 @@ export class ThreadsApiService {
       username: data.username,
       name: data.name,
       biography: data.biography,
-      isPrivate: data.is_private,
+      isPrivate: false,
     };
   }
 
