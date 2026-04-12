@@ -19,11 +19,8 @@
     </div>
 
     <div v-else class="threads-connect__disconnected">
-      <p class="threads-connect__description">
-        Connect your Threads account to publish and schedule posts directly from the workspace.
-      </p>
       <a class="threads-connect__button" :href="authUrl">
-        Connect Threads
+        Connect
       </a>
     </div>
   </div>

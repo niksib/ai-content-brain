@@ -7,7 +7,7 @@
       <!-- Connected Platforms -->
       <section class="profile-section profile-section--platforms">
         <h2 class="section-title">Connected Platforms</h2>
-        <p class="section-subtitle">Platforms you create content for and social accounts you've connected.</p>
+        <p class="section-subtitle">Connect your social accounts to publish and schedule posts directly from the workspace.</p>
         <div class="platforms-grid">
           <div
             v-for="platform in ALL_PLATFORMS"
