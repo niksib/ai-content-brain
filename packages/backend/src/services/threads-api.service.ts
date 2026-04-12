@@ -14,7 +14,9 @@ export interface ThreadsUserInfo {
   id: string;
   username: string;
   name: string;
-  isPrivate: boolean;
+  biography?: string;
+  profilePictureUrl?: string;
+  isVerified: boolean;
 }
 
 export interface ThreadsInsights {
@@ -107,7 +109,7 @@ export class ThreadsApiService {
 
   async getUserInfo(accessToken: string): Promise<ThreadsUserInfo> {
     const params = new URLSearchParams({
-      fields: "id,username,name",
+      fields: "id,username,name,threads_biography,threads_profile_picture_url,is_verified",
       access_token: accessToken,
     });
 
@@ -122,13 +124,18 @@ export class ThreadsApiService {
       id: string;
       username: string;
       name: string;
+      threads_biography?: string;
+      threads_profile_picture_url?: string;
+      is_verified?: boolean;
     };
 
     return {
       id: data.id,
       username: data.username,
       name: data.name,
-      isPrivate: false,
+      biography: data.threads_biography,
+      profilePictureUrl: data.threads_profile_picture_url,
+      isVerified: data.is_verified ?? false,
     };
   }
 

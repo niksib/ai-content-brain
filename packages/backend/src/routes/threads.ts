@@ -79,13 +79,11 @@ threadsRoutes.get("/threads/callback", async (context) => {
         accessToken: tokenData.accessToken,
         tokenExpiresAt,
         scopes: "threads_basic,threads_content_publish,threads_manage_insights",
-        isPrivateProfile: userInfo.isPrivate,
       },
       update: {
         threadsUserId: userInfo.id,
         accessToken: tokenData.accessToken,
         tokenExpiresAt,
-        isPrivateProfile: userInfo.isPrivate,
       },
     });
 
