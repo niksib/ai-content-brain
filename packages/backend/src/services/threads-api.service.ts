@@ -14,7 +14,6 @@ export interface ThreadsUserInfo {
   id: string;
   username: string;
   name: string;
-  biography?: string;
   isPrivate: boolean;
 }
 
@@ -108,7 +107,7 @@ export class ThreadsApiService {
 
   async getUserInfo(accessToken: string): Promise<ThreadsUserInfo> {
     const params = new URLSearchParams({
-      fields: "id,username,name,biography",
+      fields: "id,username,name",
       access_token: accessToken,
     });
 
@@ -123,14 +122,12 @@ export class ThreadsApiService {
       id: string;
       username: string;
       name: string;
-      biography?: string;
     };
 
     return {
       id: data.id,
       username: data.username,
       name: data.name,
-      biography: data.biography,
       isPrivate: false,
     };
   }
