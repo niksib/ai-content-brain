@@ -58,11 +58,14 @@ const minScheduleDate = computed(() => {
   return now.toISOString().slice(0, 16);
 });
 
+const config = useRuntimeConfig();
+const apiBaseUrl = config.public.apiBaseUrl as string;
+
 onMounted(async () => {
   try {
-    const config = useRuntimeConfig();
     const response = await $fetch<{ account: { id: string } | null }>(
-      `${config.public.apiBaseUrl}/api/threads/account`
+      `${apiBaseUrl}/api/threads/account`,
+      { credentials: 'include' }
     );
     accountConnected.value = response.account !== null;
   } catch {
@@ -76,9 +79,9 @@ async function publishNow(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    const config = useRuntimeConfig();
-    await $fetch(`${config.public.apiBaseUrl}/api/threads/publish`, {
+    await $fetch(`${apiBaseUrl}/api/threads/publish`, {
       method: 'POST',
+      credentials: 'include',
       body: {
         text: props.text,
         contentIdeaId: props.contentIdeaId,
@@ -100,9 +103,9 @@ async function schedulePost(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    const config = useRuntimeConfig();
-    await $fetch(`${config.public.apiBaseUrl}/api/threads/schedule`, {
+    await $fetch(`${apiBaseUrl}/api/threads/schedule`, {
       method: 'POST',
+      credentials: 'include',
       body: {
         text: props.text,
         scheduledAt: new Date(scheduledAtInput.value).toISOString(),

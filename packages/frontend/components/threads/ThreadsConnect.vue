@@ -56,7 +56,8 @@ async function loadAccount(): Promise<void> {
   try {
     const config = useRuntimeConfig();
     const response = await $fetch<{ account: ThreadsAccount | null }>(
-      `${config.public.apiBaseUrl}/api/threads/account`
+      `${config.public.apiBaseUrl}/api/threads/account`,
+      { credentials: 'include' }
     );
     account.value = response.account;
   } catch {
@@ -66,7 +67,10 @@ async function loadAccount(): Promise<void> {
 
 async function disconnect(): Promise<void> {
   const config = useRuntimeConfig();
-  await $fetch(`${config.public.apiBaseUrl}/api/threads/account`, { method: 'DELETE' });
+  await $fetch(`${config.public.apiBaseUrl}/api/threads/account`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
   account.value = null;
 }
 </script>

@@ -56,7 +56,8 @@ onMounted(async () => {
   try {
     const config = useRuntimeConfig();
     const response = await $fetch<{ insights: InsightsResponse }>(
-      `${config.public.apiBaseUrl}/api/threads/insights`
+      `${config.public.apiBaseUrl}/api/threads/insights`,
+      { credentials: 'include' }
     );
     insights.value = response.insights;
   } catch {
