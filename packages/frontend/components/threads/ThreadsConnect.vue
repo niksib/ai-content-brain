@@ -1,37 +1,35 @@
 <template>
   <div class="threads-connect">
-    <div v-if="account" class="threads-connect__connected">
-      <div class="threads-connect__status">
-        <span class="threads-connect__indicator threads-connect__indicator--ok"></span>
-        <span class="threads-connect__label">Threads connected</span>
+    <template v-if="account">
+      <div class="threads-connect__account">
+        <img
+          v-if="account.profilePictureUrl"
+          :src="account.profilePictureUrl"
+          class="threads-connect__avatar"
+          alt="Threads avatar"
+        />
+        <div v-else class="threads-connect__avatar-placeholder">
+          <span class="material-symbols-outlined" style="font-size:16px;color:#fff;">person</span>
+        </div>
+        <span class="threads-connect__username">@{{ account.username }}</span>
       </div>
-      <div class="threads-connect__meta">
-        <span class="threads-connect__expires">
-          Token expires {{ formattedExpiry }}
-        </span>
-        <span v-if="account.isPrivateProfile" class="threads-connect__private-badge">
-          Private profile — manual reconnect required before expiry
-        </span>
-      </div>
-      <button class="threads-connect__disconnect" @click="disconnect">
-        Disconnect
-      </button>
-    </div>
+      <button class="threads-connect__btn" @click="disconnect">Disconnect</button>
+    </template>
 
-    <div v-else class="threads-connect__disconnected">
-      <a class="threads-connect__button" :href="authUrl">
-        Connect
-      </a>
-    </div>
+    <template v-else>
+      <a class="threads-connect__btn" :href="authUrl">Connect</a>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 
 interface ThreadsAccount {
   id: string;
   threadsUserId: string;
+  username: string;
+  profilePictureUrl: string | null;
   tokenExpiresAt: string;
   scopes: string;
   isPrivateProfile: boolean;
@@ -40,13 +38,8 @@ interface ThreadsAccount {
 
 const account = ref<ThreadsAccount | null>(null);
 const config = useRuntimeConfig();
-const authUrl = `${config.public.apiBaseUrl}/api/threads/auth`;
-
-const formattedExpiry = computed(() => {
-  if (!account.value) return '';
-  const date = new Date(account.value.tokenExpiresAt);
-  return date.toLocaleDateString();
-});
+const apiBaseUrl = config.public.apiBaseUrl as string;
+const authUrl = `${apiBaseUrl}/api/threads/auth`;
 
 onMounted(async () => {
   await loadAccount();
@@ -54,9 +47,8 @@ onMounted(async () => {
 
 async function loadAccount(): Promise<void> {
   try {
-    const config = useRuntimeConfig();
     const response = await $fetch<{ account: ThreadsAccount | null }>(
-      `${config.public.apiBaseUrl}/api/threads/account`,
+      `${apiBaseUrl}/api/threads/account`,
       { credentials: 'include' }
     );
     account.value = response.account;
@@ -66,8 +58,7 @@ async function loadAccount(): Promise<void> {
 }
 
 async function disconnect(): Promise<void> {
-  const config = useRuntimeConfig();
-  await $fetch(`${config.public.apiBaseUrl}/api/threads/account`, {
+  await $fetch(`${apiBaseUrl}/api/threads/account`, {
     method: 'DELETE',
     credentials: 'include',
   });
@@ -78,81 +69,47 @@ async function disconnect(): Promise<void> {
 <style scoped>
 .threads-connect {
   width: 100%;
-}
-
-.threads-connect__connected {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.threads-connect__status {
+.threads-connect__account {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
-.threads-connect__indicator {
-  width: 8px;
-  height: 8px;
+.threads-connect__avatar {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
-.threads-connect__indicator--ok {
-  background: #10b981;
-}
-
-.threads-connect__label {
-  font-weight: 500;
-  font-size: 0.875rem;
-}
-
-.threads-connect__meta {
+.threads-connect__avatar-placeholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #374151;
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.threads-connect__expires {
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-
-.threads-connect__private-badge {
-  font-size: 0.75rem;
-  color: #f59e0b;
-}
-
-.threads-connect__disconnect {
-  width: 100%;
-  padding: 0.4rem 0;
-  border: none;
-  border-radius: 8px;
-  background: #000;
+.threads-connect__username {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: white;
-  cursor: pointer;
-  transition: all 0.15s;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.threads-connect__disconnect:hover {
-  background: #1a1a1a;
-}
-
-.threads-connect__disconnected {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.threads-connect__description {
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin: 0;
-}
-
-.threads-connect__button {
+.threads-connect__btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -165,10 +122,11 @@ async function disconnect(): Promise<void> {
   font-size: 0.8125rem;
   font-weight: 500;
   text-decoration: none;
-  transition: all 0.15s;
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
-.threads-connect__button:hover {
+.threads-connect__btn:hover {
   background: #1a1a1a;
 }
 </style>

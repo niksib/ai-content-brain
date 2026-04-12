@@ -22,7 +22,7 @@
               <span v-if="isActivePlatform(platform)" class="platform-badge">Active</span>
             </div>
             <p class="platform-card__name">{{ PLATFORM_NAMES[platform] }}</p>
-            <div class="platform-card__social">
+            <div v-if="platform !== 'threads'" class="platform-card__social">
               <span class="platform-card__not-connected">Not connected</span>
             </div>
             <ThreadsConnect v-if="platform === 'threads'" />
@@ -584,14 +584,8 @@ onMounted(async () => {
 /* ── Connected Platforms ── */
 .platforms-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.875rem;
-}
-
-@media (max-width: 700px) {
-  .platforms-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 
 .platform-card {

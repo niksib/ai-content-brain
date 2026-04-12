@@ -31,6 +31,8 @@ threadsRoutes.get("/threads/account", requireAuth, async (context) => {
     select: {
       id: true,
       threadsUserId: true,
+      username: true,
+      profilePictureUrl: true,
       tokenExpiresAt: true,
       scopes: true,
       isPrivateProfile: true,
@@ -76,12 +78,16 @@ threadsRoutes.get("/threads/callback", async (context) => {
       create: {
         userId: verifiedUserId,
         threadsUserId: userInfo.id,
+        username: userInfo.username,
+        profilePictureUrl: userInfo.profilePictureUrl ?? null,
         accessToken: tokenData.accessToken,
         tokenExpiresAt,
         scopes: "threads_basic,threads_content_publish,threads_keyword_search,threads_manage_insights,threads_manage_replies,threads_profile_discovery,threads_read_replies",
       },
       update: {
         threadsUserId: userInfo.id,
+        username: userInfo.username,
+        profilePictureUrl: userInfo.profilePictureUrl ?? null,
         accessToken: tokenData.accessToken,
         tokenExpiresAt,
       },

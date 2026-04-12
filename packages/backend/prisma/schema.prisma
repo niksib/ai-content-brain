@@ -247,19 +247,21 @@ enum CreditTransactionType {
 // ==================== THREADS INTEGRATION ====================
 
 model ThreadsAccount {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  threadsUserId    String
-  accessToken      String
-  tokenExpiresAt   DateTime
-  scopes           String
-  isPrivateProfile Boolean  @default(false)
-  postsCount       Int      @default(0)
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  threadsUserId     String
+  username          String   @default("")
+  profilePictureUrl String?
+  accessToken       String
+  tokenExpiresAt    DateTime
+  scopes            String
+  isPrivateProfile  Boolean  @default(false)
+  postsCount        Int      @default(0)
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  scheduledPosts   ScheduledPost[]
+  scheduledPosts    ScheduledPost[]
 }
 
 model ScheduledPost {
