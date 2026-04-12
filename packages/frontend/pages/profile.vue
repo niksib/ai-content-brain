@@ -675,14 +675,14 @@ onMounted(async () => {
 .platform-card__connect-btn {
   width: 100%;
   padding: 0.4rem 0;
-  border: 1px solid #d1d5db;
+  border: none;
   border-radius: 8px;
-  background: #fff;
+  background: #000;
   font-size: 0.8125rem;
   font-weight: 500;
-  color: #6b7280;
+  color: #fff;
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.4;
   transition: all 0.15s;
 }
 

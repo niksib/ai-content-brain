@@ -72,9 +72,7 @@ async function disconnect(): Promise<void> {
 
 <style scoped>
 .threads-connect {
-  padding: 1rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  width: 100%;
 }
 
 .threads-connect__connected {
@@ -121,19 +119,20 @@ async function disconnect(): Promise<void> {
 }
 
 .threads-connect__disconnect {
-  align-self: flex-start;
-  padding: 0.375rem 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: white;
+  width: 100%;
+  padding: 0.4rem 0;
+  border: none;
+  border-radius: 8px;
+  background: #000;
   font-size: 0.8125rem;
-  color: #6b7280;
+  font-weight: 500;
+  color: white;
   cursor: pointer;
+  transition: all 0.15s;
 }
 
 .threads-connect__disconnect:hover {
-  background: #f9fafb;
-  color: #374151;
+  background: #1a1a1a;
 }
 
 .threads-connect__disconnected {
@@ -149,16 +148,19 @@ async function disconnect(): Promise<void> {
 }
 
 .threads-connect__button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  padding: 0.5rem 1rem;
+  justify-content: center;
+  width: 100%;
+  padding: 0.4rem 0;
   background: #000;
   color: white;
+  border: none;
   border-radius: 8px;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   text-decoration: none;
-  width: fit-content;
+  transition: all 0.15s;
 }
 
 .threads-connect__button:hover {
