@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
-import { threadsApiService } from "../services/threads-api.service.js";
+import { threadsApiService, THREADS_BASE_URL } from "../services/threads-api.service.js";
 import type { AppEnv } from "../types/hono.js";
 
 function signOAuthState(userId: string): string {
@@ -148,6 +148,13 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
       data: { postsCount: { increment: 1 } },
     });
 
+    if (body.contentIdeaId) {
+      await prisma.contentIdea.update({
+        where: { id: body.contentIdeaId, userId: user.id },
+        data: { publishStatus: "posted", threadsPostId: result.postId },
+      });
+    }
+
     return context.json({ postId: result.postId });
   } catch (publishError) {
     console.error("[threads/publish] Publish failed:", publishError);
@@ -194,6 +201,13 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
       scheduledAt,
     },
   });
+
+  if (body.contentIdeaId) {
+    await prisma.contentIdea.update({
+      where: { id: body.contentIdeaId, userId: user.id },
+      data: { publishStatus: "scheduled" },
+    });
+  }
 
   return context.json({ scheduledPost });
 });
@@ -274,5 +288,109 @@ threadsRoutes.get("/threads/insights", requireAuth, async (context) => {
   } catch (insightsError) {
     console.error("[threads/insights] Failed to fetch insights:", insightsError);
     return context.json({ error: "Failed to fetch insights. Please try again." }, 500);
+  }
+});
+
+// POST /threads/insights/:contentIdeaId/refresh — fetch and store a new insights snapshot
+threadsRoutes.post("/threads/insights/:contentIdeaId/refresh", requireAuth, async (context) => {
+  const user = context.get("user");
+  const contentIdeaId = context.req.param("contentIdeaId");
+
+  const idea = await prisma.contentIdea.findUnique({
+    where: { id: contentIdeaId, userId: user.id },
+    select: { threadsPostId: true },
+  });
+
+  if (!idea?.threadsPostId) {
+    return context.json({ error: "No Threads post ID for this idea" }, 400);
+  }
+
+  const account = await prisma.threadsAccount.findUnique({
+    where: { userId: user.id },
+  });
+
+  if (!account) {
+    return context.json({ error: "Threads account not connected" }, 400);
+  }
+
+  if (account.tokenExpiresAt <= new Date()) {
+    return context.json({ error: "Threads token expired. Please reconnect." }, 401);
+  }
+
+  try {
+    const url = new URL(`${THREADS_BASE_URL}/${idea.threadsPostId}/insights`);
+    url.searchParams.set("metric", "views,likes,replies,reposts,quotes,shares");
+    url.searchParams.set("access_token", account.accessToken);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => "(unreadable)");
+      console.error(`[threads/insights/refresh] Threads API ${response.status}:`, errorBody);
+      return context.json({ error: "Failed to fetch post insights from Threads", threadsStatus: response.status }, 502);
+    }
+
+    const data = await response.json() as { data: Array<{ name: string; values: Array<{ value: number }> }> };
+    const metrics: Record<string, number> = {};
+    for (const metricEntry of data.data ?? []) {
+      metrics[metricEntry.name] = metricEntry.values?.[0]?.value ?? 0;
+    }
+
+    const snapshot = await prisma.threadsInsightsSnapshot.create({
+      data: {
+        contentIdeaId,
+        userId: user.id,
+        views: metrics.views ?? null,
+        likes: metrics.likes ?? null,
+        replies: metrics.replies ?? null,
+        reposts: metrics.reposts ?? null,
+        quotes: metrics.quotes ?? null,
+        shares: metrics.shares ?? null,
+      },
+    });
+
+    return context.json({ snapshot });
+  } catch (refreshError) {
+    console.error("[threads/insights/refresh] Failed:", refreshError);
+    return context.json({ error: "Failed to refresh insights. Please try again." }, 500);
+  }
+});
+
+// GET /threads/post-insights/:threadsPostId — get per-post analytics
+threadsRoutes.get("/threads/post-insights/:threadsPostId", requireAuth, async (context) => {
+  const user = context.get("user");
+  const threadsPostId = context.req.param("threadsPostId");
+
+  const account = await prisma.threadsAccount.findUnique({
+    where: { userId: user.id },
+  });
+
+  if (!account) {
+    return context.json({ error: "Threads account not connected" }, 400);
+  }
+
+  if (account.tokenExpiresAt <= new Date()) {
+    return context.json({ error: "Threads token expired." }, 401);
+  }
+
+  try {
+    const url = new URL(`${THREADS_BASE_URL}/${threadsPostId}/insights`);
+    url.searchParams.set("metric", "views,likes,replies,reposts,quotes,shares");
+    url.searchParams.set("access_token", account.accessToken);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      return context.json({ error: "Failed to fetch post insights" }, 502);
+    }
+
+    const data = await response.json() as { data: Array<{ name: string; values: Array<{ value: number }> }> };
+    const metrics: Record<string, number> = {};
+    for (const metricEntry of data.data ?? []) {
+      metrics[metricEntry.name] = metricEntry.values?.[0]?.value ?? 0;
+    }
+
+    return context.json({ metrics });
+  } catch (insightsError) {
+    console.error("[threads/post-insights] Failed:", insightsError);
+    return context.json({ error: "Failed to fetch post insights" }, 500);
   }
 });

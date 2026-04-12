@@ -65,7 +65,7 @@
                   </div>
                   <div
                     class="transcript-msg__bubble transcript-msg__bubble--user"
-                    v-html="renderMarkdown(msg.content)"
+                    v-html="renderMarkdown(stripSystemContext(msg.content))"
                   ></div>
                 </div>
               </div>
@@ -247,9 +247,27 @@
                 <span v-if="store.recentlyUpdatedIdeaIds.has(idea.id)" class="idea-card__updated-badge">
                   Updated
                 </span>
+                <span v-else-if="idea.publishStatus === 'posted'" class="idea-card__publish-badge idea-card__publish-badge--posted">
+                  Posted
+                </span>
+                <span v-else-if="idea.publishStatus === 'scheduled'" class="idea-card__publish-badge idea-card__publish-badge--scheduled">
+                  Scheduled
+                </span>
               </div>
               <h4 class="idea-card__title">{{ idea.angle }}</h4>
               <p class="idea-card__body">{{ idea.description }}</p>
+
+              <!-- Threads account (shown when connected) -->
+              <div v-if="idea.platform === 'threads' && threadsAccount" class="idea-card__account">
+                <img
+                  v-if="threadsAccount.profilePictureUrl"
+                  :src="threadsAccount.profilePictureUrl"
+                  class="idea-card__account-avatar"
+                  alt="Threads avatar"
+                />
+                <div v-else class="idea-card__account-avatar-placeholder"></div>
+                <span class="idea-card__account-username">@{{ threadsAccount.username }}</span>
+              </div>
 
               <div class="idea-card__actions">
                 <template v-if="idea.status === 'proposed'">
@@ -328,9 +346,23 @@ const route = useRoute();
 const router = useRouter();
 const store = useSessionStore();
 const profileStore = useProfileStore();
+
+interface ThreadsAccount {
+  username: string;
+  profilePictureUrl: string | null;
+}
+const threadsAccount = ref<ThreadsAccount | null>(null);
 const config = useRuntimeConfig();
 const apiBaseUrl = config.public.apiBaseUrl as string;
 const { renderMarkdown } = useMarkdown();
+
+function stripSystemContext(content: string): string {
+  const start = content.indexOf('[User manually edited the content');
+  if (start === -1) return content;
+  const end = content.indexOf('}]', start);
+  if (end === -1) return content;
+  return (content.slice(0, start) + content.slice(end + 2)).replace(/^\n+/, '').trim();
+}
 
 // ─── Skeleton count ───
 // Driven by activePendingIdeas which uses setTimeout to guarantee
@@ -519,6 +551,9 @@ onMounted(async () => {
     await Promise.all([
       store.createOrLoadSession(sessionId.value),
       profileStore.loadProfile(),
+      $fetch<{ account: ThreadsAccount | null }>(`${apiBaseUrl}/api/threads/account`, { credentials: 'include' })
+        .then((r) => { threadsAccount.value = r.account; })
+        .catch(() => {}),
     ]);
     await Promise.all([store.loadMessages(), store.loadIdeas()]);
   } catch (error) {
@@ -1197,6 +1232,56 @@ onMounted(async () => {
 .idea-card--updated {
   border-color: #a5b4fc;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.idea-card__publish-badge {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.idea-card__publish-badge--posted {
+  color: #065f46;
+  background: #d1fae5;
+}
+
+.idea-card__publish-badge--scheduled {
+  color: #4338ca;
+  background: #eef2ff;
+}
+
+.idea-card__account {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.idea-card__account-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.idea-card__account-avatar-placeholder {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  flex-shrink: 0;
+}
+
+.idea-card__account-username {
+  font-size: 0.75rem;
+  color: #6b7280;
 }
 
 .idea-card__updated-badge {

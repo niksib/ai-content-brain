@@ -5,13 +5,13 @@ import type { ContentIdea } from "../../generated/prisma/client.js";
 
 const LANGUAGE_RULE = `**CRITICAL — Content Language**: Write the content strictly in the language specified as \`contentLanguage\` in the Creator Profile. The language of this prompt does not matter — the content language does. Do not mix languages.`;
 
-const SELF_CRITIQUE = `**Before calling save_produced_content, score your draft on each criterion (1–10):**
-1. Hook — Does the first line trigger reply intent without asking a question? Is it a strong opinion or specific observation?
-2. Tone match — Does it sound exactly like this creator, not like a generic AI post?
-3. Anti-AI — Zero clichés ("game-changer", "dive into", "let's explore", "I'm excited to share")?
-4. CTA — Is the closing a reply invitation (not a follow ask or external link)?
+const SELF_CRITIQUE = `**Internal quality check before saving (do not output this — think it silently):**
+- Hook: does the first line create tension or state something specific without asking a question?
+- Tone: does it sound like this specific creator, not generic AI?
+- Anti-AI: zero clichés ("game-changer", "dive into", "let's explore", "I'm excited to share")?
+- Ending: does the post END on a statement, observation, or consequence — NOT a question, not "What do you think?", not a follow CTA? The writing itself should make people want to reply, not a prompt asking them to.
 
-If any score is below 8 — rewrite that part before saving. Do not save a draft you would score below 8 on any criterion.`;
+If any check fails — rewrite that part silently. Then call save_produced_content immediately with no additional output.`;
 
 export class ThreadsAgent extends PlatformAgent {
   private constructor(userId: string, private readonly idea: ContentIdea) {

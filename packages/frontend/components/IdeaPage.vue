@@ -85,12 +85,18 @@
                 <div class="threads-card">
                   <div class="threads-card__header">
                     <div class="threads-card__avatar">
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                      <img
+                        v-if="threadsAccount?.profilePictureUrl"
+                        :src="threadsAccount.profilePictureUrl"
+                        class="threads-card__avatar-img"
+                        alt="avatar"
+                      />
+                      <svg v-else viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
                         <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
                       </svg>
                     </div>
                     <div class="threads-card__user">
-                      <span class="threads-card__username">you</span>
+                      <span class="threads-card__username">{{ threadsAccount?.username ? '@' + threadsAccount.username : 'you' }}</span>
                     </div>
                     <button
                       type="button"
@@ -146,6 +152,9 @@
             v-if="isThreadsTextPost && idea.producedContent"
             :text="threadsPublishText"
             :content-idea-id="idea.id"
+            :publish-status="idea.publishStatus"
+            @published="onPublished"
+            @scheduled="onScheduled"
           />
 
           <!-- TEXT POST (LinkedIn, other platforms) -->
@@ -290,6 +299,14 @@
           </template>
         </div>
 
+        <!-- Completed but empty content (generation failed silently) -->
+        <div v-else-if="idea.status === 'completed' && hasEmptyContent" class="idea-page__placeholder">
+          <p class="idea-page__placeholder-text">Generation failed — content was empty.</p>
+          <button class="idea-page__regenerate-btn" type="button" @click="emit('approve', idea.id)">
+            Regenerate
+          </button>
+        </div>
+
         <!-- Producing state -->
         <div v-else-if="idea.status === 'producing'" class="idea-page__placeholder">
           <p class="idea-page__placeholder-text idea-page__placeholder-text--producing">
@@ -327,6 +344,12 @@ const emit = defineEmits<{
 
 const store = useSessionStore();
 const apiClient = useApiClient();
+const config = useRuntimeConfig();
+const apiBaseUrl = config.public.apiBaseUrl as string;
+
+interface ThreadsAccount { username: string; profilePictureUrl: string | null }
+const threadsAccount = ref<ThreadsAccount | null>(null);
+
 const idea = ref<SessionIdea | null>(null);
 const isLoading = ref(false);
 const loadError = ref<string | null>(null);
@@ -400,6 +423,20 @@ const threadPosts = computed<string[]>(() => {
   if (contentBody.value.posts?.length) return contentBody.value.posts;
   if (contentBody.value.text) return [contentBody.value.text];
   return [];
+});
+
+// True when idea is marked completed but the agent saved empty content
+const hasEmptyContent = computed(() => {
+  if (!idea.value?.producedContent) return true;
+  const body = contentBody.value;
+  if (!body) return true;
+  if (body.posts?.length) return false;
+  if (body.text) return false;
+  if (body.caption) return false;
+  if (body.slides?.length) return false;
+  if (body.script?.length) return false;
+  if (body.stories?.length) return false;
+  return true;
 });
 
 // Initialise editable copies on first load.
@@ -549,12 +586,41 @@ function handleReject() {
   }
 }
 
-// Sync with store when idea status changes (e.g. producing → completed)
+function onPublished(threadsPostId: string): void {
+  if (idea.value) {
+    idea.value.publishStatus = 'posted';
+    idea.value.threadsPostId = threadsPostId;
+  }
+  // Sync to store
+  const idx = store.ideas.findIndex((i) => i.id === props.ideaId);
+  if (idx !== -1) {
+    store.ideas[idx] = { ...store.ideas[idx], publishStatus: 'posted', threadsPostId };
+  }
+}
+
+function onScheduled(): void {
+  if (idea.value) {
+    idea.value.publishStatus = 'scheduled';
+  }
+  const idx = store.ideas.findIndex((i) => i.id === props.ideaId);
+  if (idx !== -1) {
+    store.ideas[idx] = { ...store.ideas[idx], publishStatus: 'scheduled' };
+  }
+}
+
+// Sync with store when idea status or content changes (e.g. producing → completed, agent edit)
 watch(
   () => store.ideas.find((item) => item.id === props.ideaId),
   (storeIdea) => {
     if (storeIdea && idea.value) {
+      const bodyChanged = JSON.stringify(storeIdea.producedContent?.body) !==
+                          JSON.stringify(idea.value.producedContent?.body);
       idea.value = { ...storeIdea };
+      if (bodyChanged && storeIdea.producedContent) {
+        // Reset editable state so the threadPosts/contentBody watchers re-initialize with new content
+        editableThreadPosts.value = [];
+        editableTextBody.value = '';
+      }
     }
   },
   { deep: true },
@@ -562,13 +628,11 @@ watch(
 
 onMounted(async () => {
   isLoading.value = true;
+  // Load Threads account in parallel (for avatar/username in post card)
+  $fetch<{ account: ThreadsAccount | null }>(`${apiBaseUrl}/api/threads/account`, { credentials: 'include' })
+    .then((r) => { threadsAccount.value = r.account; })
+    .catch(() => {});
   try {
-    // Try to find idea in local store first
-    const localIdea = store.ideas.find((item) => item.id === props.ideaId);
-    if (localIdea) {
-      idea.value = { ...localIdea };
-    }
-    // Also fetch fresh data from API
     const freshIdea = await store.loadIdea(props.ideaId);
     if (freshIdea) {
       idea.value = freshIdea;
@@ -753,6 +817,23 @@ onMounted(async () => {
 .idea-page__placeholder-text--producing {
   color: #3b82f6;
   animation: producing-pulse 1.5s ease-in-out infinite;
+}
+
+.idea-page__regenerate-btn {
+  margin-top: 0.75rem;
+  padding: 0.4rem 1rem;
+  background: #111827;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.idea-page__regenerate-btn:hover {
+  background: #374151;
 }
 
 @keyframes producing-pulse {
@@ -1067,6 +1148,14 @@ onMounted(async () => {
   justify-content: center;
   color: #9ca3af;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.threads-card__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .threads-card__user {

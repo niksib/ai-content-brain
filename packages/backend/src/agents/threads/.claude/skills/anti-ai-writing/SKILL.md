@@ -113,7 +113,19 @@ Every abstract claim needs a specific detail behind it.
 
 Scan every output for these before delivering:
 
-**Single words to eliminate:**
+**Emotional trigger words — performance signals that read as fake (data-backed)**
+
+Bottom 25% of performers used these 2–8x more than top 10%:
+- "speed" / urgency language — **7x** higher in bottom 25% (2.7% top vs 18.8% bottom)
+- "transformation" / "before and after" / "changed my life" — **5.3x** higher (1.5% vs 8.0%)
+- "fear" / "afraid" / "warning" / "loss" — **3.8x** higher (2.2% vs 8.0%)
+- "pain" / "struggle" / "frustration" — **2.1x** higher (7.7% vs 16.2%)
+- "urgent" / "now" / "don't miss" / "limited"
+- "secret" / "nobody tells you" / "hidden"
+
+Authenticity creates emotion. Trigger words kill it. If the post is *performing* urgency rather than *reflecting* a real moment — rewrite.
+
+**Single words to eliminate (AI signals):**
 delve, tapestry, multifaceted, nuanced, pivotal, paramount, underscore, robust, seamless, streamline, leverage, utilize, facilitate, empower, unlock, unleash, transformative, revolutionary, cutting-edge, innovative, game-changer, paradigm, synergy, ecosystem, holistic, comprehensive, dynamic, foster, cultivate, navigate, realm, landscape, testament, pivotal, crucial, vital (when used excessively)
 
 **Phrases to eliminate:**

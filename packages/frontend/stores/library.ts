@@ -2,6 +2,17 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { useApiClient } from '~/services/api';
 
+export interface ThreadsInsightsSnapshot {
+  id: string;
+  views: number | null;
+  likes: number | null;
+  replies: number | null;
+  reposts: number | null;
+  quotes: number | null;
+  shares: number | null;
+  fetchedAt: string;
+}
+
 export interface LibraryContentIdea {
   id: string;
   angle: string;
@@ -9,6 +20,9 @@ export interface LibraryContentIdea {
   platform: string;
   format: string;
   status: string;
+  publishStatus?: string | null;
+  threadsPostId?: string | null;
+  insightsSnapshots?: ThreadsInsightsSnapshot[];
 }
 
 export interface LibraryItem {

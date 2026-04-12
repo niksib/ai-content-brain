@@ -64,6 +64,15 @@ export class ThreadsSchedulerService {
         data: { postsCount: { increment: 1 } },
       });
 
+      // Update ContentIdea publish status if linked
+      const scheduledPost = await prisma.scheduledPost.findUnique({ where: { id: postId } });
+      if (scheduledPost?.contentIdeaId) {
+        await prisma.contentIdea.update({
+          where: { id: scheduledPost.contentIdeaId },
+          data: { publishStatus: "posted", threadsPostId: result.postId },
+        });
+      }
+
       console.log(`[ThreadsScheduler] Published post ${postId} → Threads ID ${result.postId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

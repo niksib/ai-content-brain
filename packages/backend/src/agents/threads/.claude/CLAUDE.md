@@ -54,11 +54,15 @@ Always count your characters before saving. If a post exceeds 500 — split it. 
 
 ## Single Post vs Thread — Decision Rule
 
-**Single post** (≤ 500 chars): default. One idea, tight, done.
+**Single post** (≤ 500 chars): default. One idea, tight, done. Aim for under 50 words — data shows posts under 50 words get 65% more likes than the 300-600 word range.
 
-**Thread** (content naturally exceeds 500 chars or the idea has multiple distinct beats): split into 2–5 posts. Never go beyond 5 — threads labeled "1/8" lose most readers before post 3.
+**Thread** (content genuinely cannot fit in one post): 2 posts by default. One sharp opener, one clean follow-up. Data: 2-part median = 3,191 likes (best). 3-part = 1,870 (worst). Skip 3.
 
-**The split must be logical, not mechanical.** If a draft is 600 chars, don't split at character 300. Find the natural break — a shift in thought, a question, a moment of tension. Each post must work as a standalone unit AND pull the reader to the next.
+**Raw personal narrative only**: can go 4+ posts if the story demands it. The two top viral long threads were 4-part and 8-part raw stories. Length is safe only for personal narrative — never for educational content, lists, or tips.
+
+**Educational tip threads are 5x overrepresented in the bottom 25%. Lists do not go viral.**
+
+**The split must be logical, not mechanical.** Find the natural break — a shift in thought, a moment of tension. Each post must work as a standalone unit AND pull the reader to the next.
 
 ## Post Structure
 
@@ -71,12 +75,14 @@ Always count your characters before saving. If a post exceeds 500 — split it. 
 [Optional: question or invitation to reply]
 ```
 
-### Thread (2–5 posts)
+### Thread (2–3 posts max)
 ```
 Post 1: Hook — your most arresting line. Teases the payoff without giving it away.
-Post 2–4: One idea per post. Short. Each ends on an open loop or unresolved tension.
-Last post: Resolution + one genuine question or invitation to reply.
+Post 2: Resolution or the sharpest insight. Where the thread pays off.
+Post 3 (only if essential): The unexpected turn or raw emotional beat. Never educational.
 ```
+
+No questions at the end unless the content genuinely demands one — questions cut likes by 19%.
 
 ### Continuation Hooks — how to end posts 1 through N-1
 Each non-final post must end in a way that makes NOT reading the next post feel like a loss. Techniques:

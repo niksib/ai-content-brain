@@ -52,18 +52,26 @@ sessionRoutes.get("/sessions", requireAuth, async (context) => {
           _count: {
             select: { ideas: true },
           },
+          ideas: {
+            select: { publishStatus: true },
+          },
         },
       },
     },
     orderBy: { sessionDate: "desc" },
   });
 
-  const result = sessions.map((session) => ({
-    id: session.id,
-    sessionDate: session.sessionDate,
-    status: session.status,
-    ideaCount: session.contentPlan?._count?.ideas ?? 0,
-  }));
+  const result = sessions.map((session) => {
+    const ideas = session.contentPlan?.ideas ?? [];
+    return {
+      id: session.id,
+      sessionDate: session.sessionDate,
+      status: session.status,
+      ideaCount: session.contentPlan?._count?.ideas ?? 0,
+      postedCount: ideas.filter((i) => i.publishStatus === "posted").length,
+      scheduledCount: ideas.filter((i) => i.publishStatus === "scheduled").length,
+    };
+  });
 
   return context.json({ sessions: result });
 });
@@ -83,7 +91,7 @@ sessionRoutes.delete("/sessions/:id", requireAuth, async (context) => {
   }
 
   const session = await prisma.chatSession.findUnique({
-    where: { id: sessionId },
+    where: { id: sessionId, userId: user.id },
   });
 
   if (!session) {

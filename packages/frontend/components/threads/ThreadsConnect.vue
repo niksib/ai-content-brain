@@ -68,17 +68,15 @@ async function disconnect(): Promise<void> {
 
 <style scoped>
 .threads-connect {
-  width: 100%;
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .threads-connect__account {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.25rem;
 }
 
 .threads-connect__avatar {
@@ -113,8 +111,7 @@ async function disconnect(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  padding: 0.4rem 0;
+  padding: 0.375rem 1rem;
   background: #000;
   color: white;
   border: none;
@@ -124,6 +121,7 @@ async function disconnect(): Promise<void> {
   text-decoration: none;
   cursor: pointer;
   transition: background 0.15s;
+  white-space: nowrap;
 }
 
 .threads-connect__btn:hover {

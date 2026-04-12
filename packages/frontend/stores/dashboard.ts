@@ -7,6 +7,8 @@ export interface CalendarSession {
   sessionDate: string;
   status: string;
   ideaCount: number;
+  postedCount: number;
+  scheduledCount: number;
 }
 
 export const useDashboardStore = defineStore('dashboard', () => {

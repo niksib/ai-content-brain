@@ -7,23 +7,35 @@ description: Use this skill when ending a Threads post. Threads CTAs work differ
 
 ## How Threads CTAs Work Differently
 
-On Threads, the algorithm ranks by **reply depth** — the number and quality of replies a post generates. This changes everything about what a CTA should do.
+**Data point: adding any CTA cut likes by 12% across 1,944 posts tested.**
 
-- **Replies > likes** — a CTA that generates a reply is worth 5x a CTA that generates a like
+The default on Threads is no CTA. The best posts earn attention — they don't ask for it.
+
 - **External links in post body kill reach** — never include a URL in the post itself (put in first reply if needed)
 - **Engagement bait is penalized** — "like if you agree", "drop a ❤️" actively suppress reach
-- **Follow CTAs backfire** — they signal desperation and low-quality content; Threads followers come from being interesting, not from asking
+- **Follow CTAs backfire** — they signal desperation and low-quality content
+- **Questions as endings reduce likes by 19%** — statements outperform questions
 
-One CTA per post. No exceptions. More than one dilutes both and reads as AI.
+One CTA per post maximum. But the default is zero.
+
+**When to use a CTA:** Only when the content type genuinely requires it (series content, resource giveaway) AND the user explicitly wants one.
 
 ---
 
-## The 3 CTAs That Actually Work on Threads
+## CTAs on Threads — When You Must Use One
+
+Default: **no CTA**. Data shows any CTA costs 12% of your likes.
+
+If the user explicitly asks for a CTA or the content type demands it:
 
 ---
 
-### 1. Reply Invitation (Highest Priority)
-**Why it works:** Replies are the #1 algorithm signal on Threads. A post that generates 10 replies outperforms a post with 200 likes.
+### 1. Reply Invitation (Use Sparingly — -19% on likes)
+**Warning:** Posts with questions get 19% fewer likes than posts without (2,700 vs 2,200 median). A confident statement generates more organic replies than an explicit invitation.
+
+**Exception — rhetorical identity mirrors:** Questions that reflect who the reader *is* rather than asking what they think. "Are you the kind of person who..." works differently from "Do you agree?" — identity recognition vs homework.
+
+**When a regular question is still worth it:** When reply depth matters more than like count (e.g., building a community, gathering market research). Trade likes for conversation deliberately, not by default.
 
 **Formula:**
 > "[Question that has a real range of valid answers]?"
@@ -163,16 +175,14 @@ For threads (multi-post): CTA on the final post only. Earlier posts should end w
 
 ---
 
-## When to Use No CTA
+## When to Use No CTA — Default Case
 
-Some posts don't need a CTA. A strong opinion or sharp observation can stand alone — ending with a question weakens it.
-
-Use no CTA when:
-- The post ends with a clear conclusion that speaks for itself
+No CTA is the default. Use no CTA when:
+- The post makes a strong statement that speaks for itself
 - The post is a quick take (1-3 lines) — adding a question makes it feel forced
-- The question you'd ask is too obvious or doesn't have a real range of answers
+- The post is under 50 words — CTAs on short posts feel desperate
 
-Let the post breathe. Not every post needs explicit engagement prompting.
+A post confident enough to not ask a question generates more organic replies than one that does. Plant the flag. Say the thing. Let people react.
 
 ---
 

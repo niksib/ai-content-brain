@@ -66,6 +66,8 @@ export interface SessionIdea {
   description?: string;
   producedContent?: ProducedContent | null;
   status: 'proposed' | 'approved' | 'rejected' | 'producing' | 'completed';
+  publishStatus?: 'posted' | 'scheduled' | null;
+  threadsPostId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -85,6 +87,8 @@ export const useSessionStore = defineStore('session', () => {
   const isStreaming = ref(false);
   const currentStreamText = ref('');
   const selectedIdeaId = ref<string | null>(null);
+  const updatedByUser = ref(false);
+  const userUpdatedContent = ref<ProducedContentBody | null>(null);
 
   const sseStream = useSSEStream();
 
@@ -125,8 +129,20 @@ export const useSessionStore = defineStore('session', () => {
     ideas.value = response.ideas;
   }
 
+  function markContentUpdatedByUser(body: ProducedContentBody): void {
+    updatedByUser.value = true;
+    userUpdatedContent.value = body;
+  }
+
   async function sendIdeaMessage(text: string, ideaId: string): Promise<void> {
     if (!session.value) return;
+
+    let messageText = text;
+    if (updatedByUser.value) {
+      messageText = `[User manually edited the content. Updated content:\n${JSON.stringify(userUpdatedContent.value, null, 2)}]\n\n${text}`;
+      updatedByUser.value = false;
+      userUpdatedContent.value = null;
+    }
 
     const userMessage: SessionMessage = {
       id: `temp-${Date.now()}`,
@@ -142,36 +158,55 @@ export const useSessionStore = defineStore('session', () => {
     currentStreamText.value = '';
     isStreaming.value = true;
 
+    // Watch for idea_updated SSE events — agent calls save_produced_content
+    // mid-stream, backend emits idea_updated, we patch the store immediately.
+    const stopUpdatedWatcher = watch(
+      sseStream.updatedIdeas,
+      (updatedList) => {
+        for (const raw of updatedList) {
+          if ((raw.id as string) === ideaId) {
+            const idx = ideas.value.findIndex((i) => i.id === ideaId);
+            if (idx !== -1) ideas.value[idx] = raw as SessionIdea;
+          }
+        }
+      },
+      { deep: true },
+    );
+
     try {
       await sseStream.streamMessage(
         `${baseURL}/api/ideas/${ideaId}/message`,
-        { content: text },
+        // content = clean display text saved to DB
+        // aiContext = full context (may include user-edited diff) sent to AI
+        { content: text, aiContext: messageText },
       );
 
-      const assistantContent = sseStream.tokens.value;
-      if (assistantContent) {
-        messages.value.push({
-          id: `temp-${Date.now()}-assistant`,
-          sessionId: session.value.id,
-          role: 'assistant',
-          content: assistantContent,
-          costUsd: sseStream.costUsd.value,
-          contentIdeaId: ideaId,
-          createdAt: new Date().toISOString(),
-        });
-      }
+      const assistantContent = sseStream.tokens.value || 'Content updated.';
+      messages.value.push({
+        id: `temp-${Date.now()}-assistant`,
+        sessionId: session.value.id,
+        role: 'assistant',
+        content: assistantContent,
+        costUsd: sseStream.costUsd.value,
+        contentIdeaId: ideaId,
+        createdAt: new Date().toISOString(),
+      });
 
-      // Reload idea in case agent updated the content
-      const freshIdea = await loadIdea(ideaId);
-      if (freshIdea) {
-        const idx = ideas.value.findIndex((i) => i.id === ideaId);
-        if (idx !== -1) ideas.value[idx] = freshIdea;
+      // Reload idea only if the SSE watcher didn't receive an idea_updated event
+      const wasUpdatedViaSse = sseStream.updatedIdeas.value.some((i) => i.id === ideaId);
+      if (!wasUpdatedViaSse) {
+        const freshIdea = await loadIdea(ideaId);
+        if (freshIdea) {
+          const idx = ideas.value.findIndex((i) => i.id === ideaId);
+          if (idx !== -1) ideas.value[idx] = freshIdea;
+        }
       }
     } catch (error) {
       const idx = messages.value.indexOf(userMessage);
       if (idx !== -1) messages.value.splice(idx, 1);
       throw error;
     } finally {
+      stopUpdatedWatcher();
       currentStreamText.value = '';
       isStreaming.value = false;
     }
@@ -391,12 +426,15 @@ export const useSessionStore = defineStore('session', () => {
     isStreaming,
     currentStreamText,
     selectedIdeaId,
+    updatedByUser,
+    userUpdatedContent,
     streamTokens: sseStream.tokens,
     streamError: sseStream.error,
     pendingIdeasCount: sseStream.activePendingIdeas,
     updatingIdeaIds: sseStream.updatingIdeaIds,
     recentlyUpdatedIdeaIds,
     clearUpdatedIdea,
+    markContentUpdatedByUser,
     createOrLoadSession,
     loadMessages,
     loadIdeas,

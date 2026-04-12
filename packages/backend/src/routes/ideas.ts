@@ -134,11 +134,15 @@ ideaRoutes.post(
     const user = context.get("user");
     const ideaId = context.req.param("id");
     const body = await context.req.json();
-    const { content } = body;
+    const { content, aiContext } = body;
 
     if (!content || typeof content !== "string") {
       return context.json({ error: "content is required" }, 400);
     }
+
+    // aiContext carries extra context for the AI (e.g. user-edited content diff)
+    // but we only save the clean display text to the DB.
+    const aiMessageContent: string = typeof aiContext === "string" ? aiContext : content;
 
     const idea = await prisma.contentIdea.findUnique({
       where: { id: ideaId, userId: user.id },
@@ -181,7 +185,13 @@ ideaRoutes.post(
       select: { role: true, content: true },
     });
 
-    const messageHistory = [...syntheticHistory, ...followUpMessages];
+    // Replace the last message (the one we just saved) with aiMessageContent
+    // so the AI receives full context (e.g. user-edited diff), while the DB
+    // stores only the clean display text.
+    const historyMessages = followUpMessages.slice(0, -1).map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+    historyMessages.push({ role: "user" as const, content: aiMessageContent });
+
+    const messageHistory = [...syntheticHistory, ...historyMessages];
 
     const { send, close, response } = createSSEStream(context);
     const tokenChunks: string[] = [];
@@ -227,6 +237,32 @@ ideaRoutes.post(
     return response;
   }
 );
+
+// Update produced content body (user manual edits)
+ideaRoutes.patch("/ideas/:id/content", requireAuth, async (context) => {
+  const user = context.get("user");
+  const ideaId = context.req.param("id");
+  const body = await context.req.json();
+
+  if (!body || typeof body !== "object") {
+    return context.json({ error: "body is required" }, 400);
+  }
+
+  const idea = await prisma.contentIdea.findUnique({
+    where: { id: ideaId, userId: user.id },
+    include: { producedContent: true },
+  });
+
+  if (!idea) return context.json({ error: "Idea not found" }, 404);
+  if (!idea.producedContent) return context.json({ error: "No produced content yet" }, 400);
+
+  const updated = await prisma.producedContent.update({
+    where: { id: idea.producedContent.id },
+    data: { body },
+  });
+
+  return context.json({ content: updated });
+});
 
 // Get idea detail with produced content
 ideaRoutes.get("/ideas/:id", requireAuth, async (context) => {

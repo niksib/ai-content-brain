@@ -5,7 +5,7 @@
         v-for="(message, index) in messages"
         :key="message.id"
         :role="message.role"
-        :content="message.content"
+        :content="stripSystemContext(message.content)"
         :timestamp="message.createdAt"
       />
       <!-- Streaming assistant message (not yet in messages array) -->
@@ -64,6 +64,16 @@ function handleSend(text: string) {
 
 function handleAudioReady(blob: Blob) {
   emit('audioReady', blob);
+}
+
+// Strip the [User manually edited...] metadata block added by sendIdeaMessage.
+// Finds the block by its opening marker and removes everything up to and including '}]'.
+function stripSystemContext(content: string): string {
+  const start = content.indexOf('[User manually edited the content');
+  if (start === -1) return content;
+  const end = content.indexOf('}]', start);
+  if (end === -1) return content;
+  return (content.slice(0, start) + content.slice(end + 2)).replace(/^\n+/, '').trim();
 }
 
 // Auto-scroll when messages change or stream text updates

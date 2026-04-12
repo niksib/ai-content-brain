@@ -170,8 +170,12 @@ model ContentIdea {
 
   status        IdeaStatus    @default(proposed)
 
-  producedContent ProducedContent?
-  chatMessages    ChatMessage[]
+  publishStatus String?   // "posted" | "scheduled"
+  threadsPostId String?   // Threads media ID after publishing
+
+  producedContent   ProducedContent?
+  chatMessages      ChatMessage[]
+  insightsSnapshots ThreadsInsightsSnapshot[]
 
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -282,6 +286,26 @@ model ScheduledPost {
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+// ==================== THREADS INSIGHTS ====================
+
+model ThreadsInsightsSnapshot {
+  id            String      @id @default(cuid())
+  contentIdeaId String
+  contentIdea   ContentIdea @relation(fields: [contentIdeaId], references: [id])
+  userId        String
+
+  views         Int?
+  likes         Int?
+  replies       Int?
+  reposts       Int?
+  quotes        Int?
+  shares        Int?
+
+  fetchedAt     DateTime    @default(now())
+
+  @@index([contentIdeaId, fetchedAt(sort: Desc)])
 }
 
 enum ScheduledPostMediaType {

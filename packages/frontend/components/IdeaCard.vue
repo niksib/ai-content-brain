@@ -15,12 +15,30 @@
       <span v-else-if="isUpdated" class="idea-card__ai-badge idea-card__ai-badge--updated">
         Updated
       </span>
+      <span v-else-if="idea.publishStatus === 'posted'" class="idea-card__status idea-card__status--posted">
+        Posted
+      </span>
+      <span v-else-if="idea.publishStatus === 'scheduled'" class="idea-card__status idea-card__status--scheduled">
+        Scheduled
+      </span>
       <span v-else class="idea-card__status" :class="`idea-card__status--${idea.status}`">
         {{ statusLabel }}
       </span>
     </div>
 
     <p class="idea-card__angle">{{ idea.angle }}</p>
+
+    <!-- Threads account info (shown when connected and idea is for Threads) -->
+    <div v-if="idea.platform === 'threads' && threadsAccount" class="idea-card__account">
+      <img
+        v-if="threadsAccount.profilePictureUrl"
+        :src="threadsAccount.profilePictureUrl"
+        class="idea-card__account-avatar"
+        alt="Threads avatar"
+      />
+      <div v-else class="idea-card__account-avatar-placeholder"></div>
+      <span class="idea-card__account-username">@{{ threadsAccount.username }}</span>
+    </div>
 
     <div v-if="idea.status === 'proposed'" class="idea-card__actions">
       <button
@@ -47,10 +65,16 @@
 import { computed } from 'vue';
 import type { SessionIdea } from '~/stores/session';
 
+interface ThreadsAccount {
+  username: string;
+  profilePictureUrl: string | null;
+}
+
 const props = defineProps<{
   idea: SessionIdea;
   isUpdating?: boolean;
   isUpdated?: boolean;
+  threadsAccount?: ThreadsAccount | null;
 }>();
 
 const emit = defineEmits<{
@@ -210,6 +234,16 @@ const statusLabel = computed(() => {
   color: #065f46;
 }
 
+.idea-card__status--posted {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.idea-card__status--scheduled {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
 @keyframes status-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
@@ -224,6 +258,39 @@ const statusLabel = computed(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.idea-card__account {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.idea-card__account-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.idea-card__account-avatar-placeholder {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  flex-shrink: 0;
+}
+
+.idea-card__account-username {
+  font-size: 0.75rem;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .idea-card__actions {

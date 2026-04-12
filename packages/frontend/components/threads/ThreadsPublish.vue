@@ -4,6 +4,19 @@
       <span>Connect your Threads account in Settings to publish.</span>
     </div>
 
+    <!-- Already posted -->
+    <div v-else-if="publishStatus === 'posted'" class="threads-publish__posted">
+      <span class="material-symbols-outlined" style="font-size:16px;color:#10b981;">check_circle</span>
+      Posted to Threads
+    </div>
+
+    <!-- Scheduled (not yet published) -->
+    <div v-else-if="publishStatus === 'scheduled'" class="threads-publish__scheduled">
+      <span class="material-symbols-outlined" style="font-size:16px;color:#6366f1;">schedule</span>
+      Scheduled
+    </div>
+
+    <!-- Publish / schedule actions -->
     <div v-else class="threads-publish__actions">
       <button
         class="threads-publish__btn threads-publish__btn--primary"
@@ -43,6 +56,12 @@ import { ref, computed, onMounted } from 'vue';
 const props = defineProps<{
   text: string;
   contentIdeaId?: string;
+  publishStatus?: 'posted' | 'scheduled' | null;
+}>();
+
+const emit = defineEmits<{
+  published: [threadsPostId: string];
+  scheduled: [];
 }>();
 
 const accountConnected = ref(false);
@@ -55,7 +74,9 @@ const errorMessage = ref('');
 const minScheduleDate = computed(() => {
   const now = new Date();
   now.setMinutes(now.getMinutes() + 5);
-  return now.toISOString().slice(0, 16);
+  // datetime-local requires local time string, not UTC
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 });
 
 const config = useRuntimeConfig();
@@ -79,7 +100,7 @@ async function publishNow(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    await $fetch(`${apiBaseUrl}/api/threads/publish`, {
+    const result = await $fetch<{ postId: string }>(`${apiBaseUrl}/api/threads/publish`, {
       method: 'POST',
       credentials: 'include',
       body: {
@@ -87,7 +108,7 @@ async function publishNow(): Promise<void> {
         contentIdeaId: props.contentIdeaId,
       },
     });
-    successMessage.value = 'Published successfully!';
+    emit('published', result.postId);
   } catch {
     errorMessage.value = 'Failed to publish. Please try again.';
   } finally {
@@ -103,17 +124,25 @@ async function schedulePost(): Promise<void> {
   errorMessage.value = '';
 
   try {
+    // datetime-local gives "YYYY-MM-DDTHH:mm" without timezone.
+    // Parsing it as-is treats it as UTC in some environments — we must
+    // build the Date from components so the browser uses local time.
+    const [datePart, timePart] = scheduledAtInput.value.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+    const scheduledAtLocal = new Date(year, month - 1, day, hours, minutes);
+
     await $fetch(`${apiBaseUrl}/api/threads/schedule`, {
       method: 'POST',
       credentials: 'include',
       body: {
         text: props.text,
-        scheduledAt: new Date(scheduledAtInput.value).toISOString(),
+        scheduledAt: scheduledAtLocal.toISOString(),
         contentIdeaId: props.contentIdeaId,
       },
     });
-    successMessage.value = `Scheduled for ${new Date(scheduledAtInput.value).toLocaleString()}`;
     scheduledAtInput.value = '';
+    emit('scheduled');
   } catch {
     errorMessage.value = 'Failed to schedule. Please try again.';
   } finally {
@@ -130,6 +159,24 @@ async function schedulePost(): Promise<void> {
 .threads-publish__no-account {
   font-size: 0.8125rem;
   color: #9ca3af;
+}
+
+.threads-publish__posted {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #10b981;
+}
+
+.threads-publish__scheduled {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6366f1;
 }
 
 .threads-publish__actions {

@@ -100,34 +100,49 @@ Clear, specific, open-ended — real range of valid answers
 
 ---
 
-## Structure 4: Multi-Post Thread
-**Best for:** Stories or processes that need more than 500 characters, step-by-step breakdowns
-**Length:** 4-7 posts (more than 8 loses most readers)
-**Triggers:** People reading through the whole thread increases watch time; the algorithm notices
+## Structure 4: Two-Post Thread (Default Multi-Post)
+**Best for:** Stories or ideas that need more than 500 characters but can be told in two beats
+**Length:** 2 posts. That's the format. Data shows 2-part threads outperform 3-part by 71%.
+**Triggers:** Full read-through signals to the algorithm; second post creates a natural second engagement opportunity
 
 ```
 Post 1 (HOOK):
-The most interesting or unexpected part of the whole thread
-Must make someone want to read Post 2
-End with nothing or "🧵" — the thread visual shows automatically
+The most interesting or unexpected part — not the setup, the payoff teased.
+Must make someone want to read Post 2.
+End without a question — let the tension pull them forward.
 
-Post 2-4 (BODY):
-One specific point per post
-Short — white space is better than filled characters
-Each post should make sense alone AND build on the previous
-
-Post 5 (TURN):
-The surprising part, the "but then", the counterintuitive item
-This is the post that gets reshared most
-
-Post 6 (TAKEAWAY):
-The specific lesson. Not "so remember to always X" — a real, specific conclusion
-
-Post 7 (OPTIONAL — REPLY INVITE):
-Genuine question. Never "like this if you agree".
+Post 2 (RESOLUTION):
+The sharpest insight, the specific lesson, the real moment.
+Short. Every word earns its place.
+No CTA unless absolutely necessary — data shows CTAs cut likes by 12%.
 ```
 
-**What makes it work:** Reply depth compounds across the thread. Each post is a new opportunity for someone to engage. Threads that end with a real question generate the most conversation.
+**What makes it work:** Compression beats explanation. Two focused posts outperform four sprawling ones. The reader who finishes Post 2 got what they came for — that's the signal.
+
+---
+
+## Structure 4b: Long Raw Narrative (Personal Stories Only)
+**When to use:** Raw personal story with genuine emotional weight. Not a breakdown. Not a how-to. Not a framework. Not a list.
+**Length:** As many posts as the story needs — 4, 6, 8. The two top viral long threads were 4-part and 8-part raw stories.
+**Never:** Educational content, tips, frameworks, or lists — these are **5x overrepresented in the bottom 25%** regardless of length.
+
+```
+Post 1 (HOOK):
+Drop mid-scene. The most raw, unexpected moment.
+
+Post 2–N (THE STORY):
+One beat per post. Move fast. No padding.
+Each post ends with unresolved tension that pulls to the next.
+
+Last post (THE LANDING):
+What it cost or what it meant. Honest, specific. Not a lesson — the actual thing.
+```
+
+**Rules:**
+- If it's educational, it doesn't belong here. Lists do not go viral.
+- If you're going long, bleed. Generic long-form is worse than short-form with no emotion.
+- No question at the end. Say the thing. Let readers respond on their own terms.
+- "If you go long, go personal." — the data is unambiguous on this.
 
 ---
 
@@ -150,12 +165,16 @@ No setup. No explanation. Just the observation.
 ## Structure Anti-Patterns
 
 **Never do this:**
+- **"How to" hooks** — 0% in top 10% across 1,996 posts. Zero. Not a single one.
+- **Posts in the 300-600 word range** — the dead zone. Under 50 words gets 65% more likes.
+- **3+ post threads for non-personal-story content** — 2-part beats 3-part by 71%
+- **Questions as endings** — posts with questions got 19% fewer likes than posts without
+- **Emotional trigger words as urgency signals** (speed, fear, pain, urgent, crisis) — bottom performers used 2-8x more of these; performed emotion leaks
 - Long unbroken paragraphs — Threads readers skip walls of text
 - "In this thread I'll cover..." — cuts reply rate significantly
 - Starting with context before the interesting thing
 - Ending with "Follow me for more" — penalized and ineffective
 - Listing 10 things in one post — break it into a thread or cut ruthlessly
-- Repeating the hook in the body ("As I said above...")
 - Generic closing lines ("Hope this helps!", "Let me know what you think!")
 
 ---
@@ -166,6 +185,9 @@ No setup. No explanation. Just the observation.
 |-----------|-----------|
 | You have a strong opinion | Opinionated Single Post |
 | Something real happened | Specific Personal Story |
-| You want to hear from your audience | Conversation Starter |
-| The content needs more than 500 chars | Multi-Post Thread |
+| You want to hear from your audience | Conversation Starter (no question — make a statement that invites reaction) |
+| Content needs >500 chars, not a personal story | Two-Post Thread |
+| Raw personal story with emotional weight | Three-Post Thread (exception) |
 | You have one sharp observation | Quick Take |
+
+**Default direction:** When in doubt, cut. Under 50 words beats everything else on Threads.

@@ -8,27 +8,24 @@
       <section class="profile-section profile-section--platforms">
         <h2 class="section-title">Connected Platforms</h2>
         <p class="section-subtitle">Connect your social accounts to publish and schedule posts directly from the workspace.</p>
-        <div class="platforms-grid">
+        <div class="platforms-list">
           <div
             v-for="platform in ALL_PLATFORMS"
             :key="platform"
-            class="platform-card"
-            :class="[`platform-card--${platform}`, { 'platform-card--active': isActivePlatform(platform) }]"
+            class="platform-row"
+            :class="`platform-row--${platform}`"
           >
-            <div class="platform-card__top">
-              <div class="platform-card__icon-wrap" :class="`platform-card__icon-wrap--${platform}`">
+            <div class="platform-row__left">
+              <div class="platform-row__icon-wrap" :class="`platform-row__icon-wrap--${platform}`">
                 <PlatformIcon :platform="platform" />
               </div>
+              <span class="platform-row__name">{{ PLATFORM_NAMES[platform] }}</span>
               <span v-if="isActivePlatform(platform)" class="platform-badge">Active</span>
             </div>
-            <p class="platform-card__name">{{ PLATFORM_NAMES[platform] }}</p>
-            <div v-if="platform !== 'threads'" class="platform-card__social">
-              <span class="platform-card__not-connected">Not connected</span>
+            <div class="platform-row__right">
+              <ThreadsConnect v-if="platform === 'threads'" />
+              <button v-else class="platform-card__connect-btn" type="button" disabled>Connect</button>
             </div>
-            <ThreadsConnect v-if="platform === 'threads'" />
-            <button v-else class="platform-card__connect-btn" type="button" disabled>
-              Connect
-            </button>
           </div>
         </div>
       </section>
@@ -342,6 +339,7 @@ const PLATFORM_NAMES: Record<Platform, string> = {
   instagram: 'Instagram',
 };
 
+
 function isActivePlatform(platform: Platform): boolean {
   return (form.platforms as string[]).includes(platform);
 }
@@ -582,60 +580,70 @@ onMounted(async () => {
 }
 
 /* ── Connected Platforms ── */
-.platforms-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.875rem;
-}
-
-.platform-card {
-  border: 1.5px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 1rem;
+.platforms-list {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  gap: 0;
 }
 
-.platform-card--active {
-  border-color: #c7d2fe;
-  background: #fafbff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.06);
-}
-
-.platform-card__top {
+.platform-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid #f3f4f6;
 }
 
-.platform-card__icon-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+.platform-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.platform-row:first-child {
+  padding-top: 0;
+}
+
+.platform-row__left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.platform-row__icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
-.platform-card__icon-wrap--threads { background: #000; }
-.platform-card__icon-wrap--linkedin { background: #0077b5; }
-.platform-card__icon-wrap--tiktok { background: #000; }
-.platform-card__icon-wrap--instagram {
+.platform-row__icon-wrap--threads { background: #000; }
+.platform-row__icon-wrap--linkedin { background: #0077b5; }
+.platform-row__icon-wrap--tiktok { background: #000; }
+.platform-row__icon-wrap--instagram {
   background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
 }
 
-.platform-card__icon-wrap :deep(.platform-icon) {
-  width: 40px;
-  height: 40px;
+.platform-row__icon-wrap :deep(.platform-icon) {
+  width: 36px;
+  height: 36px;
   border-radius: 0;
   background: transparent;
 }
 
-.platform-card__icon-wrap :deep(.platform-icon svg) {
-  width: 20px;
-  height: 20px;
+.platform-row__icon-wrap :deep(.platform-icon svg) {
+  width: 18px;
+  height: 18px;
+}
+
+.platform-row__name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #111827;
 }
 
 .platform-badge {
@@ -649,26 +657,12 @@ onMounted(async () => {
   border-radius: 9999px;
 }
 
-.platform-card__name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0;
-}
-
-.platform-card__social {
-  flex: 1;
-}
-
-.platform-card__not-connected {
-  font-size: 0.75rem;
-  color: #9ca3af;
-  margin: 0;
+.platform-row__right {
+  flex-shrink: 0;
 }
 
 .platform-card__connect-btn {
-  width: 100%;
-  padding: 0.4rem 0;
+  padding: 0.375rem 1rem;
   border: none;
   border-radius: 8px;
   background: #000;
@@ -678,6 +672,7 @@ onMounted(async () => {
   cursor: not-allowed;
   opacity: 0.4;
   transition: all 0.15s;
+  white-space: nowrap;
 }
 
 /* ── Subscription ── */

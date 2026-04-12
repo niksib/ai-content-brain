@@ -1,4 +1,4 @@
-const THREADS_BASE_URL = "https://graph.threads.net/v1.0";
+export const THREADS_BASE_URL = "https://graph.threads.net/v1.0";
 const THREADS_AUTH_URL = "https://threads.net/oauth/authorize";
 const THREADS_TOKEN_URL = "https://graph.threads.net/oauth/access_token";
 const THREADS_LONG_LIVED_URL = "https://graph.threads.net/access_token";

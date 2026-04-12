@@ -119,12 +119,13 @@
                 <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>
                 <span class="calendar-cell__done-label">Day completed</span>
               </div>
-              <span class="calendar-cell__today-idea-count">{{ day.sessions[0].ideaCount }} ideas ready</span>
+              <div class="calendar-cell__counts">
+                <CalendarCounts :session="day.sessions[0]" white />
+              </div>
             </template>
             <template v-else-if="day.sessions.length > 0 && day.sessions[0].ideaCount > 0">
-              <p class="calendar-cell__today-status">{{ day.sessions[0].ideaCount }} idea{{ day.sessions[0].ideaCount > 1 ? 's' : '' }} ready</p>
-              <div class="calendar-cell__progress-bar">
-                <div class="calendar-cell__progress-fill" style="width:100%"></div>
+              <div class="calendar-cell__counts">
+                <CalendarCounts :session="day.sessions[0]" white />
               </div>
             </template>
             <template v-else>
@@ -138,9 +139,9 @@
           <template v-else-if="day.sessions.length > 0">
             <div class="calendar-cell__session-count">
               <span class="material-symbols-outlined calendar-cell__session-icon" :style="{color: day.sessions[0].status === 'completed' ? '#16a34a' : '#6366f1'}">check_circle</span>
-              <span class="calendar-cell__count-text" :class="{'calendar-cell__count-text--green': day.sessions[0].status === 'completed'}">
-                {{ day.sessions[0].ideaCount }} idea{{ day.sessions[0].ideaCount !== 1 ? 's' : '' }} completed
-              </span>
+              <div class="calendar-cell__counts">
+                <CalendarCounts :session="day.sessions[0]" />
+              </div>
             </div>
           </template>
 
@@ -216,6 +217,14 @@ async function handleStartSession(): Promise<void> {
 
 function navigateToSession(sessionId: string): void {
   router.push(`/sessions/${sessionId}`);
+}
+
+function calendarLabel(session: CalendarSession): string {
+  const parts: string[] = [];
+  if (session.ideaCount > 0) parts.push(`${session.ideaCount} created`);
+  if (session.postedCount > 0) parts.push(`${session.postedCount} posted`);
+  if (session.scheduledCount > 0) parts.push(`${session.scheduledCount} scheduled`);
+  return parts.join(', ') || `${session.ideaCount} ideas`;
 }
 
 function handleCellClick(day: { number: number; isToday: boolean; sessions: CalendarSession[] }): void {
@@ -728,6 +737,10 @@ const daysInMonth = computed(() => {
   border-radius: 9999px;
 }
 
+
+.calendar-cell__counts {
+  margin-top: 0.25rem;
+}
 
 .calendar-cell__session-count {
   flex: 1;
