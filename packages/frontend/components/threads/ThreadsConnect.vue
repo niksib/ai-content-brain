@@ -39,7 +39,8 @@ interface ThreadsAccount {
 }
 
 const account = ref<ThreadsAccount | null>(null);
-const authUrl = '/api/threads/auth';
+const config = useRuntimeConfig();
+const authUrl = `${config.public.apiBaseUrl}/api/threads/auth`;
 
 const formattedExpiry = computed(() => {
   if (!account.value) return '';
