@@ -25,7 +25,8 @@
             <div class="platform-card__social">
               <span class="platform-card__not-connected">Not connected</span>
             </div>
-            <button class="platform-card__connect-btn" type="button" disabled>
+            <ThreadsConnect v-if="platform === 'threads'" />
+            <button v-else class="platform-card__connect-btn" type="button" disabled>
               Connect
             </button>
           </div>
@@ -319,6 +320,7 @@ import { ref, reactive, watch, onMounted, computed } from 'vue';
 import { useProfileStore, type ProfileUpdateData } from '~/stores/profile';
 import { useBillingStore } from '~/stores/billing';
 import PlatformIcon from '~/components/PlatformIcon.vue';
+import ThreadsConnect from '~/components/threads/ThreadsConnect.vue';
 
 const config = useRuntimeConfig();
 const router = useRouter();

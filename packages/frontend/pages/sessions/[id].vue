@@ -460,6 +460,7 @@ watch(micAudioBlob, async (blob) => {
     const response = await $fetch<{ transcript: string }>(`${apiBaseUrl}/api/voice/transcribe`, {
       method: 'POST',
       body: formData,
+      credentials: 'include',
       signal: transcriptionAbort.signal,
     });
     chatInputText.value = response.transcript;
