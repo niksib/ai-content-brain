@@ -57,12 +57,12 @@ threadsRoutes.get("/threads/callback", async (context) => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
   if (error || !code || !state) {
-    return context.redirect(`${frontendUrl}/settings?threads_error=access_denied`);
+    return context.redirect(`${frontendUrl}/profile?threads_error=access_denied`);
   }
 
   const verifiedUserId = verifyOAuthState(state);
   if (!verifiedUserId) {
-    return context.redirect(`${frontendUrl}/settings?threads_error=invalid_state`);
+    return context.redirect(`${frontendUrl}/profile?threads_error=invalid_state`);
   }
 
   try {
@@ -89,10 +89,10 @@ threadsRoutes.get("/threads/callback", async (context) => {
       },
     });
 
-    return context.redirect(`${frontendUrl}/settings?threads_connected=true`);
+    return context.redirect(`${frontendUrl}/profile?threads_connected=true`);
   } catch (connectError) {
     console.error("[threads/callback] Failed to connect Threads account:", connectError);
-    return context.redirect(`${frontendUrl}/settings?threads_error=connection_failed`);
+    return context.redirect(`${frontendUrl}/profile?threads_error=connection_failed`);
   }
 });
 
