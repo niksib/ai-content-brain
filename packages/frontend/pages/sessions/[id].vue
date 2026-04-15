@@ -20,7 +20,8 @@
         <div class="recording-bg recording-bg--br"></div>
 
         <div class="recording-container">
-          <h1 class="recording-title">What did you do today?</h1>
+          <h1 class="recording-title">What's on your mind?</h1>
+          <p class="recording-subtitle">Just talk - ideas, thoughts, observations, whatever's been floating around. No need to structure anything. Raw is good.</p>
 
           <p v-if="store.streamError" class="session-error">{{ store.streamError }}</p>
 
@@ -244,6 +245,17 @@
                   <span class="idea-card__platform-name">{{ platformLabel(idea.platform) }}</span>
                   <span class="idea-card__format-badge">{{ formatLabel(idea.format) }}</span>
                 </div>
+                <!-- Connected account — right side of the top row -->
+                <div v-if="idea.platform === 'threads' && threadsAccount" class="idea-card__account-inline">
+                  <img
+                    v-if="threadsAccount.profilePictureUrl"
+                    :src="threadsAccount.profilePictureUrl"
+                    class="idea-card__account-avatar"
+                    alt="Threads avatar"
+                  />
+                  <div v-else class="idea-card__account-avatar-placeholder"></div>
+                  <span class="idea-card__account-username">@{{ threadsAccount.username }}</span>
+                </div>
                 <span v-if="store.recentlyUpdatedIdeaIds.has(idea.id)" class="idea-card__updated-badge">
                   Updated
                 </span>
@@ -256,18 +268,6 @@
               </div>
               <h4 class="idea-card__title">{{ idea.angle }}</h4>
               <p class="idea-card__body">{{ idea.description }}</p>
-
-              <!-- Threads account (shown when connected) -->
-              <div v-if="idea.platform === 'threads' && threadsAccount" class="idea-card__account">
-                <img
-                  v-if="threadsAccount.profilePictureUrl"
-                  :src="threadsAccount.profilePictureUrl"
-                  class="idea-card__account-avatar"
-                  alt="Threads avatar"
-                />
-                <div v-else class="idea-card__account-avatar-placeholder"></div>
-                <span class="idea-card__account-username">@{{ threadsAccount.username }}</span>
-              </div>
 
               <div class="idea-card__actions">
                 <template v-if="idea.status === 'proposed'">
@@ -556,6 +556,12 @@ onMounted(async () => {
         .catch(() => {}),
     ]);
     await Promise.all([store.loadMessages(), store.loadIdeas()]);
+
+    // Open a specific idea if navigated from Publishing page
+    const ideaParam = route.query.idea as string | undefined;
+    if (ideaParam && store.ideas.some((i) => i.id === ideaParam)) {
+      store.selectedIdeaId = ideaParam;
+    }
   } catch (error) {
     console.error('Session initialization failed:', error);
   } finally {
@@ -636,8 +642,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
-  max-width: 560px;
+  max-width: 600px;
   width: 100%;
   padding: 0 1.5rem;
   text-align: center;
@@ -649,7 +654,18 @@ onMounted(async () => {
   font-weight: 800;
   letter-spacing: -0.03em;
   color: #191c1e;
-  margin: 0;
+  margin: 0 0 0.75rem;
+  line-height: 1.1;
+  margin-bottom: 20px;
+}
+
+.recording-subtitle {
+  font-size: 1rem;
+  color: #6b7280;
+  line-height: 1.6;
+  margin: 0 0 0.5rem;
+  max-width: 420px;
+  margin-bottom: 40px;
 }
 
 /* Orb */
@@ -1254,13 +1270,11 @@ onMounted(async () => {
   background: #eef2ff;
 }
 
-.idea-card__account {
+.idea-card__account-inline {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #f3f4f6;
+  gap: 0.25rem;
+  margin-left: auto;
 }
 
 .idea-card__account-avatar {

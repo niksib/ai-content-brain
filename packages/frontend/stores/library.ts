@@ -21,7 +21,9 @@ export interface LibraryContentIdea {
   format: string;
   status: string;
   publishStatus?: string | null;
+  scheduledAt?: string | null;
   threadsPostId?: string | null;
+  contentPlan?: { chatSessionId: string };
   insightsSnapshots?: ThreadsInsightsSnapshot[];
 }
 
@@ -107,6 +109,23 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  function markPublished(contentIdeaId: string, threadsPostId: string): void {
+    const item = items.value.find((i) => i.contentIdeaId === contentIdeaId);
+    if (item) {
+      item.contentIdea.publishStatus = 'posted';
+      item.contentIdea.threadsPostId = threadsPostId;
+      item.contentIdea.scheduledAt = null;
+    }
+  }
+
+  function markScheduled(contentIdeaId: string, scheduledAt: string): void {
+    const item = items.value.find((i) => i.contentIdeaId === contentIdeaId);
+    if (item) {
+      item.contentIdea.publishStatus = 'scheduled';
+      item.contentIdea.scheduledAt = scheduledAt;
+    }
+  }
+
   return {
     items,
     total,
@@ -121,5 +140,7 @@ export const useLibraryStore = defineStore('library', () => {
     setFilter,
     nextPage,
     prevPage,
+    markPublished,
+    markScheduled,
   };
 });

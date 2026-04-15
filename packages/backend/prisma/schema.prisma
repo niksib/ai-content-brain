@@ -171,6 +171,7 @@ model ContentIdea {
   status        IdeaStatus    @default(proposed)
 
   publishStatus String?   // "posted" | "scheduled"
+  scheduledAt   DateTime? // set when post is scheduled for publishing
   threadsPostId String?   // Threads media ID after publishing
 
   producedContent   ProducedContent?
@@ -261,6 +262,9 @@ model ThreadsAccount {
   scopes            String
   isPrivateProfile  Boolean  @default(false)
   postsCount        Int      @default(0)
+
+  styleAnalyzed     Boolean  @default(false)
+  styleAnalyzedAt   DateTime?
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { threadsApiService, THREADS_BASE_URL } from "../services/threads-api.service.js";
+import { analyzeWritingStyleFromThreads } from "../services/style-analysis.service.js";
 import type { AppEnv } from "../types/hono.js";
 
 function signOAuthState(userId: string): string {
@@ -37,6 +38,7 @@ threadsRoutes.get("/threads/account", requireAuth, async (context) => {
       scopes: true,
       isPrivateProfile: true,
       postsCount: true,
+      styleAnalyzed: true,
     },
   });
 
@@ -93,7 +95,12 @@ threadsRoutes.get("/threads/callback", async (context) => {
       },
     });
 
-    return context.redirect(`${frontendUrl}/profile?threads_connected=true`);
+    // Fire-and-forget: analyze writing style from the user's recent posts
+    analyzeWritingStyleFromThreads(verifiedUserId).catch((analysisError) => {
+      console.error("[threads/callback] Style analysis failed:", analysisError);
+    });
+
+    return context.redirect(`${frontendUrl}/dashboard?threads_connected=true`);
   } catch (connectError) {
     console.error("[threads/callback] Failed to connect Threads account:", connectError);
     return context.redirect(`${frontendUrl}/profile?threads_error=connection_failed`);
@@ -205,7 +212,7 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
   if (body.contentIdeaId) {
     await prisma.contentIdea.update({
       where: { id: body.contentIdeaId, userId: user.id },
-      data: { publishStatus: "scheduled" },
+      data: { publishStatus: "scheduled", scheduledAt },
     });
   }
 

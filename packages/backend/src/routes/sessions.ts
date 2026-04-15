@@ -47,6 +47,9 @@ sessionRoutes.get("/sessions", requireAuth, async (context) => {
       type: "daily",
     },
     include: {
+      _count: {
+        select: { messages: true },
+      },
       contentPlan: {
         include: {
           _count: {
@@ -67,6 +70,7 @@ sessionRoutes.get("/sessions", requireAuth, async (context) => {
       id: session.id,
       sessionDate: session.sessionDate,
       status: session.status,
+      messageCount: session._count.messages,
       ideaCount: session.contentPlan?._count?.ideas ?? 0,
       postedCount: ideas.filter((i) => i.publishStatus === "posted").length,
       scheduledCount: ideas.filter((i) => i.publishStatus === "scheduled").length,
@@ -102,6 +106,14 @@ sessionRoutes.delete("/sessions/:id", requireAuth, async (context) => {
 
   const plan = await prisma.contentPlan.findUnique({ where: { chatSessionId: sessionId } });
   if (plan) {
+    const ideas = await prisma.contentIdea.findMany({
+      where: { contentPlanId: plan.id },
+      select: { id: true },
+    });
+    const ideaIds = ideas.map((idea) => idea.id);
+
+    await prisma.producedContent.deleteMany({ where: { contentIdeaId: { in: ideaIds } } });
+    await prisma.threadsInsightsSnapshot.deleteMany({ where: { contentIdeaId: { in: ideaIds } } });
     await prisma.contentIdea.deleteMany({ where: { contentPlanId: plan.id } });
     await prisma.contentPlan.delete({ where: { id: plan.id } });
   }

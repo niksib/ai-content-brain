@@ -1,3 +1,4 @@
+import type Anthropic from "@anthropic-ai/sdk";
 import { BaseAgent, type AgentToolSet, type AgentToolOptions } from "../base.agent.js";
 import {
   saveContentIdeaTool,
@@ -26,8 +27,10 @@ export class StrategistAgent extends BaseAgent {
   }
 
   getTools(options: AgentToolOptions = {}): AgentToolSet {
+    const webSearchTool = { type: "web_search_20250305", name: "web_search" } as unknown as Anthropic.Tool;
+
     return {
-      definitions: [saveContentIdeaTool, updateContentIdeaTool],
+      definitions: [webSearchTool, saveContentIdeaTool, updateContentIdeaTool],
       executors: {
         save_content_idea: makeSaveContentIdea(options.onIdeaSaved),
         update_content_idea: makeUpdateContentIdea(options.onIdeaUpdating, options.onIdeaUpdated),

@@ -120,42 +120,21 @@
                     @blur="flushThreadPostEdit(index, $event)"
                     @keydown.enter.exact.prevent="($event.target as HTMLElement).blur()"
                   />
-                  <div class="threads-card__actions">
-                    <button type="button" class="threads-card__action">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                      </svg>
-                    </button>
-                    <button type="button" class="threads-card__action">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                      </svg>
-                    </button>
-                    <button type="button" class="threads-card__action">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20">
-                        <path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/>
-                      </svg>
-                    </button>
-                    <button type="button" class="threads-card__action">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="20" height="20">
-                        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                      </svg>
-                    </button>
+                  <!-- Publish / schedule actions — shown only on the last card -->
+                  <div v-if="index === editableThreadPosts.length - 1" class="threads-card__publish">
+                    <ThreadsPublish
+                      :text="threadsPublishText"
+                      :content-idea-id="idea.id"
+                      :publish-status="idea.publishStatus"
+                      :scheduled-at="scheduledAt"
+                      @published="onPublished"
+                      @scheduled="onScheduled"
+                    />
                   </div>
                 </div>
               </div>
             </div>
           </template>
-
-          <!-- THREADS PUBLISH ACTIONS -->
-          <ThreadsPublish
-            v-if="isThreadsTextPost && idea.producedContent"
-            :text="threadsPublishText"
-            :content-idea-id="idea.id"
-            :publish-status="idea.publishStatus"
-            @published="onPublished"
-            @scheduled="onScheduled"
-          />
 
           <!-- TEXT POST (LinkedIn, other platforms) -->
           <template v-else-if="idea.format === 'text_post' && contentBody">
@@ -351,6 +330,7 @@ interface ThreadsAccount { username: string; profilePictureUrl: string | null }
 const threadsAccount = ref<ThreadsAccount | null>(null);
 
 const idea = ref<SessionIdea | null>(null);
+const scheduledAt = ref<string | null>(null);
 const isLoading = ref(false);
 const loadError = ref<string | null>(null);
 const copyLabel = ref('Copy');
@@ -498,10 +478,12 @@ function flushSave(persistFn: () => Promise<void>): void {
 
 async function persistThreadEdits(): Promise<void> {
   if (!idea.value?.producedContent) return;
-  Object.entries(draftPosts).forEach(([i, text]) => {
-    editableThreadPosts.value[Number(i)] = text;
-  });
-  const posts = editableThreadPosts.value;
+  // Build posts from current editableThreadPosts merged with any in-progress drafts.
+  // Do NOT mutate editableThreadPosts.value — that would change v-for keys and
+  // cause Vue to destroy/recreate the contenteditable elements (wiping their innerText).
+  const posts = editableThreadPosts.value.map((existing, i) =>
+    draftPosts[i] !== undefined ? draftPosts[i] : existing,
+  );
   const updatedBody: ProducedContentBody = {
     ...contentBody.value,
     posts: posts.length > 1 ? [...posts] : undefined,
@@ -598,7 +580,8 @@ function onPublished(threadsPostId: string): void {
   }
 }
 
-function onScheduled(): void {
+function onScheduled(isoDate: string): void {
+  scheduledAt.value = isoDate;
   if (idea.value) {
     idea.value.publishStatus = 'scheduled';
   }
@@ -609,14 +592,21 @@ function onScheduled(): void {
 }
 
 // Sync with store when idea status or content changes (e.g. producing → completed, agent edit)
+// Note: store.ideas is populated from the list endpoint which does not include producedContent.
+// Preserve the locally-loaded producedContent so the content view doesn't disappear after
+// a publish/schedule action updates the store.
 watch(
   () => store.ideas.find((item) => item.id === props.ideaId),
   (storeIdea) => {
     if (storeIdea && idea.value) {
-      const bodyChanged = JSON.stringify(storeIdea.producedContent?.body) !==
+      const merged = {
+        ...storeIdea,
+        producedContent: storeIdea.producedContent ?? idea.value.producedContent,
+      };
+      const bodyChanged = JSON.stringify(merged.producedContent?.body) !==
                           JSON.stringify(idea.value.producedContent?.body);
-      idea.value = { ...storeIdea };
-      if (bodyChanged && storeIdea.producedContent) {
+      idea.value = merged;
+      if (bodyChanged && merged.producedContent) {
         // Reset editable state so the threadPosts/contentBody watchers re-initialize with new content
         editableThreadPosts.value = [];
         editableTextBody.value = '';
@@ -1197,29 +1187,9 @@ onMounted(async () => {
   white-space: pre-wrap;
 }
 
-.threads-card__actions {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.5rem 0.75rem 0.875rem;
+.threads-card__publish {
   border-top: 1px solid #f3f4f6;
-}
-
-.threads-card__action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: none;
-  color: #6b7280;
-  cursor: default;
-  border-radius: 8px;
-  transition: color 0.15s;
-}
-
-.threads-card__action:hover {
-  color: #111827;
+  padding: 0.75rem 1rem 0.875rem;
 }
 
 /* Inline editing */

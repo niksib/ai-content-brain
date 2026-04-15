@@ -1,6 +1,7 @@
 <template>
   <span class="platform-icon" :class="`platform-icon--${platform}`">
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <img v-if="platform === 'threads'" src="~/assets/icons/threads.svg" alt="Threads" />
+    <svg v-else viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path :d="svgPath" :fill="fill" />
     </svg>
   </span>
@@ -43,19 +44,20 @@ const fill = computed(() => FILLS[props.platform]);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   border-radius: 6px;
   flex-shrink: 0;
 }
 
-.platform-icon svg {
-  width: 13px;
-  height: 13px;
+.platform-icon svg,
+.platform-icon img {
+  width: 18px;
+  height: 18px;
 }
 
 .platform-icon--threads {
-  background: #000000;
+  background: none;
 }
 
 .platform-icon--linkedin {

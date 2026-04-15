@@ -32,6 +32,12 @@ export interface ThreadsPublishResult {
   postId: string;
 }
 
+export interface ThreadsPost {
+  id: string;
+  text: string;
+  timestamp: string;
+}
+
 export class ThreadsApiService {
   buildAuthorizationUrl(state: string): string {
     const params = new URLSearchParams({
@@ -237,6 +243,38 @@ export class ThreadsApiService {
       followersCount: getValue("followers_count"),
       views: getValue("views"),
     };
+  }
+
+  async fetchUserPosts(
+    threadsUserId: string,
+    accessToken: string,
+    limit: number = 20
+  ): Promise<ThreadsPost[]> {
+    const params = new URLSearchParams({
+      fields: "id,text,timestamp",
+      limit: String(limit),
+      access_token: accessToken,
+    });
+
+    const response = await fetch(
+      `${THREADS_BASE_URL}/${threadsUserId}/threads?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Threads posts fetch failed: ${response.status}`);
+    }
+
+    const data = await response.json() as {
+      data: Array<{ id: string; text?: string; timestamp: string }>;
+    };
+
+    return data.data
+      .filter((post) => post.text && post.text.trim().length > 0)
+      .map((post) => ({
+        id: post.id,
+        text: post.text!.trim(),
+        timestamp: post.timestamp,
+      }));
   }
 
   calculateEngagementRate(insights: Omit<ThreadsInsights, "views">): number {

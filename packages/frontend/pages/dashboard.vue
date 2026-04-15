@@ -22,8 +22,8 @@
       </div> -->
     </div>
 
-    <!-- ── Action Cards ── -->
-    <div class="action-grid">
+    <!-- ── Action Cards (hidden during onboarding) ── -->
+    <div v-if="!showOnboardingBlock" class="action-grid">
       <button
         class="action-card action-card--primary"
         :disabled="isStarting"
@@ -62,6 +62,85 @@
         </div>
       </button>
     </div>
+
+    <!-- ── Onboarding Checklist ── -->
+    <section v-if="showOnboardingBlock" class="onboarding-checklist">
+      <div class="onboarding-checklist__header">
+        <div>
+          <p class="onboarding-checklist__eyebrow">Setup</p>
+          <h3 class="onboarding-checklist__title">Get started</h3>
+        </div>
+        <span class="onboarding-checklist__progress">{{ completedStepsCount }} / {{ totalStepsCount }} done</span>
+      </div>
+
+      <div class="onboarding-checklist__steps">
+
+        <!-- Step: Connect Threads -->
+        <div v-if="hasThreadsPlatform" class="checklist-step" :class="{ 'checklist-step--done': threadsConnected }">
+          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': threadsConnected }">
+            <span class="material-symbols-outlined">{{ threadsConnected ? 'check_circle' : 'link' }}</span>
+          </div>
+          <div class="checklist-step__content">
+            <p class="checklist-step__title">Connect your Threads account</p>
+            <p class="checklist-step__desc">
+              {{ threadsConnected ? `Connected as @${threadsAccount?.username}` : 'So AI can learn your voice and write content that sounds like you' }}
+            </p>
+          </div>
+          <a v-if="!threadsConnected" :href="threadsAuthUrl" class="checklist-step__btn">Connect</a>
+        </div>
+
+        <!-- Step: Analyze writing style (shows only after Threads connected) -->
+        <div v-if="hasThreadsPlatform && threadsConnected" class="checklist-step" :class="{ 'checklist-step--done': styleAnalyzed }">
+          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': styleAnalyzed, 'checklist-step__icon-wrap--pending': !styleAnalyzed }">
+            <span v-if="styleAnalyzed" class="material-symbols-outlined">check_circle</span>
+            <span v-else class="checklist-step__spinner"></span>
+          </div>
+          <div class="checklist-step__content">
+            <p class="checklist-step__title">Analyze your writing style</p>
+            <p class="checklist-step__desc">
+              {{ styleAnalyzed ? 'AI learned your tone from your posts' : 'Analyzing your last 20 posts...' }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Step: Start first session -->
+        <div class="checklist-step" :class="{ 'checklist-step--done': hasAnySessions, 'checklist-step--locked': sessionStepLocked }">
+          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasAnySessions, 'checklist-step__icon-wrap--locked': sessionStepLocked }">
+            <span class="material-symbols-outlined">{{ hasAnySessions ? 'check_circle' : sessionStepLocked ? 'lock' : 'mic' }}</span>
+          </div>
+          <div class="checklist-step__content">
+            <p class="checklist-step__title">Start your first session</p>
+            <p class="checklist-step__desc">
+              {{ hasAnySessions ? 'You\'ve already started creating' : 'Talk freely — AI turns it into ready-to-post content' }}
+            </p>
+          </div>
+          <button v-if="!hasAnySessions && !sessionStepLocked" class="checklist-step__btn" :disabled="isStarting" @click="handleStartSession">
+            Start session
+          </button>
+        </div>
+
+        <!-- Step: Publish first post -->
+        <div class="checklist-step" :class="{ 'checklist-step--done': hasPublishedPost, 'checklist-step--locked': publishStepLocked }">
+          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasPublishedPost, 'checklist-step__icon-wrap--locked': publishStepLocked }">
+            <span class="material-symbols-outlined">{{ hasPublishedPost ? 'check_circle' : publishStepLocked ? 'lock' : 'rocket_launch' }}</span>
+          </div>
+          <div class="checklist-step__content">
+            <p class="checklist-step__title">Publish your first post</p>
+            <p class="checklist-step__desc">
+              {{ hasPublishedPost ? 'Your first post is live' : 'Review your AI-generated posts and publish to Threads' }}
+            </p>
+          </div>
+          <button
+            v-if="!hasPublishedPost && !publishStepLocked && latestSessionId"
+            class="checklist-step__btn"
+            @click="router.push(`/sessions/${latestSessionId}`)"
+          >
+            View ideas
+          </button>
+        </div>
+
+      </div>
+    </section>
 
     <!-- ── Content Calendar ── -->
     <section class="calendar-section">
@@ -158,10 +237,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useDashboardStore, type CalendarSession } from '~/stores/dashboard';
 import { useBillingStore } from '~/stores/billing';
 import { useProfileStore } from '~/stores/profile';
+
+interface ThreadsAccount {
+  id: string;
+  threadsUserId: string;
+  username: string;
+  profilePictureUrl: string | null;
+  tokenExpiresAt: string;
+  scopes: string;
+  isPrivateProfile: boolean;
+  postsCount: number;
+  styleAnalyzed: boolean;
+}
 
 definePageMeta({
   layout: 'default',
@@ -171,7 +262,96 @@ const dashboardStore = useDashboardStore();
 const billingStore = useBillingStore();
 const profileStore = useProfileStore();
 const router = useRouter();
+const config = useRuntimeConfig();
 const isStarting = ref(false);
+
+// ── Onboarding checklist state ──
+const threadsAccount = ref<ThreadsAccount | null>(null);
+const apiBaseUrl = config.public.apiBaseUrl as string;
+const threadsAuthUrl = `${apiBaseUrl}/api/threads/auth`;
+let styleAnalysisPoller: ReturnType<typeof setInterval> | null = null;
+
+const hasThreadsPlatform = computed(() =>
+  profileStore.profile?.platforms.some(p => p.toLowerCase() === 'threads') ?? false
+);
+
+const threadsConnected = computed(() => threadsAccount.value !== null);
+const styleAnalyzed = computed(() => threadsAccount.value?.styleAnalyzed ?? false);
+
+const hasAnySessions = computed(() =>
+  dashboardStore.sessions.some(session => session.messageCount > 0)
+);
+
+const hasPublishedPost = computed(() =>
+  dashboardStore.sessions.some(session => session.postedCount > 0)
+);
+
+const sessionStepLocked = computed(() =>
+  hasThreadsPlatform.value && !threadsConnected.value
+);
+
+const publishStepLocked = computed(() => !hasAnySessions.value);
+
+const latestSessionId = computed(() => {
+  if (dashboardStore.sessions.length === 0) return null;
+  return [...dashboardStore.sessions]
+    .sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime())[0].id;
+});
+
+const onboardingSteps = computed(() => {
+  const steps: boolean[] = [];
+  if (hasThreadsPlatform.value) {
+    steps.push(threadsConnected.value);
+    if (threadsConnected.value) steps.push(styleAnalyzed.value);
+  }
+  steps.push(hasAnySessions.value);
+  steps.push(hasPublishedPost.value);
+  return steps;
+});
+
+const completedStepsCount = computed(() => onboardingSteps.value.filter(Boolean).length);
+const totalStepsCount = computed(() => onboardingSteps.value.length);
+const showOnboardingBlock = computed(
+  () => profileStore.profile !== null && completedStepsCount.value < totalStepsCount.value
+);
+
+async function loadThreadsAccount(): Promise<void> {
+  try {
+    const response = await $fetch<{ account: ThreadsAccount | null }>(
+      `${apiBaseUrl}/api/threads/account`,
+      { credentials: 'include' }
+    );
+    threadsAccount.value = response.account;
+  } catch {
+    threadsAccount.value = null;
+  }
+}
+
+function startStyleAnalysisPolling(): void {
+  if (styleAnalysisPoller) return;
+  styleAnalysisPoller = setInterval(async () => {
+    await loadThreadsAccount();
+    if (styleAnalyzed.value) stopStyleAnalysisPolling();
+  }, 5000);
+}
+
+function stopStyleAnalysisPolling(): void {
+  if (styleAnalysisPoller) {
+    clearInterval(styleAnalysisPoller);
+    styleAnalysisPoller = null;
+  }
+}
+
+watch(
+  () => threadsConnected.value && !styleAnalyzed.value,
+  (shouldPoll) => {
+    if (shouldPoll) startStyleAnalysisPolling();
+    else stopStyleAnalysisPolling();
+  },
+  { immediate: true }
+);
+
+onUnmounted(() => stopStyleAnalysisPolling());
 
 const greetingName = computed(() => {
   return profileStore.userName || profileStore.userEmail.split('@')[0];
@@ -198,6 +378,7 @@ onMounted(async () => {
     dashboardStore.loadSessions(),
     billingStore.loadBalance(),
     profileStore.loadProfile(),
+    loadThreadsAccount(),
   ]);
 });
 
@@ -794,6 +975,172 @@ const daysInMonth = computed(() => {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: rgba(255, 255, 255, 0.75);
+}
+
+/* ─── Onboarding Checklist ─── */
+.onboarding-checklist {
+  background: #ffffff;
+  border-radius: 32px;
+  padding: 2.5rem;
+  box-shadow: 0 12px 32px -4px rgba(25, 28, 30, 0.06);
+  border: 1px solid rgba(241, 241, 241, 0.8);
+}
+
+.onboarding-checklist__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.onboarding-checklist__eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #3525cd;
+  margin: 0 0 0.25rem;
+}
+
+.onboarding-checklist__title {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #191c1e;
+  margin: 0;
+}
+
+.onboarding-checklist__progress {
+  padding: 0.3rem 0.875rem;
+  background: rgba(53, 37, 205, 0.07);
+  color: #3525cd;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.onboarding-checklist__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.checklist-step {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 20px;
+  background: #f7f9fb;
+  border: 1.5px solid #f1f1f1;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.checklist-step--done {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.checklist-step--locked {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.checklist-step__icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(53, 37, 205, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #3525cd;
+}
+
+.checklist-step__icon-wrap--done {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.checklist-step__icon-wrap--pending {
+  background: rgba(234, 179, 8, 0.1);
+  color: #ca8a04;
+}
+
+.checklist-step__icon-wrap--locked {
+  background: rgba(107, 114, 128, 0.08);
+  color: #9ca3af;
+}
+
+.checklist-step__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.checklist-step__title {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #191c1e;
+  margin: 0 0 0.2rem;
+}
+
+.checklist-step--done .checklist-step__title {
+  color: #166534;
+}
+
+.checklist-step__desc {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.checklist-step--done .checklist-step__desc {
+  color: #16a34a;
+}
+
+.checklist-step__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1.25rem;
+  background: #3525cd;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.checklist-step__btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.checklist-step__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.checklist-step__spinner {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid rgba(202, 138, 4, 0.25);
+  border-top-color: #ca8a04;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
 }
 
 /* ─── Insights Grid ─── */

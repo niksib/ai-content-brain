@@ -7,7 +7,7 @@ description: Use this skill when the Content Strategist is deciding what from th
 
 ## The Core Question
 
-Not everything that happened today is worth posting. The Content Strategist's most important job is deciding what to SKIP, not what to include.
+Not everything the creator shares is worth posting. The Content Strategist's most important job is deciding what to SKIP, not what to include.
 
 Ask one question about every story or insight from the voice dump:
 
@@ -69,8 +69,8 @@ These sound like something, but say nothing. Every statement needs a specific cl
 ### What They've Already Posted
 Check content history. If a similar topic, angle, or insight appeared in the last 30 days — skip it or find a genuinely new angle.
 
-### "Today I Did X"
-Progress updates with no insight, result, or lesson attached. "Today I worked on my app" is not a post. "Today I realized the feature I've been building for 2 weeks is the wrong solution" — that's a post.
+### "I Did X"
+Progress updates with no insight, result, or lesson attached. "I've been working on my app" is not a post. "I realized the feature I've been building for 2 weeks is the wrong solution" — that's a post.
 
 ### Complaints Without Resolution
 Something frustrating happened, but there's no lesson, no resolution, no insight. Just frustration. Skip it.
@@ -100,7 +100,7 @@ If you can't summarize the core angle in one sentence, the angle isn't clear eno
 
 ## Content Filtering Output
 
-For each item from the voice dump, make a clear call:
+For each item from the user's stream of thoughts, make a clear call:
 
 **POST** — this has a clear angle, specific detail, and obvious platform
 **SKIP** — this lacks specificity, has no lesson, or is too generic

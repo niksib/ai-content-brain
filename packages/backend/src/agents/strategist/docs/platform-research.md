@@ -84,7 +84,7 @@
 ### Post Structure
 - First line = hook (must stop scroll)
 - Keep conversational, not polished
-- End with question or invitation to reply
+- End on a statement, observation, or consequence — never a direct question or generic CTA
 - 500 character limit — be tight
 - Never explicit engagement bait ("like if you agree")
 

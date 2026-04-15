@@ -1,183 +1,146 @@
 <template>
-  <div class="library-page">
-    <h1 class="library-page__title">Content Library</h1>
+  <div class="pub-page">
+    <div v-if="store.isLoading" class="pub-page__loading">Loading...</div>
 
-    <!-- Filter bar -->
-    <div class="library-page__filters">
-      <select
-        :value="store.filters.platform"
-        class="library-page__select"
-        @change="store.setFilter('platform', ($event.target as HTMLSelectElement).value)"
-      >
-        <option value="">All Platforms</option>
-        <option value="threads">Threads</option>
-        <option value="linkedin">LinkedIn</option>
-        <option value="tiktok">TikTok</option>
-        <option value="instagram">Instagram</option>
-      </select>
+    <template v-else>
+      <!-- Backlog: ready to publish -->
+      <section v-if="backlogItems.length > 0" class="pub-backlog">
+        <div class="pub-backlog__header">
+          <h2 class="pub-section-title">Ready to publish</h2>
+          <span class="pub-section-count">{{ backlogItems.length }}</span>
+        </div>
+        <div class="pub-backlog__scroll">
+          <LibraryBacklogCard
+            v-for="item in backlogItems"
+            :key="item.id"
+            :item="item"
+            @open="navigateToIdea(item)"
+            @published="onPublished"
+            @scheduled="onScheduled"
+          />
+        </div>
+      </section>
 
-      <select
-        :value="store.filters.format"
-        class="library-page__select"
-        @change="store.setFilter('format', ($event.target as HTMLSelectElement).value)"
-      >
-        <option value="">All Formats</option>
-        <option value="text_post">Text Post</option>
-        <option value="video_script">Video Script</option>
-        <option value="carousel">Carousel</option>
-        <option value="stories">Stories</option>
-      </select>
-    </div>
-
-    <!-- Loading state -->
-    <div v-if="store.isLoading" class="library-page__loading">
-      <p>Loading content...</p>
-    </div>
-
-    <!-- Empty state -->
-    <div v-else-if="store.items.length === 0" class="library-page__empty">
-      <p>No content produced yet</p>
-    </div>
-
-    <!-- Content grid -->
-    <div v-else class="library-page__grid">
-      <ContentCard
-        v-for="item in store.items"
-        :key="item.id"
-        :item="item"
-        @select="handleSelect"
+      <!-- Calendar -->
+      <PublishingCalendar
+        :items="calendarItems"
+        :current-month="currentMonth"
+        :current-year="currentYear"
+        @navigate="navigateToIdea"
+        @update:month="onMonthChange"
       />
-    </div>
-
-    <!-- Pagination -->
-    <div v-if="store.totalPages > 1" class="library-page__pagination">
-      <button
-        :disabled="!store.hasPrevPage"
-        class="library-page__page-btn"
-        @click="store.prevPage()"
-      >
-        Previous
-      </button>
-      <span class="library-page__page-info">
-        Page {{ store.page }} of {{ store.totalPages }}
-      </span>
-      <button
-        :disabled="!store.hasNextPage"
-        class="library-page__page-btn"
-        @click="store.nextPage()"
-      >
-        Next
-      </button>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { useLibraryStore } from '~/stores/library';
+import { ref, computed, onMounted } from 'vue';
+import { useLibraryStore, type LibraryItem } from '~/stores/library';
+import LibraryBacklogCard from '~/components/LibraryBacklogCard.vue';
+import PublishingCalendar from '~/components/PublishingCalendar.vue';
 
-definePageMeta({
-  layout: 'default',
-});
+definePageMeta({ layout: 'default' });
 
 const store = useLibraryStore();
 const router = useRouter();
 
-onMounted(() => {
-  store.loadLibrary();
-});
+const currentYear = ref(new Date().getFullYear());
+const currentMonth = ref(new Date().getMonth());
 
-function handleSelect(contentId: string) {
-  const item = store.items.find((contentItem) => contentItem.id === contentId);
-  if (item) {
-    router.push(`/sessions?idea=${item.contentIdeaId}`);
+const calendarItems = computed(() =>
+  store.items.filter((item) =>
+    item.contentIdea.publishStatus === 'scheduled' || item.contentIdea.publishStatus === 'posted',
+  ),
+);
+
+const backlogItems = computed(() =>
+  store.items.filter((item) => !item.contentIdea.publishStatus),
+);
+
+function onMonthChange(year: number, month: number): void {
+  currentYear.value = year;
+  currentMonth.value = month;
+}
+
+function navigateToIdea(item: LibraryItem): void {
+  const sessionId = item.contentIdea.contentPlan?.chatSessionId;
+  if (sessionId) {
+    router.push(`/sessions/${sessionId}?idea=${item.contentIdeaId}`);
   }
 }
+
+function onPublished(contentIdeaId: string, threadsPostId: string): void {
+  store.markPublished(contentIdeaId, threadsPostId);
+}
+
+function onScheduled(contentIdeaId: string, scheduledAt: string): void {
+  store.markScheduled(contentIdeaId, scheduledAt);
+}
+
+onMounted(() => store.loadLibrary());
 </script>
 
 <style scoped>
-.library-page {
-  max-width: 960px;
+.pub-page {
+  max-width: 1400px;
   margin: 0 auto;
-}
-
-.library-page__title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #111827;
-  margin: 0 0 1.5rem;
-}
-
-.library-page__filters {
+  padding: 2.5rem 2rem 4rem;
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  flex-direction: column;
+  gap: 3rem;
 }
 
-.library-page__select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  color: #374151;
-  background: white;
-  cursor: pointer;
-  min-width: 140px;
-}
-
-.library-page__select:focus {
-  outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
-}
-
-.library-page__loading,
-.library-page__empty {
-  text-align: center;
-  padding: 3rem 1rem;
+.pub-page__loading {
   color: #9ca3af;
   font-size: 0.9375rem;
+  padding: 3rem;
+  text-align: center;
 }
 
-.library-page__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
+.pub-section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.library-page__pagination {
+.pub-section-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6366f1;
+  background: #eef2ff;
+  padding: 0.125rem 0.5rem;
+  border-radius: 10px;
+}
+
+.pub-backlog__header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  gap: 0.625rem;
+  margin-bottom: 0.875rem;
 }
 
-.library-page__page-btn {
-  padding: 0.5rem 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: white;
-  color: #374151;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
+.pub-backlog__scroll {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  scrollbar-width: thin;
 }
 
-.library-page__page-btn:hover:not(:disabled) {
-  border-color: #6366f1;
-  color: #6366f1;
+.pub-backlog__scroll::-webkit-scrollbar {
+  height: 4px;
 }
 
-.library-page__page-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.pub-backlog__scroll::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 2px;
 }
 
-.library-page__page-info {
-  font-size: 0.875rem;
-  color: #6b7280;
+.pub-backlog__scroll::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
 }
 </style>

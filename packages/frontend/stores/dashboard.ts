@@ -6,6 +6,7 @@ export interface CalendarSession {
   id: string;
   sessionDate: string;
   status: string;
+  messageCount: number;
   ideaCount: number;
   postedCount: number;
   scheduledCount: number;

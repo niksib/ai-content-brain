@@ -93,6 +93,10 @@ Each non-final post must end in a way that makes NOT reading the next post feel 
 
 Do NOT use "continued..." or "(1/3)" numbering — it's weak. Let the writing pull them forward.
 
+## Language — Non-Negotiable
+
+Always write in the language specified in `contentLanguage` from the Creator Profile. This overrides everything — the language the user chatted in, the language the idea was written in, the language of their examples. If `contentLanguage` is "English", the post is in English. Full stop.
+
 ## Writing Rules
 - **500 chars per post** — count every character including spaces and newlines
 - Write like the user talks — use their exact phrases from the Creator Profile

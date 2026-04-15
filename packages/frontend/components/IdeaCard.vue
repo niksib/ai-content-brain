@@ -8,37 +8,39 @@
     <div class="idea-card__header">
       <span class="idea-card__platform">{{ platformEmoji }}</span>
       <span class="idea-card__format">{{ idea.format }}</span>
-      <span v-if="isUpdating" class="idea-card__ai-badge idea-card__ai-badge--working">
-        <span class="idea-card__ai-dot"></span>
-        AI working
-      </span>
-      <span v-else-if="isUpdated" class="idea-card__ai-badge idea-card__ai-badge--updated">
-        Updated
-      </span>
-      <span v-else-if="idea.publishStatus === 'posted'" class="idea-card__status idea-card__status--posted">
-        Posted
-      </span>
-      <span v-else-if="idea.publishStatus === 'scheduled'" class="idea-card__status idea-card__status--scheduled">
-        Scheduled
-      </span>
-      <span v-else class="idea-card__status" :class="`idea-card__status--${idea.status}`">
-        {{ statusLabel }}
-      </span>
+      <div class="idea-card__header-right">
+        <!-- Connected account (shown on the right, opposite the platform/format) -->
+        <div v-if="idea.platform === 'threads' && threadsAccount" class="idea-card__account-inline">
+          <img
+            v-if="threadsAccount.profilePictureUrl"
+            :src="threadsAccount.profilePictureUrl"
+            class="idea-card__account-avatar"
+            alt="Threads avatar"
+          />
+          <div v-else class="idea-card__account-avatar-placeholder"></div>
+          <span class="idea-card__account-username">@{{ threadsAccount.username }}</span>
+        </div>
+        <!-- Status / AI badge -->
+        <span v-if="isUpdating" class="idea-card__ai-badge idea-card__ai-badge--working">
+          <span class="idea-card__ai-dot"></span>
+          AI working
+        </span>
+        <span v-else-if="isUpdated" class="idea-card__ai-badge idea-card__ai-badge--updated">
+          Updated
+        </span>
+        <span v-else-if="idea.publishStatus === 'posted'" class="idea-card__status idea-card__status--posted">
+          Posted
+        </span>
+        <span v-else-if="idea.publishStatus === 'scheduled'" class="idea-card__status idea-card__status--scheduled">
+          Scheduled
+        </span>
+        <span v-else class="idea-card__status" :class="`idea-card__status--${idea.status}`">
+          {{ statusLabel }}
+        </span>
+      </div>
     </div>
 
     <p class="idea-card__angle">{{ idea.angle }}</p>
-
-    <!-- Threads account info (shown when connected and idea is for Threads) -->
-    <div v-if="idea.platform === 'threads' && threadsAccount" class="idea-card__account">
-      <img
-        v-if="threadsAccount.profilePictureUrl"
-        :src="threadsAccount.profilePictureUrl"
-        class="idea-card__account-avatar"
-        alt="Threads avatar"
-      />
-      <div v-else class="idea-card__account-avatar-placeholder"></div>
-      <span class="idea-card__account-username">@{{ threadsAccount.username }}</span>
-    </div>
 
     <div v-if="idea.status === 'proposed'" class="idea-card__actions">
       <button
@@ -142,8 +144,23 @@ const statusLabel = computed(() => {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
-.idea-card__ai-badge {
+.idea-card__header-right {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.idea-card__account-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  max-width: 100px;
+}
+
+.idea-card__ai-badge {
   display: flex;
   align-items: center;
   gap: 0.375rem;
@@ -199,7 +216,6 @@ const statusLabel = computed(() => {
 }
 
 .idea-card__status {
-  margin-left: auto;
   font-size: 0.6875rem;
   font-weight: 600;
   padding: 0.125rem 0.5rem;
@@ -258,15 +274,6 @@ const statusLabel = computed(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.idea-card__account {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #f3f4f6;
 }
 
 .idea-card__account-avatar {
