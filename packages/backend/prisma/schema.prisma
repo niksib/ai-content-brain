@@ -281,6 +281,7 @@ model ScheduledPost {
 
   contentIdeaId    String?
   text             String
+  posts            Json?                  // populated for multi-post threads instead of text
   mediaType        ScheduledPostMediaType @default(TEXT)
   mediaUrl         String?
 

@@ -197,6 +197,77 @@ export class ThreadsApiService {
     return { postId: publishData.id };
   }
 
+  async publishThreadChain(
+    threadsUserId: string,
+    accessToken: string,
+    posts: string[]
+  ): Promise<{ postIds: string[] }> {
+    if (posts.length === 0) throw new Error("Posts array cannot be empty");
+    if (posts.length === 1) {
+      const result = await this.publishTextPost(threadsUserId, accessToken, posts[0]);
+      return { postIds: [result.postId] };
+    }
+
+    const postIds: string[] = [];
+
+    // Publish first post via existing method
+    const firstResult = await this.publishTextPost(threadsUserId, accessToken, posts[0]);
+    postIds.push(firstResult.postId);
+    console.log(`[ThreadsApi] Thread post 1/${posts.length} published → ${firstResult.postId}`);
+
+    // Publish each subsequent post as a reply
+    for (let index = 1; index < posts.length; index++) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const containerParams = new URLSearchParams({
+        media_type: "TEXT",
+        text: posts[index],
+        reply_to_id: postIds[index - 1],
+        access_token: accessToken,
+      });
+
+      const containerResponse = await fetch(
+        `${THREADS_BASE_URL}/${threadsUserId}/threads`,
+        { method: "POST", body: containerParams }
+      );
+
+      if (!containerResponse.ok) {
+        const errorBody = await containerResponse.text().catch(() => "");
+        throw new Error(
+          `Thread reply ${index + 1}/${posts.length} container failed (${containerResponse.status}): ${errorBody}`
+        );
+      }
+
+      const containerData = await containerResponse.json() as { id: string };
+
+      // Text-only replies process quickly — 5s is sufficient
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+
+      const publishParams = new URLSearchParams({
+        creation_id: containerData.id,
+        access_token: accessToken,
+      });
+
+      const publishResponse = await fetch(
+        `${THREADS_BASE_URL}/${threadsUserId}/threads_publish`,
+        { method: "POST", body: publishParams }
+      );
+
+      if (!publishResponse.ok) {
+        const errorBody = await publishResponse.text().catch(() => "");
+        throw new Error(
+          `Thread reply ${index + 1}/${posts.length} publish failed (${publishResponse.status}): ${errorBody}. Successful post IDs so far: ${postIds.join(", ")}`
+        );
+      }
+
+      const publishData = await publishResponse.json() as { id: string };
+      postIds.push(publishData.id);
+      console.log(`[ThreadsApi] Thread post ${index + 1}/${posts.length} published → ${publishData.id}`);
+    }
+
+    return { postIds };
+  }
+
   async getProfileInsights(
     threadsUserId: string,
     accessToken: string,

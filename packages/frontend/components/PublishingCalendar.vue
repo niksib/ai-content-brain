@@ -40,6 +40,7 @@
             'calendar-cell--today': day.isToday,
             'calendar-cell--weekend': day.isWeekend,
             'calendar-cell--empty': day.items.length === 0 && !day.isToday,
+            'calendar-cell--has-items': day.items.length > 0,
           }"
         >
           <!-- Day number -->
@@ -48,25 +49,24 @@
             <span v-if="day.isToday" class="calendar-cell__today-label">Today</span>
           </div>
 
-          <!-- Content chips -->
-          <div v-if="day.items.length > 0" class="calendar-cell__chips">
+          <!-- Content bubbles -->
+          <div v-if="day.items.length > 0" class="calendar-cell__bubbles">
             <div
-              v-for="item in day.items"
+              v-for="item in day.items.slice(0, 3)"
               :key="item.id"
-              class="calendar-chip"
-              :class="chipClass(item)"
+              class="calendar-bubble"
+              :class="bubbleClass(item)"
               @click.stop="emit('navigate', item)"
             >
-              <!-- Chip header: platform icon + format | status badge -->
-              <div class="calendar-chip__header">
-                <div class="calendar-chip__platform">
-                  <PlatformIcon :platform="(item.platform as any)" :size="10" />
-                  <span class="calendar-chip__format">{{ formatLabel(item.format) }}</span>
-                </div>
-                <span class="calendar-chip__status">{{ chipStatusLabel(item) }}</span>
+              <div class="calendar-bubble__meta">
+                <PlatformIcon :platform="(item.platform as any)" :size="11" />
+                <span class="calendar-bubble__format">{{ formatLabel(item.format) }}</span>
+                <span class="calendar-bubble__status">{{ chipStatusLabel(item) }}</span>
               </div>
-              <!-- Chip body: title -->
-              <p class="calendar-chip__title">{{ item.contentIdea.angle }}</p>
+              <p class="calendar-bubble__title">{{ item.contentIdea.angle }}</p>
+            </div>
+            <div v-if="day.items.length > 3" class="calendar-bubble__overflow">
+              +{{ day.items.length - 3 }} more
             </div>
           </div>
         </div>
@@ -153,6 +153,12 @@ function chipClass(item: LibraryItem): string {
   if (item.contentIdea.publishStatus === 'posted') return 'calendar-chip--posted';
   if (item.contentIdea.publishStatus === 'scheduled') return 'calendar-chip--scheduled';
   return 'calendar-chip--ready';
+}
+
+function bubbleClass(item: LibraryItem): string {
+  if (item.contentIdea.publishStatus === 'posted') return 'calendar-bubble--posted';
+  if (item.contentIdea.publishStatus === 'scheduled') return 'calendar-bubble--scheduled';
+  return 'calendar-bubble--ready';
 }
 
 function prevMonth(): void {
@@ -264,25 +270,27 @@ function nextMonth(): void {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 1px;
-  background: rgba(199, 196, 216, 0.15);
+  gap: 0.5rem;
   min-width: 700px;
 }
 
 /* ── Day cells ── */
 .calendar-cell {
   min-height: 140px;
-  padding: 0.5rem;
+  padding: 0.625rem;
   background: #f7f9fb;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   border: 1px solid rgba(199, 196, 216, 0.3);
+  border-radius: 12px;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
 .calendar-cell--inactive {
   background: rgba(242, 244, 246, 0.4);
-  border-color: rgba(199, 196, 216, 0.15);
+  border-color: rgba(199, 196, 216, 0.1);
+  border-radius: 0;
   pointer-events: none;
 }
 
@@ -292,11 +300,25 @@ function nextMonth(): void {
 
 .calendar-cell--today {
   background: rgba(53, 37, 205, 0.04);
-  border-color: rgba(53, 37, 205, 0.3);
+  border-color: rgba(53, 37, 205, 0.35);
+  box-shadow: 0 0 0 1px rgba(53, 37, 205, 0.12);
 }
 
 .calendar-cell--empty {
   background: #f7f9fb;
+  border-style: dashed;
+}
+
+.calendar-cell--has-items {
+  background: #ffffff;
+  border-color: rgba(199, 196, 216, 0.4);
+  box-shadow: 0 2px 8px rgba(25, 28, 30, 0.04);
+  cursor: pointer;
+}
+
+.calendar-cell--has-items:hover {
+  border-color: rgba(53, 37, 205, 0.25);
+  box-shadow: 0 4px 16px rgba(25, 28, 30, 0.08);
 }
 
 /* ── Cell header ── */
@@ -304,11 +326,11 @@ function nextMonth(): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.375rem;
 }
 
 .calendar-cell__number {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #464555;
   line-height: 1;
@@ -317,103 +339,117 @@ function nextMonth(): void {
 .calendar-cell--today .calendar-cell__number {
   color: #3525cd;
   font-weight: 900;
+  font-size: 0.875rem;
 }
 
 .calendar-cell__today-label {
-  font-size: 0.5625rem;
+  font-size: 0.5rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #3525cd;
-  opacity: 0.7;
+  background: rgba(53, 37, 205, 0.08);
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
 }
 
-/* ── Chips container ── */
-.calendar-cell__chips {
+/* ── Bubbles container ── */
+.calendar-cell__bubbles {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.3rem;
   overflow: hidden;
 }
 
-/* ── Content chip ── */
-.calendar-chip {
-  background: #ffffff;
-  border: 1px solid rgba(199, 196, 216, 0.2);
-  border-radius: 6px;
-  padding: 0.3125rem 0.375rem;
+/* ── Content bubble ── */
+.calendar-bubble {
+  border-radius: 8px;
+  padding: 0.375rem 0.5rem;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  box-shadow: 0 1px 3px rgba(25, 28, 30, 0.05);
+  transition: filter 0.15s, transform 0.1s;
 }
 
-.calendar-chip:hover {
-  border-color: rgba(53, 37, 205, 0.3);
-  box-shadow: 0 2px 6px rgba(53, 37, 205, 0.08);
+.calendar-bubble:hover {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
 }
 
-/* Chip header: platform icon + format | status badge */
-.calendar-chip__header {
+.calendar-bubble:active {
+  transform: scale(0.98);
+}
+
+/* Status color variants */
+.calendar-bubble--posted {
+  background: #e6faf8;
+  border: 1px solid #86f2e4;
+}
+
+.calendar-bubble--scheduled {
+  background: #eeecff;
+  border: 1px solid #c7c2ff;
+}
+
+.calendar-bubble--ready {
+  background: #fff4ef;
+  border: 1px solid #ffd1bd;
+}
+
+/* Bubble meta: platform icon + format + status badge */
+.calendar-bubble__meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.25rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.2rem;
 }
 
-.calendar-chip__platform {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
-.calendar-chip__format {
-  font-size: 0.5rem;
+.calendar-bubble__format {
+  font-size: 0.5625rem;
   font-weight: 700;
   color: #777587;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Status badge inside chip */
-.calendar-chip__status {
-  font-size: 0.4rem;
+.calendar-bubble__status {
+  font-size: 0.5rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 0.0625rem 0.25rem;
-  border-radius: 3px;
+  letter-spacing: 0.05em;
   flex-shrink: 0;
 }
 
-.calendar-chip--scheduled .calendar-chip__status {
-  background: #e2dfff;
-  color: #3323cc;
-}
+.calendar-bubble--posted .calendar-bubble__status { color: #006f66; }
+.calendar-bubble--scheduled .calendar-bubble__status { color: #3323cc; }
+.calendar-bubble--ready .calendar-bubble__status { color: #7b2f00; }
 
-.calendar-chip--posted .calendar-chip__status {
-  background: #86f2e4;
-  color: #006f66;
-}
-
-.calendar-chip--ready .calendar-chip__status {
-  background: #ffdbcc;
-  color: #7b2f00;
-}
-
-/* Chip title */
-.calendar-chip__title {
-  font-size: 0.625rem;
+/* Bubble title */
+.calendar-bubble__title {
+  font-size: 0.6875rem;
   font-weight: 600;
   color: #191c1e;
-  line-height: 1.3;
+  line-height: 1.35;
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Overflow badge */
+.calendar-bubble__overflow {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  color: #777587;
+  text-align: center;
+  padding: 0.2rem 0.375rem;
+  background: #f2f4f6;
+  border-radius: 6px;
+  cursor: default;
 }
 
 /* ── Custom scrollbar ── */

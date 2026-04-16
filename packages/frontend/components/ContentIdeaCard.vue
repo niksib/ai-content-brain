@@ -240,10 +240,17 @@ const minDate = computed(() => {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 });
 
+const publishPosts = computed((): string[] | null => {
+  const body = props.libraryBody;
+  if (!body) return null;
+  if (Array.isArray(body.posts) && body.posts.length > 1) return body.posts as string[];
+  return null;
+});
+
 const publishText = computed((): string => {
   const body = props.libraryBody;
   if (!body) return '';
-  if (Array.isArray(body.posts)) return (body.posts as string[]).join('\n\n');
+  if (Array.isArray(body.posts)) return (body.posts as string[])[0] ?? '';
   if (typeof body.text === 'string') return body.text;
   return '';
 });
@@ -277,12 +284,22 @@ async function publishNow(): Promise<void> {
   isPublishing.value = true;
   errorMessage.value = '';
   try {
-    const result = await $fetch<{ postId: string }>(`${apiBaseUrl}/api/threads/publish`, {
-      method: 'POST',
-      credentials: 'include',
-      body: { text: publishText.value, contentIdeaId: props.ideaId },
-    });
-    emit('published', props.ideaId, result.postId);
+    const posts = publishPosts.value;
+    if (posts) {
+      const result = await $fetch<{ postIds: string[] }>(`${apiBaseUrl}/api/threads/publish-thread`, {
+        method: 'POST',
+        credentials: 'include',
+        body: { posts, contentIdeaId: props.ideaId },
+      });
+      emit('published', props.ideaId, result.postIds[0]);
+    } else {
+      const result = await $fetch<{ postId: string }>(`${apiBaseUrl}/api/threads/publish`, {
+        method: 'POST',
+        credentials: 'include',
+        body: { text: publishText.value, contentIdeaId: props.ideaId },
+      });
+      emit('published', props.ideaId, result.postId);
+    }
   } catch (error: unknown) {
     const apiError = (error as { data?: { error?: string } })?.data?.error;
     errorMessage.value = apiError ?? 'Failed to publish. Please try again.';
@@ -300,10 +317,15 @@ async function schedulePost(): Promise<void> {
     const [hours, minutes] = scheduleTimeInput.value.split(':').map(Number);
     const isoString = new Date(year, month - 1, day, hours, minutes).toISOString();
 
+    const posts = publishPosts.value;
+    const scheduleBody = posts
+      ? { posts, scheduledAt: isoString, contentIdeaId: props.ideaId }
+      : { text: publishText.value, scheduledAt: isoString, contentIdeaId: props.ideaId };
+
     await $fetch(`${apiBaseUrl}/api/threads/schedule`, {
       method: 'POST',
       credentials: 'include',
-      body: { text: publishText.value, scheduledAt: isoString, contentIdeaId: props.ideaId },
+      body: scheduleBody,
     });
 
     showPopover.value = false;

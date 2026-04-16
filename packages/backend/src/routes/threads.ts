@@ -118,7 +118,7 @@ threadsRoutes.delete("/threads/account", requireAuth, async (context) => {
   return context.json({ success: true });
 });
 
-// POST /threads/publish — publish a post immediately
+// POST /threads/publish — publish a single post immediately
 threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
   const user = context.get("user");
   const body = await context.req.json() as { text: string; contentIdeaId?: string };
@@ -169,17 +169,90 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
   }
 });
 
-// POST /threads/schedule — schedule a post for later
-threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
+// POST /threads/publish-thread — publish a multi-post reply chain
+threadsRoutes.post("/threads/publish-thread", requireAuth, async (context) => {
   const user = context.get("user");
-  const body = await context.req.json() as { text: string; scheduledAt: string; contentIdeaId?: string };
+  const body = await context.req.json() as { posts: string[]; contentIdeaId?: string };
 
-  if (!body.text?.trim() || typeof body.text !== "string") {
-    return context.json({ error: "text is required" }, 400);
+  if (!Array.isArray(body.posts) || body.posts.length === 0) {
+    return context.json({ error: "posts must be a non-empty array" }, 400);
   }
 
-  if (body.text.length > 500) {
-    return context.json({ error: "text must be 500 characters or fewer" }, 400);
+  for (const [postIndex, postText] of body.posts.entries()) {
+    if (typeof postText !== "string" || !postText.trim()) {
+      return context.json({ error: `post[${postIndex}] is empty` }, 400);
+    }
+    if (postText.length > 500) {
+      return context.json({ error: `post[${postIndex}] exceeds 500 characters` }, 400);
+    }
+  }
+
+  const account = await prisma.threadsAccount.findUnique({
+    where: { userId: user.id },
+  });
+
+  if (!account) {
+    return context.json({ error: "Threads account not connected" }, 400);
+  }
+
+  if (account.tokenExpiresAt <= new Date()) {
+    return context.json({ error: "Threads token expired. Please reconnect your account in Settings." }, 401);
+  }
+
+  try {
+    const result = await threadsApiService.publishThreadChain(
+      account.threadsUserId,
+      account.accessToken,
+      body.posts
+    );
+
+    await prisma.threadsAccount.update({
+      where: { id: account.id },
+      data: { postsCount: { increment: 1 } },
+    });
+
+    if (body.contentIdeaId) {
+      await prisma.contentIdea.update({
+        where: { id: body.contentIdeaId, userId: user.id },
+        data: { publishStatus: "posted", threadsPostId: result.postIds[0] },
+      });
+    }
+
+    return context.json({ postIds: result.postIds });
+  } catch (publishError) {
+    console.error("[threads/publish-thread] Thread publish failed:", publishError);
+    return context.json({ error: "Failed to publish thread. Please try again." }, 500);
+  }
+});
+
+// POST /threads/schedule — schedule a post (single or multi-post thread) for later
+threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
+  const user = context.get("user");
+  const body = await context.req.json() as {
+    text?: string;
+    posts?: string[];
+    scheduledAt: string;
+    contentIdeaId?: string;
+  };
+
+  const isThread = Array.isArray(body.posts) && body.posts.length > 1;
+
+  if (isThread) {
+    for (const [postIndex, postText] of body.posts!.entries()) {
+      if (typeof postText !== "string" || !postText.trim()) {
+        return context.json({ error: `post[${postIndex}] is empty` }, 400);
+      }
+      if (postText.length > 500) {
+        return context.json({ error: `post[${postIndex}] exceeds 500 characters` }, 400);
+      }
+    }
+  } else {
+    if (!body.text?.trim() || typeof body.text !== "string") {
+      return context.json({ error: "text is required" }, 400);
+    }
+    if (body.text.length > 500) {
+      return context.json({ error: "text must be 500 characters or fewer" }, 400);
+    }
   }
 
   if (!body.scheduledAt) {
@@ -204,7 +277,8 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
       userId: user.id,
       threadsAccountId: account.id,
       contentIdeaId: body.contentIdeaId ?? null,
-      text: body.text,
+      text: isThread ? (body.posts![0] ?? "") : body.text!,
+      posts: isThread ? body.posts : undefined,
       scheduledAt,
     },
   });

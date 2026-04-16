@@ -27,36 +27,49 @@ export class ThreadsSchedulerService {
     });
 
     await Promise.allSettled(
-      duePosts.map((post) =>
-        this.publishScheduledPost(
-          post.id,
-          post.threadsAccountId,
-          post.threadsAccount.threadsUserId,
-          post.threadsAccount.accessToken,
-          post.text
-        )
+      duePosts.map((scheduledPost) =>
+        this.publishScheduledPost(scheduledPost)
       )
     );
   }
 
   private async publishScheduledPost(
-    postId: string,
-    threadsAccountId: string,
-    threadsUserId: string,
-    accessToken: string,
-    text: string
+    scheduledPost: {
+      id: string;
+      threadsAccountId: string;
+      contentIdeaId: string | null;
+      text: string;
+      posts: unknown;
+      threadsAccount: { threadsUserId: string; accessToken: string };
+    }
   ): Promise<void> {
+    const { id: postId, threadsAccountId, contentIdeaId, text, posts, threadsAccount } = scheduledPost;
+    const { threadsUserId, accessToken } = threadsAccount;
+
     await prisma.scheduledPost.update({
       where: { id: postId },
       data: { status: "publishing" },
     });
 
     try {
-      const result = await threadsApiService.publishTextPost(threadsUserId, accessToken, text);
+      const postsArray = Array.isArray(posts) ? (posts as string[]) : null;
+      const isThread = postsArray !== null && postsArray.length > 1;
+
+      let firstPostId: string;
+
+      if (isThread) {
+        const result = await threadsApiService.publishThreadChain(threadsUserId, accessToken, postsArray);
+        firstPostId = result.postIds[0];
+        console.log(`[ThreadsScheduler] Published thread ${postId} → post IDs: ${result.postIds.join(", ")}`);
+      } else {
+        const result = await threadsApiService.publishTextPost(threadsUserId, accessToken, text);
+        firstPostId = result.postId;
+        console.log(`[ThreadsScheduler] Published post ${postId} → Threads ID ${firstPostId}`);
+      }
 
       await prisma.scheduledPost.update({
         where: { id: postId },
-        data: { status: "published", threadsPostId: result.postId },
+        data: { status: "published", threadsPostId: firstPostId },
       });
 
       await prisma.threadsAccount.update({
@@ -64,16 +77,12 @@ export class ThreadsSchedulerService {
         data: { postsCount: { increment: 1 } },
       });
 
-      // Update ContentIdea publish status if linked
-      const scheduledPost = await prisma.scheduledPost.findUnique({ where: { id: postId } });
-      if (scheduledPost?.contentIdeaId) {
+      if (contentIdeaId) {
         await prisma.contentIdea.update({
-          where: { id: scheduledPost.contentIdeaId },
-          data: { publishStatus: "posted", threadsPostId: result.postId },
+          where: { id: contentIdeaId },
+          data: { publishStatus: "posted", threadsPostId: firstPostId },
         });
       }
-
-      console.log(`[ThreadsScheduler] Published post ${postId} → Threads ID ${result.postId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       await prisma.scheduledPost.update({
