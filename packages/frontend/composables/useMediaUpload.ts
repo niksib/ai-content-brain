@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref, type Ref } from 'vue';
 
 export interface UploadedMediaFile {
   id: string;
@@ -11,25 +11,24 @@ export interface UploadedMediaFile {
 }
 
 export interface UseMediaUploadReturn {
-  isUploading: Readonly<typeof isUploading>;
-  progress: Readonly<typeof progress>;
-  error: Readonly<typeof error>;
+  isUploading: Ref<boolean>;
+  progress: Ref<number>;
+  error: Ref<string | null>;
   upload: (file: File) => Promise<UploadedMediaFile | null>;
   cancel: () => void;
 }
 
-const isUploading = ref(false);
-const progress = ref(0);
-const error = ref<string | null>(null);
-
-let abortController: AbortController | null = null;
-
-export function useMediaUpload() {
+export function useMediaUpload(): UseMediaUploadReturn {
   const config = useRuntimeConfig();
   const apiBaseUrl = config.public.apiBaseUrl as string;
 
+  const isUploading = ref(false);
+  const progress = ref(0);
+  const error = ref<string | null>(null);
+  let xhr: XMLHttpRequest | null = null;
+
   function cancel(): void {
-    abortController?.abort();
+    xhr?.abort();
     isUploading.value = false;
     progress.value = 0;
   }
@@ -38,13 +37,12 @@ export function useMediaUpload() {
     isUploading.value = true;
     progress.value = 0;
     error.value = null;
-    abortController = new AbortController();
 
     const formData = new FormData();
     formData.append('file', file);
 
     return new Promise((resolve) => {
-      const xhr = new XMLHttpRequest();
+      xhr = new XMLHttpRequest();
 
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) {
@@ -54,9 +52,9 @@ export function useMediaUpload() {
 
       xhr.addEventListener('load', () => {
         isUploading.value = false;
-        if (xhr.status === 201) {
+        if (xhr!.status === 201) {
           try {
-            const result = JSON.parse(xhr.responseText) as UploadedMediaFile;
+            const result = JSON.parse(xhr!.responseText) as UploadedMediaFile;
             resolve(result);
           } catch {
             error.value = 'Invalid response from server';
@@ -64,10 +62,10 @@ export function useMediaUpload() {
           }
         } else {
           try {
-            const body = JSON.parse(xhr.responseText) as { error?: string };
-            error.value = body.error ?? `Upload failed (${xhr.status})`;
+            const body = JSON.parse(xhr!.responseText) as { error?: string };
+            error.value = body.error ?? `Upload failed (${xhr!.status})`;
           } catch {
-            error.value = `Upload failed (${xhr.status})`;
+            error.value = `Upload failed (${xhr!.status})`;
           }
           resolve(null);
         }
@@ -85,19 +83,11 @@ export function useMediaUpload() {
         resolve(null);
       });
 
-      abortController!.signal.addEventListener('abort', () => xhr.abort());
-
       xhr.open('POST', `${apiBaseUrl}/api/media/upload`);
       xhr.withCredentials = true;
       xhr.send(formData);
     });
   }
 
-  return {
-    isUploading: isUploading as Readonly<typeof isUploading>,
-    progress: progress as Readonly<typeof progress>,
-    error: error as Readonly<typeof error>,
-    upload,
-    cancel,
-  };
+  return { isUploading, progress, error, upload, cancel };
 }

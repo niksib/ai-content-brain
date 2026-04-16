@@ -2,6 +2,7 @@
   <div
     class="idea-card"
     :class="cardClasses"
+    :style="{ borderLeftColor: statusVisual.color }"
     @click="emit('select', ideaId)"
     @mouseenter="isUpdated && emit('seen', ideaId)"
   >
@@ -20,7 +21,10 @@
       </div>
 
       <!-- Status badge -->
-      <span class="idea-card__status" :class="statusClass">
+      <span
+        class="idea-card__status"
+        :style="{ background: statusVisual.bg, color: statusVisual.color }"
+      >
         <span v-if="isUpdating" class="idea-card__status-dot"></span>
         {{ statusText }}
       </span>
@@ -124,6 +128,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import PlatformIcon from '~/components/PlatformIcon.vue';
+import { useStatusColors, resolveStatusKey } from '~/composables/useStatusColors';
 
 type Platform = 'threads' | 'linkedin' | 'tiktok' | 'instagram';
 
@@ -188,28 +193,18 @@ const truncatedDescription = computed(() => props.description ?? '');
 
 // ─── Status ───
 
-const STATUS_LABELS: Record<string, string> = {
-  proposed: 'Proposed',
-  approved: 'Approved',
-  rejected: 'Rejected',
-  producing: 'Producing',
-  completed: 'Ready to post',
-};
+const { visual } = useStatusColors();
 
-const statusText = computed(() => {
-  if (props.isUpdating) return 'AI working';
-  if (props.isUpdated) return 'Updated';
-  if (props.publishStatus === 'posted') return 'Posted';
-  if (props.publishStatus === 'scheduled') return 'Scheduled';
-  return STATUS_LABELS[props.status] ?? props.status;
+const statusVisual = computed(() => {
+  if (props.isUpdating || props.isUpdated) {
+    // "AI working" / "Updated" state — use producing lavender/blue from shared palette
+    return { ...visual('producing'), label: props.isUpdating ? 'AI working' : 'Updated' };
+  }
+  const key = resolveStatusKey(props.status, props.publishStatus);
+  return visual(key);
 });
 
-const statusClass = computed(() => {
-  if (props.isUpdating || props.isUpdated) return 'idea-card__status--updating';
-  if (props.publishStatus === 'posted') return 'idea-card__status--posted';
-  if (props.publishStatus === 'scheduled') return 'idea-card__status--scheduled';
-  return `idea-card__status--${props.status}`;
-});
+const statusText = computed(() => statusVisual.value.label);
 
 const cardClasses = computed(() => ({
   'idea-card--updating': props.isUpdating,
@@ -346,6 +341,7 @@ async function schedulePost(): Promise<void> {
 .idea-card {
   background: #ffffff;
   border: 1px solid rgba(199, 196, 216, 0.15);
+  border-left: 4px solid currentColor;
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
@@ -467,51 +463,8 @@ async function schedulePost(): Promise<void> {
   50% { opacity: 0.25; }
 }
 
-.idea-card__status--proposed {
-  background: #ffdbcc;
-  color: #7b2f00;
-}
-
-.idea-card__status--approved {
-  background: #86f2e4;
-  color: #006f66;
-}
-
-.idea-card__status--rejected {
-  background: #e0e3e5;
-  color: #464555;
-}
-
-.idea-card__status--producing {
-  background: #e2dfff;
-  color: #3323cc;
-  animation: status-pulse 1.5s ease-in-out infinite;
-}
-
-.idea-card__status--completed {
-  background: #86f2e4;
-  color: #006f66;
-}
-
-.idea-card__status--posted {
-  background: #86f2e4;
-  color: #006f66;
-}
-
-.idea-card__status--scheduled {
-  background: #e2dfff;
-  color: #3323cc;
-}
-
-.idea-card__status--updating {
-  background: #e2dfff;
-  color: #3323cc;
-}
-
-@keyframes status-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
+/* Status background/color is applied inline from the shared status palette
+   (see useStatusColors composable). Only shared animations/utilities remain. */
 
 /* ─── Body ─── */
 .idea-card__body {

@@ -150,6 +150,7 @@ import { useMediaUpload, type UploadedMediaFile } from '~/composables/useMediaUp
 const props = defineProps<{
   text: string;
   posts?: string[] | null;
+  postsMedia?: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string } | null> | null;
   contentIdeaId?: string;
   publishStatus?: 'posted' | 'scheduled' | null;
   scheduledAt?: string | null;
@@ -267,6 +268,16 @@ function buildMediaType(mimeType: string): 'IMAGE' | 'VIDEO' {
   return mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE';
 }
 
+function buildThreadPayload() {
+  return (props.posts ?? []).map((text, index) => {
+    const media = props.postsMedia?.[index];
+    if (media) {
+      return { text, mediaType: media.mediaType, mediaUrl: media.mediaUrl };
+    }
+    return { text };
+  });
+}
+
 async function publishNow(): Promise<void> {
   isPublishing.value = true;
   errorMessage.value = '';
@@ -276,7 +287,7 @@ async function publishNow(): Promise<void> {
       const result = await $fetch<{ postIds: string[] }>(`${apiBaseUrl}/api/threads/publish-thread`, {
         method: 'POST',
         credentials: 'include',
-        body: { posts: props.posts, contentIdeaId: props.contentIdeaId },
+        body: { posts: buildThreadPayload(), contentIdeaId: props.contentIdeaId },
       });
       emit('published', result.postIds[0]);
     } else {
@@ -320,7 +331,7 @@ async function schedulePost(): Promise<void> {
     };
 
     if (isMultiThread.value) {
-      scheduleBody.posts = props.posts;
+      scheduleBody.posts = buildThreadPayload();
     } else {
       scheduleBody.text = props.text;
     }

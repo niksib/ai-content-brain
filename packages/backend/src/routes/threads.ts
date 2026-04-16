@@ -205,18 +205,28 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
 // POST /threads/publish-thread — publish a multi-post reply chain
 threadsRoutes.post("/threads/publish-thread", requireAuth, async (context) => {
   const user = context.get("user");
-  const body = await context.req.json() as { posts: string[]; contentIdeaId?: string };
+  const body = await context.req.json() as {
+    posts: Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>;
+    contentIdeaId?: string;
+  };
 
   if (!Array.isArray(body.posts) || body.posts.length === 0) {
     return context.json({ error: "posts must be a non-empty array" }, 400);
   }
 
-  for (const [postIndex, postText] of body.posts.entries()) {
-    if (typeof postText !== "string" || !postText.trim()) {
+  const normalized = body.posts.map((entry) =>
+    typeof entry === "string" ? { text: entry } : entry
+  );
+
+  for (const [postIndex, post] of normalized.entries()) {
+    if (typeof post.text !== "string" || !post.text.trim()) {
       return context.json({ error: `post[${postIndex}] is empty` }, 400);
     }
-    if (postText.length > 500) {
+    if (post.text.length > 500) {
       return context.json({ error: `post[${postIndex}] exceeds 500 characters` }, 400);
+    }
+    if (post.mediaUrl && post.mediaType !== "IMAGE" && post.mediaType !== "VIDEO") {
+      return context.json({ error: `post[${postIndex}] has mediaUrl without a valid mediaType` }, 400);
     }
   }
 
@@ -236,7 +246,7 @@ threadsRoutes.post("/threads/publish-thread", requireAuth, async (context) => {
     const result = await threadsApiService.publishThreadChain(
       account.threadsUserId,
       account.accessToken,
-      body.posts
+      normalized
     );
 
     await prisma.threadsAccount.update({

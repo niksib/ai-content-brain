@@ -17,18 +17,24 @@
 
     <!-- Idea content -->
     <div v-else-if="idea" class="idea-page__content">
-      <!-- Title -->
-      <h1 class="idea-page__title">{{ idea.angle }}</h1>
-
-      <!-- Meta badges -->
+      <!-- Meta badges (platform + format + status) sit above the title now -->
       <div class="idea-page__meta">
         <span class="idea-page__badge idea-page__badge--platform">
-          <PlatformIcon :platform="idea.platform as 'threads' | 'linkedin' | 'tiktok' | 'instagram'" :size="12" />
+          <PlatformIcon :platform="idea.platform as 'threads' | 'linkedin' | 'tiktok' | 'instagram'" :size="14" />
+          <span class="idea-page__platform-label">{{ platformLabel }}</span>
         </span>
-        <span class="idea-page__badge idea-page__badge--format">
-          {{ formatLabel }}
-        </span>
+        <span
+          class="idea-page__badge"
+          :style="{ background: formatVisual.bg, color: formatVisual.color }"
+        >{{ formatVisual.label }}</span>
+        <span
+          class="idea-page__badge"
+          :style="{ background: statusVisual.bg, color: statusVisual.color }"
+        >{{ statusVisual.label }}</span>
       </div>
+
+      <!-- Title -->
+      <h1 class="idea-page__title">{{ idea.angle }}</h1>
 
       <!-- Description -->
       <div v-if="idea.description" class="idea-page__section">
@@ -71,7 +77,7 @@
             <p class="idea-page__image-suggestion-brief">{{ imageSuggestion.brief }}</p>
           </div>
 
-          <!-- THREADS POST CARD (single or multi-thread) -->
+          <!-- THREADS POST CARD (single or multi-thread, laid out as a timeline) -->
           <template v-if="isThreadsTextPost && contentBody">
             <div class="edit-status-bar">
               <span class="edit-hint">Click on any post to edit</span>
@@ -81,18 +87,22 @@
                 Saved
               </span>
             </div>
-            <div class="threads-thread">
-              <div
+
+            <ol class="thread-timeline">
+              <li
                 v-for="(postText, index) in editableThreadPosts"
                 :key="`${index}-${postText.slice(0, 20)}`"
-                class="threads-thread__item"
+                class="thread-timeline__item"
+                :class="{ 'thread-timeline__item--last': index === editableThreadPosts.length - 1 }"
               >
-                <!-- Vertical connector line between posts -->
-                <div v-if="index < editableThreadPosts.length - 1" class="threads-thread__connector-wrap">
-                  <div class="threads-thread__line" />
+                <!-- Timeline marker -->
+                <div class="thread-timeline__marker">
+                  <span class="thread-timeline__dot">{{ index + 1 }}</span>
+                  <div v-if="index < editableThreadPosts.length - 1" class="thread-timeline__line" />
                 </div>
 
-                <div class="threads-card">
+                <!-- Post card -->
+                <div class="thread-timeline__card threads-card">
                   <div class="threads-card__header">
                     <div class="threads-card__avatar">
                       <img
@@ -107,6 +117,9 @@
                     </div>
                     <div class="threads-card__user">
                       <span class="threads-card__username">{{ threadsAccount?.username ? '@' + threadsAccount.username : 'you' }}</span>
+                      <span v-if="editableThreadPosts.length > 1" class="threads-card__thread-index">
+                        Post {{ index + 1 }} of {{ editableThreadPosts.length }}
+                      </span>
                     </div>
                     <button
                       type="button"
@@ -130,11 +143,55 @@
                     @blur="flushThreadPostEdit(index, $event)"
                     @keydown.enter.exact.prevent="($event.target as HTMLElement).blur()"
                   />
+
+                  <!-- Per-post media attachment -->
+                  <div class="threads-card__media">
+                    <div v-if="postsMedia[index]" class="threads-card__media-preview">
+                      <img
+                        v-if="postsMedia[index]!.mimeType.startsWith('image/')"
+                        :src="postsMedia[index]!.url"
+                        class="threads-card__media-thumb"
+                        alt="attached media"
+                      />
+                      <div v-else class="threads-card__media-video">
+                        <span class="material-symbols-outlined" style="font-size:16px;">videocam</span>
+                        <span>{{ postsMedia[index]!.mimeType.includes('mp4') ? 'MP4' : 'MOV' }}</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="threads-card__media-remove"
+                        title="Remove media"
+                        @click="removePostMedia(index)"
+                      >
+                        <span class="material-symbols-outlined" style="font-size:14px;">close</span>
+                      </button>
+                    </div>
+
+                    <div v-else-if="postsMediaUploading[index]" class="threads-card__media-progress">
+                      <div class="threads-card__media-bar">
+                        <div class="threads-card__media-fill" :style="{ width: `${postsMediaProgress[index] ?? 0}%` }" />
+                      </div>
+                      <span class="threads-card__media-progress-label">{{ postsMediaProgress[index] ?? 0 }}%</span>
+                    </div>
+
+                    <label v-else class="threads-card__media-attach">
+                      <span class="material-symbols-outlined" style="font-size:15px;">add_photo_alternate</span>
+                      Add media
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,video/mp4,video/quicktime"
+                        style="display:none"
+                        @change="onPostFileSelected(index, $event)"
+                      />
+                    </label>
+                  </div>
+
                   <!-- Publish / schedule actions — shown only on the last card -->
                   <div v-if="index === editableThreadPosts.length - 1" class="threads-card__publish">
                     <ThreadsPublish
                       :text="threadsPublishText"
                       :posts="threadsPublishPosts"
+                      :posts-media="threadsPublishPostsMedia"
                       :content-idea-id="idea.id"
                       :publish-status="idea.publishStatus"
                       :scheduled-at="scheduledAt"
@@ -143,8 +200,8 @@
                     />
                   </div>
                 </div>
-              </div>
-            </div>
+              </li>
+            </ol>
           </template>
 
           <!-- TEXT POST (LinkedIn, other platforms) -->
@@ -317,11 +374,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, watch, nextTick, reactive } from 'vue';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 import ThreadsPublish from '~/components/threads/ThreadsPublish.vue';
 import { useSessionStore, type SessionIdea, type ProducedContentBody, type ImageSuggestion } from '~/stores/session';
 import { useApiClient } from '~/services/api';
+import { useMediaUpload, type UploadedMediaFile } from '~/composables/useMediaUpload';
+import { useStatusColors, useFormatColors, resolveStatusKey } from '~/composables/useStatusColors';
 
 const props = defineProps<{
   ideaId: string;
@@ -364,18 +423,29 @@ const textBodyEl = ref<HTMLElement | null>(null);
 const draftPosts: Record<number, string> = {};
 let draftTextBody = '';
 
-const FORMAT_LABELS: Record<string, string> = {
-  text_post: 'Post',
-  text_with_image: 'Post + Image',
-  image_series: 'Image Series',
-  video_script: 'Video Script',
-  carousel: 'Carousel',
-  stories: 'Stories',
+const PLATFORM_LABELS: Record<string, string> = {
+  threads: 'Threads',
+  linkedin: 'LinkedIn',
+  tiktok: 'TikTok',
+  instagram: 'Instagram',
 };
 
-const formatLabel = computed(() => {
+const { visual: statusColor } = useStatusColors();
+const { visual: formatColor } = useFormatColors();
+
+const platformLabel = computed(() => {
   if (!idea.value) return '';
-  return FORMAT_LABELS[idea.value.format] ?? idea.value.format;
+  return PLATFORM_LABELS[idea.value.platform] ?? idea.value.platform;
+});
+
+const formatVisual = computed(() => {
+  if (!idea.value) return formatColor('text_post');
+  return formatColor(idea.value.format);
+});
+
+const statusVisual = computed(() => {
+  if (!idea.value) return statusColor('proposed');
+  return statusColor(resolveStatusKey(idea.value.status, idea.value.publishStatus));
 });
 
 const isThreadsTextPost = computed(
@@ -395,6 +465,60 @@ const threadsPublishText = computed((): string => {
   if (Array.isArray(body.posts)) return (body.posts as string[])[0] ?? '';
   if (typeof body.text === 'string') return body.text;
   return '';
+});
+
+// ─── Per-post media (multi-thread attachments) ───
+const postsMedia = ref<Array<UploadedMediaFile | null>>([]);
+const postsMediaUploading = reactive<Record<number, boolean>>({});
+const postsMediaProgress = reactive<Record<number, number>>({});
+
+function ensureMediaSlots(count: number): void {
+  while (postsMedia.value.length < count) postsMedia.value.push(null);
+  if (postsMedia.value.length > count) postsMedia.value.splice(count);
+}
+
+async function onPostFileSelected(index: number, event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  input.value = '';
+
+  const uploader = useMediaUpload();
+  postsMediaUploading[index] = true;
+  postsMediaProgress[index] = 0;
+
+  const stopWatch = watch(
+    uploader.progress,
+    (value) => { postsMediaProgress[index] = value; }
+  );
+
+  try {
+    const result = await uploader.upload(file);
+    if (result) {
+      ensureMediaSlots(editableThreadPosts.value.length);
+      postsMedia.value[index] = result;
+    }
+  } finally {
+    stopWatch();
+    postsMediaUploading[index] = false;
+    postsMediaProgress[index] = 0;
+  }
+}
+
+function removePostMedia(index: number): void {
+  if (postsMedia.value[index]) postsMedia.value[index] = null;
+}
+
+const threadsPublishPostsMedia = computed(() => {
+  if (!threadsPublishPosts.value) return null;
+  return threadsPublishPosts.value.map((_text, index) => {
+    const media = postsMedia.value[index];
+    if (!media) return null;
+    return {
+      mediaType: media.mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE',
+      mediaUrl: media.url,
+    } as { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string };
+  });
 });
 
 const IMAGE_TYPE_LABELS: Record<string, string> = {
@@ -453,6 +577,7 @@ const hasEmptyContent = computed(() => {
 watch(threadPosts, (posts) => {
   if (editableThreadPosts.value.length === 0) {
     editableThreadPosts.value = [...posts];
+    ensureMediaSlots(posts.length);
     nextTick(() => {
       posts.forEach((text, i) => {
         const el = postBodyEls.value[i];
@@ -705,61 +830,42 @@ onMounted(async () => {
 }
 
 .idea-page__title {
-  margin: 0 0 1rem;
-  font-size: 1.375rem;
-  font-weight: 600;
-  line-height: 1.3;
-  color: #1f2937;
+  margin: 0 0 1.5rem;
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #111827;
+  font-family: 'Manrope', sans-serif;
 }
 
 .idea-page__meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
-  margin-bottom: 2rem;
+  margin: 0 0 0.625rem;
 }
 
 .idea-page__badge {
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 0.25rem 0.625rem;
-  border-radius: 6px;
-  text-transform: capitalize;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.3rem 0.625rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .idea-page__badge--platform {
-  background: transparent;
-  padding: 0;
-}
-
-.idea-page__badge--format {
   background: #f3f4f6;
   color: #4b5563;
 }
 
-.idea-page__badge--proposed {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.idea-page__badge--approved {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.idea-page__badge--rejected {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-.idea-page__badge--producing {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.idea-page__badge--completed {
-  background: #d1fae5;
-  color: #065f46;
+.idea-page__platform-label {
+  font-size: 0.6875rem;
 }
 
 .idea-page__section {
@@ -1111,34 +1217,174 @@ onMounted(async () => {
   white-space: pre-wrap;
 }
 
-/* Threads thread wrapper */
-.threads-thread {
+/* Thread timeline — each post sits on a numbered marker with a connector line */
+.thread-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
-.threads-thread__item {
+.thread-timeline__item {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+}
+
+.thread-timeline__item--last {
+  padding-bottom: 0;
+}
+
+.thread-timeline__marker {
   position: relative;
-  margin-bottom: 0;
-}
-
-.threads-thread__item + .threads-thread__item {
-  margin-top: 0;
-}
-
-.threads-thread__connector-wrap {
   display: flex;
-  justify-content: center;
-  padding: 0 0 0 18px; /* align with avatar center */
-  height: 16px;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 0.875rem;
 }
 
-.threads-thread__line {
+.thread-timeline__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3525cd, #4f46e5);
+  color: #fff;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(53, 37, 205, 0.25);
+  z-index: 1;
+}
+
+.thread-timeline__line {
+  flex: 1;
   width: 2px;
-  height: 100%;
-  background: #e5e7eb;
+  margin-top: 0.25rem;
+  margin-bottom: -1rem; /* continue under the next item's padding */
+  background: linear-gradient(to bottom, #c7d2fe, #e0e7ff);
   border-radius: 1px;
+}
+
+.thread-timeline__card {
+  min-width: 0;
+}
+
+/* Per-post media attach */
+.threads-card__media {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem 0.75rem;
+}
+
+.threads-card__media-attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  border: 1.5px dashed #c7c4d8;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #777587;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.threads-card__media-attach:hover {
+  border-color: #3525cd;
+  color: #3525cd;
+}
+
+.threads-card__media-preview {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.threads-card__media-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e0e3e5;
+}
+
+.threads-card__media-video {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  background: #191c1e;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.threads-card__media-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #464555;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.threads-card__media-remove:hover {
+  background: #ba1a1a;
+}
+
+.threads-card__media-progress {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.threads-card__media-bar {
+  flex: 1;
+  height: 4px;
+  background: #e0e3e5;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.threads-card__media-fill {
+  height: 100%;
+  background: #3525cd;
+  border-radius: 9999px;
+  transition: width 0.2s;
+}
+
+.threads-card__media-progress-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #464555;
+  white-space: nowrap;
+}
+
+.threads-card__thread-index {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  margin-top: 0.125rem;
 }
 
 /* Threads post card */

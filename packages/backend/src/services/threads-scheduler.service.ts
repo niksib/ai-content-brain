@@ -52,13 +52,16 @@ export class ThreadsSchedulerService {
     });
 
     try {
-      const postsArray = Array.isArray(posts) ? (posts as string[]) : null;
+      const postsArray = Array.isArray(posts) ? (posts as Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>) : null;
       const isThread = postsArray !== null && postsArray.length > 1;
 
       let firstPostId: string;
 
       if (isThread) {
-        const result = await threadsApiService.publishThreadChain(threadsUserId, accessToken, postsArray);
+        const normalized = postsArray.map((entry) =>
+          typeof entry === "string" ? { text: entry } : entry
+        );
+        const result = await threadsApiService.publishThreadChain(threadsUserId, accessToken, normalized);
         firstPostId = result.postIds[0];
         console.log(`[ThreadsScheduler] Published thread ${postId} → post IDs: ${result.postIds.join(", ")}`);
       } else {

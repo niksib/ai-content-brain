@@ -349,31 +349,56 @@ export class ThreadsApiService {
   async publishThreadChain(
     threadsUserId: string,
     accessToken: string,
-    posts: string[]
+    posts: Array<{ text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>
   ): Promise<{ postIds: string[] }> {
     if (posts.length === 0) throw new Error("Posts array cannot be empty");
+
+    // Single post fast path — reuses text or media publish helpers
     if (posts.length === 1) {
-      const result = await this.publishTextPost(threadsUserId, accessToken, posts[0]);
+      const single = posts[0];
+      if (single.mediaType && single.mediaUrl) {
+        const result = await this.publishSingleMediaPost(
+          threadsUserId,
+          accessToken,
+          single.text,
+          single.mediaType,
+          single.mediaUrl
+        );
+        return { postIds: [result.postId] };
+      }
+      const result = await this.publishTextPost(threadsUserId, accessToken, single.text);
       return { postIds: [result.postId] };
     }
 
     const postIds: string[] = [];
 
-    // Publish first post via existing method
-    const firstResult = await this.publishTextPost(threadsUserId, accessToken, posts[0]);
-    postIds.push(firstResult.postId);
-    console.log(`[ThreadsApi] Thread post 1/${posts.length} published → ${firstResult.postId}`);
+    for (let index = 0; index < posts.length; index++) {
+      const current = posts[index];
+      const prevPostId = index > 0 ? postIds[index - 1] : null;
 
-    // Publish each subsequent post as a reply
-    for (let index = 1; index < posts.length; index++) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (index > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
 
       const containerParams = new URLSearchParams({
-        media_type: "TEXT",
-        text: posts[index],
-        reply_to_id: postIds[index - 1],
+        text: current.text,
         access_token: accessToken,
       });
+
+      const hasMedia = Boolean(current.mediaType && current.mediaUrl);
+      if (hasMedia) {
+        containerParams.set("media_type", current.mediaType!);
+        containerParams.set(
+          current.mediaType === "IMAGE" ? "image_url" : "video_url",
+          current.mediaUrl!
+        );
+      } else {
+        containerParams.set("media_type", "TEXT");
+      }
+
+      if (prevPostId) {
+        containerParams.set("reply_to_id", prevPostId);
+      }
 
       const containerResponse = await fetch(
         `${THREADS_BASE_URL}/${threadsUserId}/threads`,
@@ -383,14 +408,18 @@ export class ThreadsApiService {
       if (!containerResponse.ok) {
         const errorBody = await containerResponse.text().catch(() => "");
         throw new Error(
-          `Thread reply ${index + 1}/${posts.length} container failed (${containerResponse.status}): ${errorBody}`
+          `Thread post ${index + 1}/${posts.length} container failed (${containerResponse.status}): ${errorBody}. Successful post IDs so far: ${postIds.join(", ") || "none"}`
         );
       }
 
       const containerData = await containerResponse.json() as { id: string };
 
-      // Text-only replies process quickly — 5s is sufficient
-      await new Promise((resolve) => setTimeout(resolve, 5_000));
+      // Media posts need status polling; text posts just need a short settle
+      if (hasMedia) {
+        await this.pollContainerStatus(containerData.id, accessToken);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 5_000));
+      }
 
       const publishParams = new URLSearchParams({
         creation_id: containerData.id,
@@ -405,7 +434,7 @@ export class ThreadsApiService {
       if (!publishResponse.ok) {
         const errorBody = await publishResponse.text().catch(() => "");
         throw new Error(
-          `Thread reply ${index + 1}/${posts.length} publish failed (${publishResponse.status}): ${errorBody}. Successful post IDs so far: ${postIds.join(", ")}`
+          `Thread post ${index + 1}/${posts.length} publish failed (${publishResponse.status}): ${errorBody}. Successful post IDs so far: ${postIds.join(", ") || "none"}`
         );
       }
 

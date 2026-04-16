@@ -303,7 +303,6 @@ function nextMonth(): void {
 .calendar-cell--inactive {
   background: rgba(242, 244, 246, 0.4);
   border-color: rgba(199, 196, 216, 0.1);
-  border-radius: 0;
   pointer-events: none;
 }
 
