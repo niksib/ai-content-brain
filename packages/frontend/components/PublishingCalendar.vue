@@ -65,9 +65,14 @@
               </div>
               <p class="calendar-bubble__title">{{ item.contentIdea.angle }}</p>
             </div>
-            <div v-if="day.items.length > 3" class="calendar-bubble__overflow">
+            <button
+              v-if="day.items.length > 3"
+              type="button"
+              class="calendar-bubble__overflow"
+              @click.stop="emit('navigate', day.items[3])"
+            >
               +{{ day.items.length - 3 }} more
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -440,16 +445,31 @@ function nextMonth(): void {
   overflow: hidden;
 }
 
-/* Overflow badge */
+/* Overflow badge — button opening the first hidden item's session */
 .calendar-bubble__overflow {
+  display: block;
+  width: 100%;
+  font-family: inherit;
   font-size: 0.5625rem;
   font-weight: 700;
   color: #777587;
   text-align: center;
-  padding: 0.2rem 0.375rem;
+  padding: 0.25rem 0.375rem;
   background: #f2f4f6;
+  border: 1px solid transparent;
   border-radius: 6px;
-  cursor: default;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.calendar-bubble__overflow:hover {
+  background: #e2dfff;
+  color: #3525cd;
+  border-color: rgba(53, 37, 205, 0.2);
+}
+
+.calendar-bubble__overflow:active {
+  transform: scale(0.97);
 }
 
 /* ── Custom scrollbar ── */
