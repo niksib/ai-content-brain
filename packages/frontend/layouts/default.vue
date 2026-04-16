@@ -65,38 +65,7 @@
 
     <!-- Main canvas -->
     <main class="flex-1 min-w-0 overflow-y-auto relative">
-      <!-- Top header -->
-      <header class="sticky top-0 z-40 px-10 py-5 flex justify-between items-center bg-slate-50/70 backdrop-blur-xl border-b border-slate-100">
-        <div class="min-w-0">
-          <h2 class="text-2xl font-extrabold font-headline tracking-tighter text-slate-900">{{ pageTitle }}</h2>
-          <p v-if="pageSubtitle" class="text-on-surface-variant text-sm font-medium">{{ pageSubtitle }}</p>
-        </div>
-        <div class="flex items-center gap-3">
-          <div class="relative">
-            <input
-              v-model="searchQuery"
-              class="bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 text-sm w-64 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
-              placeholder="Search content..."
-              type="text"
-            />
-            <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-sm">search</span>
-          </div>
-          <button class="w-10 h-10 rounded-full hover:bg-slate-200 flex items-center justify-center text-on-surface-variant" title="Notifications">
-            <span class="material-symbols-outlined">notifications</span>
-          </button>
-          <button
-            class="w-10 h-10 rounded-full hover:bg-slate-200 flex items-center justify-center text-on-surface-variant"
-            title="Settings"
-            @click="router.push('/profile')"
-          >
-            <span class="material-symbols-outlined">settings</span>
-          </button>
-        </div>
-      </header>
-
-      <div class="min-h-[calc(100vh-72px)]">
-        <slot />
-      </div>
+      <slot />
     </main>
   </div>
 </template>
@@ -115,7 +84,6 @@ const billingStore = useBillingStore();
 const profileStore = useProfileStore();
 
 const isStarting = ref(false);
-const searchQuery = ref('');
 
 interface NavLink {
   to: string;
@@ -134,21 +102,6 @@ const navLinks: NavLink[] = [
 function isActive(targetPath: string): boolean {
   return route.path === targetPath || route.path.startsWith(`${targetPath}/`);
 }
-
-const pageTitle = computed((): string => {
-  const metaTitle = route.meta.pageTitle;
-  if (typeof metaTitle === 'string' && metaTitle) return metaTitle;
-  const labelFromNav = navLinks.find((link) => isActive(link.to))?.label;
-  if (labelFromNav) return labelFromNav;
-  if (route.path.startsWith('/sessions/')) return 'Session';
-  return 'Postrr';
-});
-
-const pageSubtitle = computed((): string => {
-  const metaSubtitle = route.meta.pageSubtitle;
-  if (typeof metaSubtitle === 'string') return metaSubtitle;
-  return '';
-});
 
 const userInitials = computed(() => {
   const name = profileStore.userName || profileStore.userEmail;
