@@ -12,8 +12,9 @@
 
     <!-- Publish / Schedule actions -->
     <div v-else class="threads-publish__wrapper">
-      <!-- Media attachment area -->
-      <div class="threads-publish__media">
+      <!-- Media attachment area — single-post only; multi-thread posts attach
+           media per-post in the parent IdeaPage timeline. -->
+      <div v-if="!isMultiThread" class="threads-publish__media">
         <!-- Attached file preview -->
         <div v-if="attachedMedia" class="threads-publish__media-preview">
           <img
