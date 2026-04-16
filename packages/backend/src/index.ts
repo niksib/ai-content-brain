@@ -14,6 +14,7 @@ import { ideaRoutes } from "./routes/ideas.js";
 import { libraryRoutes } from "./routes/library.js";
 import { billingRoutes } from "./routes/billing.js";
 import { threadsRoutes } from "./routes/threads.js";
+import { mediaRoutes } from "./routes/media.js";
 import { threadsSchedulerService } from "./services/threads-scheduler.service.js";
 
 const app = new Hono();
@@ -38,6 +39,7 @@ app.route("/api", ideaRoutes);
 app.route("/api", libraryRoutes);
 app.route("/api", billingRoutes);
 app.route("/api", threadsRoutes);
+app.route("/api", mediaRoutes);
 
 const port = 3001;
 

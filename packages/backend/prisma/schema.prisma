@@ -250,6 +250,24 @@ enum CreditTransactionType {
   content_production
 }
 
+// ==================== MEDIA FILES ====================
+
+model MediaFile {
+  id        String   @id @default(cuid())
+  userId    String
+  url       String
+  gcsPath   String
+  mimeType  String
+  size      Int
+  width     Int?
+  height    Int?
+  duration  Int?     // seconds, for video
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 // ==================== THREADS INTEGRATION ====================
 
 model ThreadsAccount {
