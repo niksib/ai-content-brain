@@ -66,10 +66,10 @@
               <p class="calendar-bubble__title">{{ item.contentIdea.angle }}</p>
             </div>
             <button
-              v-if="day.items.length > 3"
+              v-if="day.items.length > 3 && sessionIdForDay(day)"
               type="button"
               class="calendar-bubble__overflow"
-              @click.stop="emit('navigate', day.items[3])"
+              @click.stop="emit('navigate-session', sessionIdForDay(day)!)"
             >
               +{{ day.items.length - 3 }} more
             </button>
@@ -93,6 +93,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   navigate: [item: LibraryItem];
+  'navigate-session': [sessionId: string];
   'update:month': [year: number, month: number];
 }>();
 
@@ -164,6 +165,14 @@ function bubbleClass(item: LibraryItem): string {
   if (item.contentIdea.publishStatus === 'posted') return 'calendar-bubble--posted';
   if (item.contentIdea.publishStatus === 'scheduled') return 'calendar-bubble--scheduled';
   return 'calendar-bubble--ready';
+}
+
+function sessionIdForDay(day: { items: LibraryItem[] }): string | null {
+  for (const item of day.items) {
+    const sessionId = item.contentIdea.contentPlan?.chatSessionId;
+    if (sessionId) return sessionId;
+  }
+  return null;
 }
 
 function prevMonth(): void {

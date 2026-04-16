@@ -8,6 +8,7 @@
       :current-month="currentMonth"
       :current-year="currentYear"
       @navigate="navigateToIdea"
+      @navigate-session="navigateToSession"
       @update:month="onMonthChange"
     />
   </div>
@@ -36,6 +37,10 @@ function navigateToIdea(item: LibraryItem): void {
   if (sessionId) {
     router.push(`/sessions/${sessionId}?idea=${item.contentIdeaId}`);
   }
+}
+
+function navigateToSession(sessionId: string): void {
+  router.push(`/sessions/${sessionId}`);
 }
 
 onMounted(() => store.loadLibrary());
