@@ -88,56 +88,56 @@
               </span>
             </div>
 
-            <ol class="thread-timeline">
-              <li
+            <!-- Thread = single card; posts share a vertical connector line
+                 running avatar-to-avatar on the left. -->
+            <div class="thread-card">
+              <div
                 v-for="(postText, index) in editableThreadPosts"
                 :key="`${index}-${postText.slice(0, 20)}`"
-                class="thread-timeline__item"
-                :class="{ 'thread-timeline__item--last': index === editableThreadPosts.length - 1 }"
+                class="thread-post"
+                :class="{ 'thread-post--last': index === editableThreadPosts.length - 1 }"
               >
-                <!-- Timeline marker -->
-                <div class="thread-timeline__marker">
-                  <span class="thread-timeline__dot">{{ index + 1 }}</span>
-                  <div v-if="index < editableThreadPosts.length - 1" class="thread-timeline__line" />
+                <!-- Avatar column with connector line -->
+                <div class="thread-post__gutter">
+                  <div class="thread-post__avatar">
+                    <img
+                      v-if="threadsAccount?.profilePictureUrl"
+                      :src="threadsAccount.profilePictureUrl"
+                      class="thread-post__avatar-img"
+                      alt="avatar"
+                    />
+                    <svg v-else viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                      <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                    </svg>
+                  </div>
+                  <div
+                    v-if="index < editableThreadPosts.length - 1"
+                    class="thread-post__connector"
+                  />
                 </div>
 
-                <!-- Post card -->
-                <div class="thread-timeline__card threads-card">
-                  <div class="threads-card__header">
-                    <div class="threads-card__avatar">
-                      <img
-                        v-if="threadsAccount?.profilePictureUrl"
-                        :src="threadsAccount.profilePictureUrl"
-                        class="threads-card__avatar-img"
-                        alt="avatar"
-                      />
-                      <svg v-else viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-                      </svg>
-                    </div>
-                    <div class="threads-card__user">
-                      <span class="threads-card__username">{{ threadsAccount?.username ? '@' + threadsAccount.username : 'you' }}</span>
-                      <span v-if="editableThreadPosts.length > 1" class="threads-card__thread-index">
-                        Post {{ index + 1 }} of {{ editableThreadPosts.length }}
-                      </span>
-                    </div>
+                <!-- Post body column -->
+                <div class="thread-post__content">
+                  <div class="thread-post__meta">
+                    <span class="thread-post__username">{{ threadsAccount?.username ? '@' + threadsAccount.username : 'you' }}</span>
                     <button
                       type="button"
-                      class="threads-card__more"
+                      class="thread-post__copy"
                       :title="copiedIndex === index ? 'Copied!' : 'Copy'"
                       @click="copyPost(postText, index)"
                     >
-                      <svg v-if="copiedIndex === index" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" style="color: #059669">
+                      <svg v-if="copiedIndex === index" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14" style="color: #059669">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
-                      <svg v-else viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                      <svg v-else viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
                         <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                       </svg>
                     </button>
                   </div>
+
                   <div
                     :ref="(el) => { if (el) postBodyEls[index] = el as HTMLElement }"
-                    class="threads-card__body"
+                    class="thread-post__body"
                     contenteditable="true"
                     @input="onThreadPostInput(index, $event)"
                     @blur="flushThreadPostEdit(index, $event)"
@@ -145,21 +145,21 @@
                   />
 
                   <!-- Per-post media attachment -->
-                  <div class="threads-card__media">
-                    <div v-if="postsMedia[index]" class="threads-card__media-preview">
+                  <div class="thread-post__media">
+                    <div v-if="postsMedia[index]" class="thread-post__media-preview">
                       <img
                         v-if="postsMedia[index]!.mimeType.startsWith('image/')"
                         :src="postsMedia[index]!.url"
-                        class="threads-card__media-thumb"
+                        class="thread-post__media-thumb"
                         alt="attached media"
                       />
-                      <div v-else class="threads-card__media-video">
+                      <div v-else class="thread-post__media-video">
                         <span class="material-symbols-outlined" style="font-size:16px;">videocam</span>
                         <span>{{ postsMedia[index]!.mimeType.includes('mp4') ? 'MP4' : 'MOV' }}</span>
                       </div>
                       <button
                         type="button"
-                        class="threads-card__media-remove"
+                        class="thread-post__media-remove"
                         title="Remove media"
                         @click="removePostMedia(index)"
                       >
@@ -167,14 +167,14 @@
                       </button>
                     </div>
 
-                    <div v-else-if="postsMediaUploading[index]" class="threads-card__media-progress">
-                      <div class="threads-card__media-bar">
-                        <div class="threads-card__media-fill" :style="{ width: `${postsMediaProgress[index] ?? 0}%` }" />
+                    <div v-else-if="postsMediaUploading[index]" class="thread-post__media-progress">
+                      <div class="thread-post__media-bar">
+                        <div class="thread-post__media-fill" :style="{ width: `${postsMediaProgress[index] ?? 0}%` }" />
                       </div>
-                      <span class="threads-card__media-progress-label">{{ postsMediaProgress[index] ?? 0 }}%</span>
+                      <span class="thread-post__media-progress-label">{{ postsMediaProgress[index] ?? 0 }}%</span>
                     </div>
 
-                    <label v-else class="threads-card__media-attach">
+                    <label v-else class="thread-post__media-attach">
                       <span class="material-symbols-outlined" style="font-size:15px;">add_photo_alternate</span>
                       Add media
                       <input
@@ -186,8 +186,8 @@
                     </label>
                   </div>
 
-                  <!-- Publish / schedule actions — shown only on the last card -->
-                  <div v-if="index === editableThreadPosts.length - 1" class="threads-card__publish">
+                  <!-- Publish / schedule actions shown after the last post -->
+                  <div v-if="index === editableThreadPosts.length - 1" class="thread-post__publish">
                     <ThreadsPublish
                       :text="threadsPublishText"
                       :posts="threadsPublishPosts"
@@ -200,8 +200,8 @@
                     />
                   </div>
                 </div>
-              </li>
-            </ol>
+              </div>
+            </div>
           </template>
 
           <!-- TEXT POST (LinkedIn, other platforms) -->
@@ -972,7 +972,7 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.idea-page__produced:has(.threads-card) {
+.idea-page__produced:has(.thread-card) {
   border: none;
   background: transparent;
   border-radius: 0;
@@ -1217,73 +1217,131 @@ onMounted(async () => {
   white-space: pre-wrap;
 }
 
-/* Thread timeline — each post sits on a numbered marker with a connector line */
-.thread-timeline {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* ─── Unified thread card (Threads-style) ─── */
+.thread-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0;
 }
 
-.thread-timeline__item {
+.thread-post {
   display: grid;
   grid-template-columns: 36px 1fr;
-  gap: 0.75rem;
-  padding-bottom: 1rem;
+  gap: 0.875rem;
+  padding-top: 0.75rem;
 }
 
-.thread-timeline__item--last {
-  padding-bottom: 0;
+.thread-post:first-child {
+  padding-top: 0;
 }
 
-.thread-timeline__marker {
-  position: relative;
+/* Avatar column hosts the connector line */
+.thread-post__gutter {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 0.875rem;
+  gap: 0.5rem;
 }
 
-.thread-timeline__dot {
-  display: inline-flex;
+.thread-post__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.thread-post__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.thread-post__connector {
+  flex: 1;
+  width: 2px;
+  background: #e5e7eb;
+  border-radius: 1px;
+  min-height: 12px;
+}
+
+.thread-post__content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding-bottom: 0.75rem;
+}
+
+.thread-post--last .thread-post__content {
+  padding-bottom: 0;
+}
+
+.thread-post__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 24px;
+}
+
+.thread-post__username {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.thread-post__copy {
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3525cd, #4f46e5);
-  color: #fff;
-  font-family: 'Manrope', sans-serif;
-  font-size: 0.75rem;
-  font-weight: 800;
-  box-shadow: 0 4px 12px rgba(53, 37, 205, 0.25);
-  z-index: 1;
+  border: none;
+  background: none;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
 }
 
-.thread-timeline__line {
-  flex: 1;
-  width: 2px;
-  margin-top: 0.25rem;
-  margin-bottom: -1rem; /* continue under the next item's padding */
-  background: linear-gradient(to bottom, #c7d2fe, #e0e7ff);
-  border-radius: 1px;
+.thread-post__copy:hover {
+  background: #f3f4f6;
+  color: #374151;
 }
 
-.thread-timeline__card {
-  min-width: 0;
+.thread-post__body {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: #1f2937;
+  outline: none;
+  white-space: pre-wrap;
+  padding: 0.125rem 0;
 }
 
-/* Per-post media attach */
-.threads-card__media {
+.thread-post__body:focus {
+  background: rgba(99, 102, 241, 0.04);
+  border-radius: 6px;
+}
+
+/* Per-post media row */
+.thread-post__media {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0 1rem 0.75rem;
+  margin-top: 0.25rem;
 }
 
-.threads-card__media-attach {
+.thread-post__media-attach {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -1297,18 +1355,18 @@ onMounted(async () => {
   transition: border-color 0.15s, color 0.15s;
 }
 
-.threads-card__media-attach:hover {
+.thread-post__media-attach:hover {
   border-color: #3525cd;
   color: #3525cd;
 }
 
-.threads-card__media-preview {
+.thread-post__media-preview {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
 
-.threads-card__media-thumb {
+.thread-post__media-thumb {
   width: 56px;
   height: 56px;
   object-fit: cover;
@@ -1316,7 +1374,7 @@ onMounted(async () => {
   border: 1px solid #e0e3e5;
 }
 
-.threads-card__media-video {
+.thread-post__media-video {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -1328,7 +1386,7 @@ onMounted(async () => {
   font-weight: 700;
 }
 
-.threads-card__media-remove {
+.thread-post__media-remove {
   position: absolute;
   top: -6px;
   right: -6px;
@@ -1344,18 +1402,18 @@ onMounted(async () => {
   justify-content: center;
 }
 
-.threads-card__media-remove:hover {
+.thread-post__media-remove:hover {
   background: #ba1a1a;
 }
 
-.threads-card__media-progress {
+.thread-post__media-progress {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.threads-card__media-bar {
+.thread-post__media-bar {
   flex: 1;
   height: 4px;
   background: #e0e3e5;
@@ -1363,121 +1421,24 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.threads-card__media-fill {
+.thread-post__media-fill {
   height: 100%;
   background: #3525cd;
   border-radius: 9999px;
   transition: width 0.2s;
 }
 
-.threads-card__media-progress-label {
+.thread-post__media-progress-label {
   font-size: 0.6875rem;
   font-weight: 700;
   color: #464555;
   white-space: nowrap;
 }
 
-.threads-card__thread-index {
-  display: block;
-  font-size: 0.625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #9ca3af;
-  margin-top: 0.125rem;
-}
-
-/* Threads post card */
-.threads-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.threads-card__header {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.875rem 1rem 0.5rem;
-}
-
-.threads-card__avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #e5e7eb;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #9ca3af;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.threads-card__avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-}
-
-.threads-card__user {
-  flex: 1;
-  min-width: 0;
-}
-
-.threads-card__username {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #111827;
-}
-
-.threads-card__more {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: none;
-  color: #9ca3af;
-  cursor: pointer;
-  border-radius: 6px;
-  flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
-}
-
-.threads-card__more:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.threads-card__body {
-  padding: 0.25rem 1rem 0.75rem;
-  font-size: 0.9375rem;
-  line-height: 1.65;
-  color: #111827;
-  white-space: pre-wrap;
-}
-
-.threads-card__publish {
+.thread-post__publish {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
   border-top: 1px solid #f3f4f6;
-  padding: 0.75rem 1rem 0.875rem;
-}
-
-/* Inline editing */
-.threads-card__body {
-  cursor: text;
-  outline: none;
-  border-radius: 4px;
-  transition: background 0.15s;
-}
-
-.threads-card__body:focus {
-  background: #f5f3ff;
-  outline: 2px solid #6366f1;
-  outline-offset: -2px;
 }
 
 .idea-page__text-body {

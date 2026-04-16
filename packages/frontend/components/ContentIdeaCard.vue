@@ -2,7 +2,6 @@
   <div
     class="idea-card"
     :class="cardClasses"
-    :style="{ borderLeftColor: statusVisual.color }"
     @click="emit('select', ideaId)"
     @mouseenter="isUpdated && emit('seen', ideaId)"
   >
@@ -341,7 +340,6 @@ async function schedulePost(): Promise<void> {
 .idea-card {
   background: #ffffff;
   border: 1px solid rgba(199, 196, 216, 0.15);
-  border-left: 4px solid currentColor;
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
