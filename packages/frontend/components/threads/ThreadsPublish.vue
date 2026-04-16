@@ -11,93 +11,145 @@
     </div>
 
     <!-- Publish / Schedule actions -->
-    <div v-else class="threads-publish__actions">
-      <button
-        class="threads-publish__btn threads-publish__btn--primary"
-        :disabled="isPublishing || !text"
-        @click="publishNow"
-      >
-        <span v-if="isPublishing">Publishing...</span>
-        <span v-else>Publish now</span>
-      </button>
-
-      <!-- Schedule button or scheduled state -->
-      <div ref="scheduleWrapEl" class="threads-publish__schedule-wrap">
-        <!-- Not yet scheduled: Schedule button -->
-        <button
-          v-if="publishStatus !== 'scheduled'"
-          ref="scheduleButtonEl"
-          class="threads-publish__btn threads-publish__btn--secondary"
-          @click.stop="togglePopover"
-        >
-          Schedule
-          <span class="material-symbols-outlined threads-publish__chevron">expand_more</span>
-        </button>
-
-        <!-- Scheduled: display date + Change button -->
-        <div v-else class="threads-publish__scheduled-state">
-          <span class="material-symbols-outlined" style="font-size:14px;color:#6366f1;flex-shrink:0;">schedule</span>
-          <span class="threads-publish__scheduled-date">{{ scheduledDisplayText }}</span>
+    <div v-else class="threads-publish__wrapper">
+      <!-- Media attachment area -->
+      <div class="threads-publish__media">
+        <!-- Attached file preview -->
+        <div v-if="attachedMedia" class="threads-publish__media-preview">
+          <img
+            v-if="attachedMedia.mimeType.startsWith('image/')"
+            :src="attachedMedia.url"
+            class="threads-publish__media-thumb"
+            alt="attached media"
+          />
+          <div v-else class="threads-publish__media-video-badge">
+            <span class="material-symbols-outlined" style="font-size:16px;">videocam</span>
+            <span>{{ attachedMedia.mimeType.includes('mp4') ? 'MP4' : 'MOV' }}</span>
+          </div>
           <button
-            ref="scheduleButtonEl"
-            class="threads-publish__change-btn"
-            @click.stop="togglePopover"
+            type="button"
+            class="threads-publish__media-remove"
+            title="Remove media"
+            @click="removeMedia"
           >
-            Change
+            <span class="material-symbols-outlined" style="font-size:14px;">close</span>
           </button>
         </div>
+
+        <!-- Upload progress -->
+        <div v-else-if="isUploading" class="threads-publish__upload-progress">
+          <div class="threads-publish__progress-bar">
+            <div class="threads-publish__progress-fill" :style="{ width: `${progress}%` }" />
+          </div>
+          <span class="threads-publish__progress-label">{{ progress }}%</span>
+          <button type="button" class="threads-publish__cancel-upload" @click="cancel()">Cancel</button>
+        </div>
+
+        <!-- Attach button -->
+        <label v-else class="threads-publish__attach-btn">
+          <span class="material-symbols-outlined" style="font-size:16px;">add_photo_alternate</span>
+          Add media
+          <input
+            ref="fileInputEl"
+            type="file"
+            accept="image/jpeg,image/png,video/mp4,video/quicktime"
+            style="display:none"
+            @change="onFileSelected"
+          />
+        </label>
       </div>
 
-      <!-- Schedule popover — teleported to body to escape overflow:hidden -->
-      <Teleport to="body">
-        <div
-          v-if="showSchedulePopover"
-          ref="popoverEl"
-          class="threads-publish__popover"
-          :style="popoverStyle"
+      <div class="threads-publish__actions">
+        <button
+          class="threads-publish__btn threads-publish__btn--primary"
+          :disabled="isPublishing || !text || isUploading"
+          @click="publishNow"
         >
-          <div class="threads-publish__popover-fields">
-            <input
-              v-model="scheduleDateInput"
-              type="date"
-              class="threads-publish__date-input"
-              :min="minDate"
-            />
-            <input
-              v-model="scheduleTimeInput"
-              type="time"
-              class="threads-publish__time-input"
-            />
-          </div>
-          <div class="threads-publish__popover-footer">
+          <span v-if="isPublishing">Publishing...</span>
+          <span v-else>Publish now</span>
+        </button>
+
+        <!-- Schedule button or scheduled state -->
+        <div ref="scheduleWrapEl" class="threads-publish__schedule-wrap">
+          <!-- Not yet scheduled: Schedule button -->
+          <button
+            v-if="publishStatus !== 'scheduled'"
+            ref="scheduleButtonEl"
+            class="threads-publish__btn threads-publish__btn--secondary"
+            :disabled="isUploading"
+            @click.stop="togglePopover"
+          >
+            Schedule
+            <span class="material-symbols-outlined threads-publish__chevron">expand_more</span>
+          </button>
+
+          <!-- Scheduled: display date + Change button -->
+          <div v-else class="threads-publish__scheduled-state">
+            <span class="material-symbols-outlined" style="font-size:14px;color:#6366f1;flex-shrink:0;">schedule</span>
+            <span class="threads-publish__scheduled-date">{{ scheduledDisplayText }}</span>
             <button
-              class="threads-publish__btn threads-publish__btn--ghost"
-              @click.stop="showSchedulePopover = false"
+              ref="scheduleButtonEl"
+              class="threads-publish__change-btn"
+              @click.stop="togglePopover"
             >
-              Cancel
-            </button>
-            <button
-              class="threads-publish__btn threads-publish__btn--primary threads-publish__btn--sm"
-              :disabled="isScheduling || !text || !scheduleDateInput || !scheduleTimeInput"
-              @click.stop="schedulePost"
-            >
-              <span v-if="isScheduling">Scheduling...</span>
-              <span v-else>Schedule</span>
+              Change
             </button>
           </div>
         </div>
-      </Teleport>
 
-      <p v-if="errorMessage" class="threads-publish__error">{{ errorMessage }}</p>
+        <!-- Schedule popover — teleported to body to escape overflow:hidden -->
+        <Teleport to="body">
+          <div
+            v-if="showSchedulePopover"
+            ref="popoverEl"
+            class="threads-publish__popover"
+            :style="popoverStyle"
+          >
+            <div class="threads-publish__popover-fields">
+              <input
+                v-model="scheduleDateInput"
+                type="date"
+                class="threads-publish__date-input"
+                :min="minDate"
+              />
+              <input
+                v-model="scheduleTimeInput"
+                type="time"
+                class="threads-publish__time-input"
+              />
+            </div>
+            <div class="threads-publish__popover-footer">
+              <button
+                class="threads-publish__btn threads-publish__btn--ghost"
+                @click.stop="showSchedulePopover = false"
+              >
+                Cancel
+              </button>
+              <button
+                class="threads-publish__btn threads-publish__btn--primary threads-publish__btn--sm"
+                :disabled="isScheduling || !text || !scheduleDateInput || !scheduleTimeInput"
+                @click.stop="schedulePost"
+              >
+                <span v-if="isScheduling">Scheduling...</span>
+                <span v-else>Schedule</span>
+              </button>
+            </div>
+          </div>
+        </Teleport>
+
+        <p v-if="errorMessage" class="threads-publish__error">{{ errorMessage }}</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useMediaUpload, type UploadedMediaFile } from '~/composables/useMediaUpload';
 
 const props = defineProps<{
   text: string;
+  posts?: string[] | null;
   contentIdeaId?: string;
   publishStatus?: 'posted' | 'scheduled' | null;
   scheduledAt?: string | null;
@@ -107,6 +159,8 @@ const emit = defineEmits<{
   published: [threadsPostId: string];
   scheduled: [scheduledAt: string];
 }>();
+
+const isMultiThread = computed(() => Array.isArray(props.posts) && props.posts.length > 1);
 
 const accountConnected = ref(false);
 const isPublishing = ref(false);
@@ -119,6 +173,10 @@ const scheduleWrapEl = ref<HTMLElement | null>(null);
 const scheduleButtonEl = ref<HTMLElement | null>(null);
 const popoverEl = ref<HTMLElement | null>(null);
 const popoverStyle = ref<Record<string, string>>({});
+const fileInputEl = ref<HTMLInputElement | null>(null);
+const attachedMedia = ref<UploadedMediaFile | null>(null);
+
+const { isUploading, progress, upload, cancel } = useMediaUpload();
 
 const minDate = computed(() => {
   const now = new Date();
@@ -145,6 +203,26 @@ const scheduledDisplayText = computed(() => {
 
 const config = useRuntimeConfig();
 const apiBaseUrl = config.public.apiBaseUrl as string;
+
+function removeMedia(): void {
+  attachedMedia.value = null;
+  if (fileInputEl.value) fileInputEl.value.value = '';
+}
+
+async function onFileSelected(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  errorMessage.value = '';
+  const result = await upload(file);
+  if (result) {
+    attachedMedia.value = result;
+  } else {
+    // error is exposed from composable; surface it here too
+    errorMessage.value = 'Media upload failed. Please try again.';
+  }
+}
 
 function togglePopover(): void {
   showSchedulePopover.value = !showSchedulePopover.value;
@@ -185,20 +263,38 @@ onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick);
 });
 
+function buildMediaType(mimeType: string): 'IMAGE' | 'VIDEO' {
+  return mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE';
+}
+
 async function publishNow(): Promise<void> {
   isPublishing.value = true;
   errorMessage.value = '';
 
   try {
-    const result = await $fetch<{ postId: string }>(`${apiBaseUrl}/api/threads/publish`, {
-      method: 'POST',
-      credentials: 'include',
-      body: {
+    if (isMultiThread.value) {
+      const result = await $fetch<{ postIds: string[] }>(`${apiBaseUrl}/api/threads/publish-thread`, {
+        method: 'POST',
+        credentials: 'include',
+        body: { posts: props.posts, contentIdeaId: props.contentIdeaId },
+      });
+      emit('published', result.postIds[0]);
+    } else {
+      const publishBody: Record<string, unknown> = {
         text: props.text,
         contentIdeaId: props.contentIdeaId,
-      },
-    });
-    emit('published', result.postId);
+      };
+      if (attachedMedia.value) {
+        publishBody.mediaUrl = attachedMedia.value.url;
+        publishBody.mediaType = buildMediaType(attachedMedia.value.mimeType);
+      }
+      const result = await $fetch<{ postId: string }>(`${apiBaseUrl}/api/threads/publish`, {
+        method: 'POST',
+        credentials: 'include',
+        body: publishBody,
+      });
+      emit('published', result.postId);
+    }
   } catch (error: unknown) {
     const apiError = (error as { data?: { error?: string } })?.data?.error;
     errorMessage.value = apiError ?? 'Failed to publish. Please try again.';
@@ -216,17 +312,23 @@ async function schedulePost(): Promise<void> {
   try {
     const [year, month, day] = scheduleDateInput.value.split('-').map(Number);
     const [hours, minutes] = scheduleTimeInput.value.split(':').map(Number);
-    const scheduledAtLocal = new Date(year, month - 1, day, hours, minutes);
-    const isoString = scheduledAtLocal.toISOString();
+    const isoString = new Date(year, month - 1, day, hours, minutes).toISOString();
+
+    const scheduleBody: Record<string, unknown> = {
+      scheduledAt: isoString,
+      contentIdeaId: props.contentIdeaId,
+    };
+
+    if (isMultiThread.value) {
+      scheduleBody.posts = props.posts;
+    } else {
+      scheduleBody.text = props.text;
+    }
 
     await $fetch(`${apiBaseUrl}/api/threads/schedule`, {
       method: 'POST',
       credentials: 'include',
-      body: {
-        text: props.text,
-        scheduledAt: isoString,
-        contentIdeaId: props.contentIdeaId,
-      },
+      body: scheduleBody,
     });
 
     showSchedulePopover.value = false;
@@ -245,6 +347,12 @@ async function schedulePost(): Promise<void> {
 <style scoped>
 .threads-publish {
   display: contents;
+}
+
+.threads-publish__wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .threads-publish__no-account {
@@ -407,5 +515,121 @@ async function schedulePost(): Promise<void> {
   color: #ef4444;
   margin: 0;
   width: 100%;
+}
+
+/* ── Media attachment ── */
+.threads-publish__media {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.threads-publish__attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.375rem 0.75rem;
+  border: 1.5px dashed #c7c4d8;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #777587;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.threads-publish__attach-btn:hover {
+  border-color: #3525cd;
+  color: #3525cd;
+}
+
+.threads-publish__media-preview {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.threads-publish__media-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e0e3e5;
+}
+
+.threads-publish__media-video-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.625rem;
+  background: #191c1e;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.threads-publish__media-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #464555;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.threads-publish__media-remove:hover {
+  background: #ba1a1a;
+}
+
+.threads-publish__upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.threads-publish__progress-bar {
+  flex: 1;
+  height: 4px;
+  background: #e0e3e5;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.threads-publish__progress-fill {
+  height: 100%;
+  background: #3525cd;
+  border-radius: 9999px;
+  transition: width 0.2s;
+}
+
+.threads-publish__progress-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #464555;
+  white-space: nowrap;
+}
+
+.threads-publish__cancel-upload {
+  border: none;
+  background: none;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+}
+
+.threads-publish__cancel-upload:hover {
+  color: #ba1a1a;
 }
 </style>

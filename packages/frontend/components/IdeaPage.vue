@@ -134,6 +134,7 @@
                   <div v-if="index === editableThreadPosts.length - 1" class="threads-card__publish">
                     <ThreadsPublish
                       :text="threadsPublishText"
+                      :posts="threadsPublishPosts"
                       :content-idea-id="idea.id"
                       :publish-status="idea.publishStatus"
                       :scheduled-at="scheduledAt"
@@ -381,15 +382,18 @@ const isThreadsTextPost = computed(
   () => idea.value?.platform === 'threads' && idea.value?.format === 'text_post',
 );
 
+const threadsPublishPosts = computed((): string[] | null => {
+  if (!idea.value?.producedContent) return null;
+  const body = idea.value.producedContent.body as Record<string, unknown>;
+  if (Array.isArray(body.posts) && body.posts.length > 1) return body.posts as string[];
+  return null;
+});
+
 const threadsPublishText = computed((): string => {
   if (!idea.value?.producedContent) return '';
   const body = idea.value.producedContent.body as Record<string, unknown>;
-  if (Array.isArray(body.posts)) {
-    return (body.posts as string[]).join('\n\n');
-  }
-  if (typeof body.text === 'string') {
-    return body.text;
-  }
+  if (Array.isArray(body.posts)) return (body.posts as string[])[0] ?? '';
+  if (typeof body.text === 'string') return body.text;
   return '';
 });
 

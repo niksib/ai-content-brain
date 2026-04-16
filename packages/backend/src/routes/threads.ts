@@ -118,10 +118,17 @@ threadsRoutes.delete("/threads/account", requireAuth, async (context) => {
   return context.json({ success: true });
 });
 
-// POST /threads/publish — publish a single post immediately
+// POST /threads/publish — publish a single post immediately (text-only or with single media)
 threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
   const user = context.get("user");
-  const body = await context.req.json() as { text: string; contentIdeaId?: string };
+  const body = await context.req.json() as {
+    text: string;
+    contentIdeaId?: string;
+    mediaUrl?: string;
+    mediaType?: "IMAGE" | "VIDEO";
+    // Carousel: array of { mediaUrl, mediaType }
+    carouselItems?: Array<{ mediaUrl: string; mediaType: "IMAGE" | "VIDEO" }>;
+  };
 
   if (!body.text?.trim() || typeof body.text !== "string") {
     return context.json({ error: "text is required" }, 400);
@@ -129,6 +136,13 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
 
   if (body.text.length > 500) {
     return context.json({ error: "text must be 500 characters or fewer" }, 400);
+  }
+
+  const hasMedia = Boolean(body.mediaUrl && body.mediaType);
+  const hasCarousel = Array.isArray(body.carouselItems) && body.carouselItems.length >= 2;
+
+  if (hasCarousel && body.carouselItems!.length > 20) {
+    return context.json({ error: "Carousel supports 2–20 items" }, 400);
   }
 
   const account = await prisma.threadsAccount.findUnique({
@@ -144,11 +158,30 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
   }
 
   try {
-    const result = await threadsApiService.publishTextPost(
-      account.threadsUserId,
-      account.accessToken,
-      body.text
-    );
+    let result: { postId: string };
+
+    if (hasCarousel) {
+      result = await threadsApiService.publishCarousel(
+        account.threadsUserId,
+        account.accessToken,
+        body.text,
+        body.carouselItems!
+      );
+    } else if (hasMedia) {
+      result = await threadsApiService.publishSingleMediaPost(
+        account.threadsUserId,
+        account.accessToken,
+        body.text,
+        body.mediaType!,
+        body.mediaUrl!
+      );
+    } else {
+      result = await threadsApiService.publishTextPost(
+        account.threadsUserId,
+        account.accessToken,
+        body.text
+      );
+    }
 
     await prisma.threadsAccount.update({
       where: { id: account.id },

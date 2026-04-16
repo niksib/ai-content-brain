@@ -197,6 +197,155 @@ export class ThreadsApiService {
     return { postId: publishData.id };
   }
 
+  private async pollContainerStatus(
+    containerId: string,
+    accessToken: string,
+    maxAttempts = 30,
+    intervalMs = 10_000
+  ): Promise<void> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+
+      const statusUrl = new URL(`${THREADS_BASE_URL}/${containerId}`);
+      statusUrl.searchParams.set("fields", "status,error_message");
+      statusUrl.searchParams.set("access_token", accessToken);
+
+      const response = await fetch(statusUrl.toString());
+      if (!response.ok) continue;
+
+      const data = await response.json() as { status: string; error_message?: string };
+
+      if (data.status === "FINISHED") return;
+      if (data.status === "ERROR") {
+        throw new Error(`Media processing failed: ${data.error_message ?? "unknown error"}`);
+      }
+      // IN_PROGRESS or PUBLISHED_BUT_INVISIBLE → keep polling
+    }
+
+    throw new Error("Media container processing timed out after 5 minutes");
+  }
+
+  async publishSingleMediaPost(
+    threadsUserId: string,
+    accessToken: string,
+    text: string,
+    mediaType: "IMAGE" | "VIDEO",
+    mediaUrl: string
+  ): Promise<ThreadsPublishResult> {
+    const containerParams = new URLSearchParams({
+      media_type: mediaType,
+      text,
+      access_token: accessToken,
+    });
+    containerParams.set(mediaType === "IMAGE" ? "image_url" : "video_url", mediaUrl);
+
+    const containerResponse = await fetch(
+      `${THREADS_BASE_URL}/${threadsUserId}/threads`,
+      { method: "POST", body: containerParams }
+    );
+
+    if (!containerResponse.ok) {
+      const errorBody = await containerResponse.text().catch(() => "");
+      throw new Error(`Media container creation failed (${containerResponse.status}): ${errorBody}`);
+    }
+
+    const containerData = await containerResponse.json() as { id: string };
+
+    await this.pollContainerStatus(containerData.id, accessToken);
+
+    const publishParams = new URLSearchParams({
+      creation_id: containerData.id,
+      access_token: accessToken,
+    });
+
+    const publishResponse = await fetch(
+      `${THREADS_BASE_URL}/${threadsUserId}/threads_publish`,
+      { method: "POST", body: publishParams }
+    );
+
+    if (!publishResponse.ok) {
+      const errorBody = await publishResponse.text().catch(() => "");
+      throw new Error(`Media publish failed (${publishResponse.status}): ${errorBody}`);
+    }
+
+    const publishData = await publishResponse.json() as { id: string };
+    return { postId: publishData.id };
+  }
+
+  async publishCarousel(
+    threadsUserId: string,
+    accessToken: string,
+    text: string,
+    mediaItems: Array<{ mediaType: "IMAGE" | "VIDEO"; mediaUrl: string }>
+  ): Promise<ThreadsPublishResult> {
+    // Step 1: Create item containers
+    const itemContainerIds: string[] = [];
+
+    for (const item of mediaItems) {
+      const itemParams = new URLSearchParams({
+        media_type: item.mediaType,
+        is_carousel_item: "true",
+        access_token: accessToken,
+      });
+      itemParams.set(item.mediaType === "IMAGE" ? "image_url" : "video_url", item.mediaUrl);
+
+      const itemResponse = await fetch(
+        `${THREADS_BASE_URL}/${threadsUserId}/threads`,
+        { method: "POST", body: itemParams }
+      );
+
+      if (!itemResponse.ok) {
+        const errorBody = await itemResponse.text().catch(() => "");
+        throw new Error(`Carousel item container creation failed (${itemResponse.status}): ${errorBody}`);
+      }
+
+      const itemData = await itemResponse.json() as { id: string };
+      itemContainerIds.push(itemData.id);
+    }
+
+    // Step 2: Create carousel container
+    const carouselParams = new URLSearchParams({
+      media_type: "CAROUSEL",
+      children: itemContainerIds.join(","),
+      text,
+      access_token: accessToken,
+    });
+
+    const carouselResponse = await fetch(
+      `${THREADS_BASE_URL}/${threadsUserId}/threads`,
+      { method: "POST", body: carouselParams }
+    );
+
+    if (!carouselResponse.ok) {
+      const errorBody = await carouselResponse.text().catch(() => "");
+      throw new Error(`Carousel container creation failed (${carouselResponse.status}): ${errorBody}`);
+    }
+
+    const carouselData = await carouselResponse.json() as { id: string };
+
+    // Step 3: Poll until ready
+    await this.pollContainerStatus(carouselData.id, accessToken);
+
+    // Step 4: Publish
+    const publishParams = new URLSearchParams({
+      creation_id: carouselData.id,
+      access_token: accessToken,
+    });
+
+    const publishResponse = await fetch(
+      `${THREADS_BASE_URL}/${threadsUserId}/threads_publish`,
+      { method: "POST", body: publishParams }
+    );
+
+    if (!publishResponse.ok) {
+      const errorBody = await publishResponse.text().catch(() => "");
+      throw new Error(`Carousel publish failed (${publishResponse.status}): ${errorBody}`);
+    }
+
+    const publishData = await publishResponse.json() as { id: string };
+    return { postId: publishData.id };
+  }
+
   async publishThreadChain(
     threadsUserId: string,
     accessToken: string,
