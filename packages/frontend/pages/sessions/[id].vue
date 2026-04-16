@@ -925,6 +925,9 @@ onMounted(async () => {
   flex-direction: column;
   gap: 0.375rem;
   flex: 1;
+  /* Allow the body (flex child) to shrink below content size so long words
+     inside bubbles wrap instead of forcing horizontal scroll on the parent. */
+  min-width: 0;
 }
 
 .transcript-msg__label {
@@ -943,6 +946,10 @@ onMounted(async () => {
   font-size: 0.875rem;
   line-height: 1.6;
   color: #191c1e;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .transcript-msg__bubble--user {

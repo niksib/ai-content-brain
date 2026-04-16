@@ -475,7 +475,6 @@ const daysInMonth = computed(() => {
 <style scoped>
 /* ─── Page wrapper ─── */
 .dashboard {
-  max-width: 1400px;
   margin: 0 auto;
   padding: 2.5rem 2rem 4rem;
   display: flex;

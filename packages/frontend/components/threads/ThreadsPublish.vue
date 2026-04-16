@@ -12,58 +12,10 @@
 
     <!-- Publish / Schedule actions -->
     <div v-else class="threads-publish__wrapper">
-      <!-- Media attachment area — single-post only; multi-thread posts attach
-           media per-post in the parent IdeaPage timeline. -->
-      <div v-if="!isMultiThread" class="threads-publish__media">
-        <!-- Attached file preview -->
-        <div v-if="attachedMedia" class="threads-publish__media-preview">
-          <img
-            v-if="attachedMedia.mimeType.startsWith('image/')"
-            :src="attachedMedia.url"
-            class="threads-publish__media-thumb"
-            alt="attached media"
-          />
-          <div v-else class="threads-publish__media-video-badge">
-            <span class="material-symbols-outlined" style="font-size:16px;">videocam</span>
-            <span>{{ attachedMedia.mimeType.includes('mp4') ? 'MP4' : 'MOV' }}</span>
-          </div>
-          <button
-            type="button"
-            class="threads-publish__media-remove"
-            title="Remove media"
-            @click="removeMedia"
-          >
-            <span class="material-symbols-outlined" style="font-size:14px;">close</span>
-          </button>
-        </div>
-
-        <!-- Upload progress -->
-        <div v-else-if="isUploading" class="threads-publish__upload-progress">
-          <div class="threads-publish__progress-bar">
-            <div class="threads-publish__progress-fill" :style="{ width: `${progress}%` }" />
-          </div>
-          <span class="threads-publish__progress-label">{{ progress }}%</span>
-          <button type="button" class="threads-publish__cancel-upload" @click="cancel()">Cancel</button>
-        </div>
-
-        <!-- Attach button -->
-        <label v-else class="threads-publish__attach-btn">
-          <span class="material-symbols-outlined" style="font-size:16px;">add_photo_alternate</span>
-          Add media
-          <input
-            ref="fileInputEl"
-            type="file"
-            accept="image/jpeg,image/png,video/mp4,video/quicktime"
-            style="display:none"
-            @change="onFileSelected"
-          />
-        </label>
-      </div>
-
       <div class="threads-publish__actions">
         <button
           class="threads-publish__btn threads-publish__btn--primary"
-          :disabled="isPublishing || !text || isUploading"
+          :disabled="isPublishing || !text"
           @click="publishNow"
         >
           <span v-if="isPublishing">Publishing...</span>
@@ -77,7 +29,6 @@
             v-if="publishStatus !== 'scheduled'"
             ref="scheduleButtonEl"
             class="threads-publish__btn threads-publish__btn--secondary"
-            :disabled="isUploading"
             @click.stop="togglePopover"
           >
             Schedule
@@ -146,7 +97,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useMediaUpload, type UploadedMediaFile } from '~/composables/useMediaUpload';
 
 const props = defineProps<{
   text: string;
@@ -175,10 +125,6 @@ const scheduleWrapEl = ref<HTMLElement | null>(null);
 const scheduleButtonEl = ref<HTMLElement | null>(null);
 const popoverEl = ref<HTMLElement | null>(null);
 const popoverStyle = ref<Record<string, string>>({});
-const fileInputEl = ref<HTMLInputElement | null>(null);
-const attachedMedia = ref<UploadedMediaFile | null>(null);
-
-const { isUploading, progress, upload, cancel } = useMediaUpload();
 
 const minDate = computed(() => {
   const now = new Date();
@@ -205,26 +151,6 @@ const scheduledDisplayText = computed(() => {
 
 const config = useRuntimeConfig();
 const apiBaseUrl = config.public.apiBaseUrl as string;
-
-function removeMedia(): void {
-  attachedMedia.value = null;
-  if (fileInputEl.value) fileInputEl.value.value = '';
-}
-
-async function onFileSelected(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-
-  errorMessage.value = '';
-  const result = await upload(file);
-  if (result) {
-    attachedMedia.value = result;
-  } else {
-    // error is exposed from composable; surface it here too
-    errorMessage.value = 'Media upload failed. Please try again.';
-  }
-}
 
 function togglePopover(): void {
   showSchedulePopover.value = !showSchedulePopover.value;
@@ -265,10 +191,6 @@ onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick);
 });
 
-function buildMediaType(mimeType: string): 'IMAGE' | 'VIDEO' {
-  return mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE';
-}
-
 function buildThreadPayload() {
   return (props.posts ?? []).map((text, index) => {
     const media = props.postsMedia?.[index];
@@ -296,9 +218,10 @@ async function publishNow(): Promise<void> {
         text: props.text,
         contentIdeaId: props.contentIdeaId,
       };
-      if (attachedMedia.value) {
-        publishBody.mediaUrl = attachedMedia.value.url;
-        publishBody.mediaType = buildMediaType(attachedMedia.value.mimeType);
+      const singleMedia = props.postsMedia?.[0];
+      if (singleMedia) {
+        publishBody.mediaUrl = singleMedia.mediaUrl;
+        publishBody.mediaType = singleMedia.mediaType;
       }
       const result = await $fetch<{ postId: string }>(`${apiBaseUrl}/api/threads/publish`, {
         method: 'POST',
@@ -529,119 +452,7 @@ async function schedulePost(): Promise<void> {
   width: 100%;
 }
 
-/* ── Media attachment ── */
-.threads-publish__media {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
 
-.threads-publish__attach-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.375rem 0.75rem;
-  border: 1.5px dashed #c7c4d8;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #777587;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-.threads-publish__attach-btn:hover {
-  border-color: #3525cd;
-  color: #3525cd;
-}
-
-.threads-publish__media-preview {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.threads-publish__media-thumb {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid #e0e3e5;
-}
-
-.threads-publish__media-video-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.375rem 0.625rem;
-  background: #191c1e;
-  color: #fff;
-  border-radius: 6px;
-  font-size: 0.6875rem;
-  font-weight: 700;
-}
-
-.threads-publish__media-remove {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #464555;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
-}
-
-.threads-publish__media-remove:hover {
-  background: #ba1a1a;
-}
-
-.threads-publish__upload-progress {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-}
-
-.threads-publish__progress-bar {
-  flex: 1;
-  height: 4px;
-  background: #e0e3e5;
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.threads-publish__progress-fill {
-  height: 100%;
-  background: #3525cd;
-  border-radius: 9999px;
-  transition: width 0.2s;
-}
-
-.threads-publish__progress-label {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  color: #464555;
-  white-space: nowrap;
-}
-
-.threads-publish__cancel-upload {
-  border: none;
-  background: none;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: #9ca3af;
-  cursor: pointer;
-  padding: 0;
-}
-
-.threads-publish__cancel-upload:hover {
-  color: #ba1a1a;
-}
+/* Media attach / preview lives in the parent IdeaPage timeline — this
+   component no longer renders attach UI; it only reads props.postsMedia. */
 </style>

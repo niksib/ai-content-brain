@@ -1485,6 +1485,7 @@ onMounted(async () => {
 /* ─── Image recommendation ─── */
 .idea-page__image-suggestion {
   margin-top: 1rem;
+  margin-bottom: 1.5rem;
   padding: 0.875rem 1rem;
   background: rgba(79, 70, 229, 0.04);
   border: 1px solid rgba(79, 70, 229, 0.14);
