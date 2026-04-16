@@ -2,10 +2,10 @@
   <div class="dashboard">
     <!-- ── Greeting & AI Command Bar ── -->
     <div class="dashboard__hero">
-      <div class="dashboard__greeting">
-        <p class="dashboard__greeting-label">{{ greetingLabel }}</p>
-        <h1 class="dashboard__greeting-title">{{ greetingName ? `${greetingPhrase}, ${greetingName}!` : 'Ready to curate today?' }}</h1>
-      </div>
+      <PageTitle
+        :label="greetingLabel"
+        :title="greetingName ? `${greetingPhrase}, ${greetingName}!` : 'Ready to curate today?'"
+      />
 
       <!-- Ask AI bar hidden per design -->
       <!-- <div class="command-bar-wrap">
@@ -241,6 +241,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useDashboardStore, type CalendarSession } from '~/stores/dashboard';
 import { useBillingStore } from '~/stores/billing';
 import { useProfileStore } from '~/stores/profile';
+import PageTitle from '~/components/PageTitle.vue';
 
 interface ThreadsAccount {
   id: string;

@@ -158,12 +158,15 @@
                 {{ isMicRecording ? 'stop_circle' : 'mic' }}
               </span>
             </button>
-            <input
+            <textarea
+              ref="chatInputEl"
               v-model="chatInputText"
               class="transcript-input__field"
               placeholder="Add a thought or request..."
-              type="text"
-              @keydown.enter="submitChatInput"
+              rows="1"
+              @input="autoResizeChatInput"
+              @keydown.enter.exact.prevent="submitChatInput"
+              @keydown.enter.shift.exact="onShiftEnter"
             />
             <button
               class="transcript-input__send"
@@ -405,6 +408,27 @@ const isInitializing = ref(true);
 const messagesContainerRef = ref<HTMLElement | null>(null);
 const isUserRecording = ref(false);
 const chatInputText = ref('');
+const chatInputEl = ref<HTMLTextAreaElement | null>(null);
+
+const CHAT_INPUT_MAX_HEIGHT = 180;
+
+function autoResizeChatInput(): void {
+  const el = chatInputEl.value;
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${Math.min(el.scrollHeight, CHAT_INPUT_MAX_HEIGHT)}px`;
+}
+
+function onShiftEnter(): void {
+  nextTick(autoResizeChatInput);
+}
+
+function resetChatInput(): void {
+  chatInputText.value = '';
+  nextTick(() => {
+    if (chatInputEl.value) chatInputEl.value.style.height = 'auto';
+  });
+}
 
 // ─── Voice recorder (mic button in chat panel) ───
 const { isRecording: isMicRecording, audioBlob: micAudioBlob, startRecording: startMicRecording, stopRecording: stopMicRecording } = useVoiceRecorder();
@@ -432,7 +456,18 @@ watch(micAudioBlob, async (blob) => {
       credentials: 'include',
       signal: transcriptionAbort.signal,
     });
-    chatInputText.value = response.transcript;
+    const transcript = response.transcript.trim();
+    if (!transcript) return;
+
+    // Auto-send voice messages straight from recording — no manual confirmation step
+    if (store.isStreaming) {
+      // If another response is streaming, fall back to filling the field so the user can send manually
+      chatInputText.value = transcript;
+      nextTick(autoResizeChatInput);
+      return;
+    }
+    resetChatInput();
+    await store.sendMessage(transcript);
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') return;
     console.warn('[voice] Transcription failed:', err);
@@ -457,7 +492,7 @@ async function handleSubmit(text: string) {
 async function submitChatInput() {
   if (!chatInputText.value.trim() || store.isStreaming) return;
   const text = chatInputText.value.trim();
-  chatInputText.value = '';
+  resetChatInput();
   await store.sendMessage(text);
 }
 
@@ -511,7 +546,7 @@ onMounted(async () => {
 /* ─── Page wrapper ─── */
 .session-page {
   position: relative;
-  height: calc(100vh - 72px);
+  height: 100vh;
   overflow: hidden;
   font-family: 'Inter', sans-serif;
 }
@@ -1038,9 +1073,9 @@ onMounted(async () => {
   flex-shrink: 0;
   margin: 0.75rem 1rem;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.75rem;
-  padding: 0.875rem 1rem;
+  padding: 0.75rem 1rem;
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -1085,10 +1120,25 @@ onMounted(async () => {
   font-weight: 500;
   color: #191c1e;
   font-family: 'Inter', sans-serif;
+  resize: none;
+  line-height: 1.5;
+  min-height: 28px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 0.25rem 0;
 }
 
 .transcript-input__field::placeholder {
   color: rgba(70, 69, 85, 0.4);
+}
+
+.transcript-input__field::-webkit-scrollbar {
+  width: 3px;
+}
+
+.transcript-input__field::-webkit-scrollbar-thumb {
+  background: #c7c4d8;
+  border-radius: 10px;
 }
 
 .transcript-input__send {

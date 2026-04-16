@@ -2,14 +2,9 @@
   <div class="bg-background font-body text-on-surface flex min-h-screen">
     <!-- Sidebar -->
     <aside class="h-screen w-64 border-r border-slate-200 bg-slate-100 flex flex-col py-6 shrink-0 sticky top-0">
-      <NuxtLink to="/dashboard" class="px-6 mb-8 flex items-center gap-3 no-underline">
-        <div class="w-10 h-10 rounded-xl btn-primary-gradient flex items-center justify-center text-white">
-          <span class="material-symbols-outlined">auto_awesome</span>
-        </div>
-        <div>
-          <h1 class="text-lg font-bold text-slate-900 font-headline leading-tight">Postrr Studio</h1>
-          <p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Creator Suite</p>
-        </div>
+      <NuxtLink to="/dashboard" class="px-6 mb-8 flex items-center gap-2 no-underline">
+        <img src="~/assets/waving-hand.svg" class="w-9 h-9 block shrink-0" alt="" />
+        <span class="brand-wordmark">Postrr</span>
       </NuxtLink>
 
       <nav class="flex-1 space-y-1">
@@ -163,4 +158,15 @@ onMounted(() => {
 }
 
 .no-underline { text-decoration: none; }
+
+.brand-wordmark {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #4F46E5, #9333ea);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 </style>

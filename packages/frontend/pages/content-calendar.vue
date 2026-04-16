@@ -1,5 +1,11 @@
 <template>
   <div class="pub-page">
+    <PageTitle
+      label="Calendar"
+      title="Content Calendar"
+      subtitle="Everything you've drafted, scheduled, and shipped — in one view."
+    />
+
     <div v-if="store.isLoading" class="pub-page__loading">Loading...</div>
 
     <PublishingCalendar
@@ -17,6 +23,7 @@
 import { ref, onMounted } from 'vue';
 import { useLibraryStore, type LibraryItem } from '~/stores/library';
 import PublishingCalendar from '~/components/PublishingCalendar.vue';
+import PageTitle from '~/components/PageTitle.vue';
 
 definePageMeta({ layout: 'default' });
 
@@ -46,6 +53,9 @@ onMounted(() => store.loadLibrary());
   max-width: 1400px;
   margin: 0 auto;
   padding: 2.5rem 2rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 
 .pub-page__loading {
