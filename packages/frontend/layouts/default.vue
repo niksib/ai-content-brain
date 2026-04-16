@@ -35,22 +35,22 @@
         </NuxtLink>
       </nav>
 
-      <div class="mt-auto space-y-1">
+      <div class="mt-auto px-2 space-y-1">
         <button
-          class="w-full flex items-center gap-3 py-2.5 px-4 text-slate-600 mx-2 hover:bg-slate-200/50 rounded-lg transition-all text-left"
+          class="w-full flex items-center gap-3 py-2.5 px-4 text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all text-left"
           @click="handleLogout"
         >
           <span class="material-symbols-outlined">logout</span>
           <span class="font-medium">Logout</span>
         </button>
         <NuxtLink
-          to="/profile"
-          class="px-6 mt-6 flex items-center gap-3 border-t border-slate-200 pt-6 no-underline hover:bg-slate-200/30 -mx-2 px-8 py-3"
+          to="/settings"
+          class="mt-4 flex items-center gap-3 border-t border-slate-200 pt-4 px-4 py-3 rounded-lg no-underline hover:bg-slate-200/40 transition-colors"
         >
           <div class="w-8 h-8 rounded-full overflow-hidden bg-indigo-100 flex items-center justify-center shrink-0">
             <span class="text-xs font-bold text-indigo-700">{{ userInitials }}</span>
           </div>
-          <div class="overflow-hidden">
+          <div class="overflow-hidden min-w-0">
             <p class="text-xs font-bold truncate text-slate-900">{{ profileStore.userName || 'You' }}</p>
             <p class="text-[10px] text-on-surface-variant truncate">{{ profileStore.userEmail }}</p>
           </div>
@@ -87,11 +87,9 @@ interface NavLink {
 }
 
 const navLinks: NavLink[] = [
-  { to: '/dashboard', label: 'Home', icon: 'grid_view' },
-  { to: '/content-calendar', label: 'Schedule', icon: 'calendar_today' },
-  { to: '/dashboard-v2', label: 'Studio', icon: 'dashboard_customize' },
-  { to: '/pricing', label: 'Monetization', icon: 'payments' },
-  { to: '/profile', label: 'Profile', icon: 'person' },
+  { to: '/dashboard', label: 'Dashboard', icon: 'grid_view' },
+  { to: '/content-calendar', label: 'Content Calendar', icon: 'calendar_today' },
+  { to: '/creator-profile', label: 'Creator Profile', icon: 'person' },
 ];
 
 function isActive(targetPath: string): boolean {
@@ -161,7 +159,7 @@ onMounted(() => {
 
 .brand-wordmark {
   font-family: 'Manrope', sans-serif;
-  font-size: 1.5rem;
+  font-size: 2rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   background: linear-gradient(135deg, #4F46E5, #9333ea);

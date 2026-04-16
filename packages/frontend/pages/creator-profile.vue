@@ -1,66 +1,33 @@
 <template>
-  <div class="profile-page">
+  <div class="creator-profile-page">
 
-    <!-- ── Row 1: Connected Platforms + Subscription ── -->
-    <div class="profile-row profile-row--top">
-
-      <!-- Connected Platforms -->
-      <section class="profile-section profile-section--platforms">
-        <h2 class="section-title">Connected Platforms</h2>
-        <p class="section-subtitle">Connect your social accounts to publish and schedule posts directly from the workspace.</p>
-        <div class="platforms-list">
-          <div
-            v-for="platform in ALL_PLATFORMS"
-            :key="platform"
-            class="platform-row"
-            :class="`platform-row--${platform}`"
-          >
-            <div class="platform-row__left">
-              <div class="platform-row__icon-wrap" :class="`platform-row__icon-wrap--${platform}`">
-                <PlatformIcon :platform="platform" />
-              </div>
-              <span class="platform-row__name">{{ PLATFORM_NAMES[platform] }}</span>
-              <span v-if="isActivePlatform(platform)" class="platform-badge">Active</span>
+    <!-- Connected Platforms -->
+    <section class="profile-section">
+      <h2 class="section-title">Connected Platforms</h2>
+      <p class="section-subtitle">Connect your social accounts to publish and schedule posts directly from the workspace.</p>
+      <div class="platforms-list">
+        <div
+          v-for="platform in ALL_PLATFORMS"
+          :key="platform"
+          class="platform-row"
+          :class="`platform-row--${platform}`"
+        >
+          <div class="platform-row__left">
+            <div class="platform-row__icon-wrap" :class="`platform-row__icon-wrap--${platform}`">
+              <PlatformIcon :platform="platform" />
             </div>
-            <div class="platform-row__right">
-              <ThreadsConnect v-if="platform === 'threads'" />
-              <button v-else class="platform-card__connect-btn" type="button" disabled>Connect</button>
-            </div>
+            <span class="platform-row__name">{{ PLATFORM_NAMES[platform] }}</span>
+            <span v-if="isActivePlatform(platform)" class="platform-badge">Active</span>
+          </div>
+          <div class="platform-row__right">
+            <ThreadsConnect v-if="platform === 'threads'" />
+            <button v-else class="platform-card__connect-btn" type="button" disabled>Connect</button>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- Subscription -->
-      <section class="profile-section profile-section--subscription">
-        <h2 class="section-title">Subscription</h2>
-        <div class="info-row">
-          <span class="info-label">Plan</span>
-          <span class="info-value">Free (Beta)</span>
-        </div>
-        <div class="credits-progress-wrap">
-          <div class="credits-progress__header">
-            <span class="info-label">Credits Used</span>
-            <span class="credits-progress__stat">{{ creditsUsedPercent }}%</span>
-          </div>
-          <div class="credits-progress__bar">
-            <div
-              class="credits-progress__fill"
-              :style="{ width: creditsUsedPercent + '%' }"
-            ></div>
-          </div>
-        </div>
-        <div class="placeholder-actions">
-          <button type="button" class="btn btn--primary" @click="handleBuyCredits">
-            Buy Credits
-          </button>
-        </div>
-        <p v-if="billingStatus === 'success'" class="save-message">Payment successful! Credits have been added.</p>
-        <p v-if="billingStatus === 'cancel'" class="save-message save-message--error">Payment was cancelled.</p>
-      </section>
-
-    </div>
-
-    <!-- ── Row 2: Creator Profile ── -->
+    <!-- Creator Profile form -->
     <section class="profile-section">
       <h2 class="section-title">Creator Profile</h2>
 
@@ -72,7 +39,6 @@
       </div>
 
       <form v-else class="profile-form" @submit.prevent="handleSave">
-        <!-- Platforms -->
         <div class="form-group">
           <label class="form-label">Platforms</label>
           <div class="chip-selector">
@@ -89,7 +55,6 @@
           </div>
         </div>
 
-        <!-- Niche -->
         <div class="form-group">
           <label class="form-label" for="niche">Niche</label>
           <input
@@ -101,7 +66,6 @@
           />
         </div>
 
-        <!-- Topics -->
         <div class="form-group">
           <label class="form-label">Topics</label>
           <div class="tag-input-wrapper">
@@ -121,7 +85,6 @@
           </div>
         </div>
 
-        <!-- Audience Description -->
         <div class="form-group">
           <label class="form-label" for="audienceDescription">Audience Description</label>
           <textarea
@@ -133,7 +96,6 @@
           />
         </div>
 
-        <!-- Audience Pain Points -->
         <div class="form-group">
           <label class="form-label" for="audiencePainPoints">Audience Pain Points</label>
           <textarea
@@ -145,7 +107,6 @@
           />
         </div>
 
-        <!-- Stage -->
         <div class="form-group">
           <label class="form-label" for="stage">Stage</label>
           <select id="stage" v-model="form.stage" class="form-select">
@@ -155,7 +116,6 @@
           </select>
         </div>
 
-        <!-- Content Language -->
         <div class="form-group">
           <label class="form-label">Content Language</label>
           <div class="chip-selector">
@@ -172,7 +132,6 @@
           </div>
         </div>
 
-        <!-- Tone of Voice -->
         <div class="form-group">
           <label class="form-label" for="toneOfVoice">Tone of Voice</label>
           <textarea
@@ -184,7 +143,6 @@
           />
         </div>
 
-        <!-- Goals -->
         <div class="form-group">
           <label class="form-label">Goals</label>
           <div class="tag-input-wrapper">
@@ -213,121 +171,20 @@
         </p>
       </form>
     </section>
-
-    <!-- ── Row 3: Account ── -->
-    <section class="profile-section">
-      <h2 class="section-title">Account</h2>
-
-      <div class="info-row">
-        <span class="info-label">Email</span>
-        <span class="info-value">{{ profileStore.userEmail || '---' }}</span>
-      </div>
-
-      <!-- Change Password -->
-      <div class="account-action">
-        <div class="account-action__header">
-          <div>
-            <p class="account-action__title">Password</p>
-            <p class="account-action__desc">Update your account password</p>
-          </div>
-          <button
-            type="button"
-            class="btn btn--secondary"
-            @click="showPasswordForm = !showPasswordForm"
-          >
-            {{ showPasswordForm ? 'Cancel' : 'Change Password' }}
-          </button>
-        </div>
-
-        <form v-if="showPasswordForm" class="account-subform" @submit.prevent="handleChangePassword">
-          <div class="form-group">
-            <label class="form-label" for="currentPassword">Current Password</label>
-            <input
-              id="currentPassword"
-              v-model="passwordForm.current"
-              type="password"
-              class="form-input"
-              autocomplete="current-password"
-              placeholder="Enter current password"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="newPassword">New Password</label>
-            <input
-              id="newPassword"
-              v-model="passwordForm.next"
-              type="password"
-              class="form-input"
-              autocomplete="new-password"
-              placeholder="At least 8 characters"
-              minlength="8"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="confirmPassword">Confirm New Password</label>
-            <input
-              id="confirmPassword"
-              v-model="passwordForm.confirm"
-              type="password"
-              class="form-input"
-              autocomplete="new-password"
-              placeholder="Repeat new password"
-              required
-            />
-          </div>
-          <p v-if="passwordError" class="save-message save-message--error">{{ passwordError }}</p>
-          <p v-if="passwordSuccess" class="save-message">{{ passwordSuccess }}</p>
-          <button
-            type="submit"
-            class="btn btn--primary"
-            :disabled="isChangingPassword"
-          >
-            {{ isChangingPassword ? 'Saving...' : 'Save New Password' }}
-          </button>
-        </form>
-      </div>
-
-      <!-- Delete Account -->
-      <div class="account-action account-action--danger">
-        <div class="account-action__header">
-          <div>
-            <p class="account-action__title account-action__title--danger">Delete Account</p>
-            <p class="account-action__desc">Permanently delete your account and all data</p>
-          </div>
-          <button
-            type="button"
-            class="btn btn--danger"
-            :disabled="isDeletingAccount"
-            @click="handleDeleteAccount"
-          >
-            {{ isDeletingAccount ? 'Deleting...' : 'Delete Account' }}
-          </button>
-        </div>
-        <p v-if="deleteError" class="save-message save-message--error">{{ deleteError }}</p>
-      </div>
-    </section>
-
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted, computed } from 'vue';
+import { ref, reactive, watch, onMounted } from 'vue';
 import { useProfileStore, type ProfileUpdateData } from '~/stores/profile';
-import { useBillingStore } from '~/stores/billing';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 import ThreadsConnect from '~/components/threads/ThreadsConnect.vue';
-
-const config = useRuntimeConfig();
-const router = useRouter();
 
 definePageMeta({
   layout: 'default',
 });
 
 const profileStore = useProfileStore();
-const billingStore = useBillingStore();
 
 const ALL_PLATFORMS = ['threads', 'linkedin', 'tiktok', 'instagram'] as const;
 type Platform = (typeof ALL_PLATFORMS)[number];
@@ -339,19 +196,9 @@ const PLATFORM_NAMES: Record<Platform, string> = {
   instagram: 'Instagram',
 };
 
-
 function isActivePlatform(platform: Platform): boolean {
   return (form.platforms as string[]).includes(platform);
 }
-
-const PLAN_MAX_CREDITS = 500;
-const creditsUsedPercent = computed(() => {
-  const used = PLAN_MAX_CREDITS - billingStore.balance;
-  return Math.max(0, Math.min(100, Math.round((used / PLAN_MAX_CREDITS) * 100)));
-});
-
-const route = useRoute();
-const billingStatus = computed(() => route.query.billing as string | undefined);
 
 const LANGUAGES = ['Russian', 'English', 'Ukrainian', 'Spanish', 'German', 'French', 'Other'];
 
@@ -371,17 +218,6 @@ const newTopic = ref('');
 const newGoal = ref('');
 const saveMessage = ref('');
 const saveError = ref(false);
-
-// ── Change Password ──
-const showPasswordForm = ref(false);
-const isChangingPassword = ref(false);
-const passwordError = ref('');
-const passwordSuccess = ref('');
-const passwordForm = reactive({ current: '', next: '', confirm: '' });
-
-// ── Delete Account ──
-const isDeletingAccount = ref(false);
-const deleteError = ref('');
 
 function populateForm() {
   const profile = profileStore.profile;
@@ -458,84 +294,14 @@ async function handleSave() {
   }
 }
 
-function handleBuyCredits() {
-  billingStore.createCheckout('price_credits_500', 'payment');
-}
-
-async function handleChangePassword() {
-  passwordError.value = '';
-  passwordSuccess.value = '';
-
-  if (passwordForm.next !== passwordForm.confirm) {
-    passwordError.value = 'New passwords do not match.';
-    return;
-  }
-  if (passwordForm.next.length < 8) {
-    passwordError.value = 'New password must be at least 8 characters.';
-    return;
-  }
-
-  isChangingPassword.value = true;
-  try {
-    await $fetch(`${config.public.apiBaseUrl}/api/auth/change-password`, {
-      method: 'POST',
-      credentials: 'include',
-      body: {
-        currentPassword: passwordForm.current,
-        newPassword: passwordForm.next,
-      },
-    });
-    passwordSuccess.value = 'Password updated successfully.';
-    passwordForm.current = '';
-    passwordForm.next = '';
-    passwordForm.confirm = '';
-    setTimeout(() => {
-      showPasswordForm.value = false;
-      passwordSuccess.value = '';
-    }, 2000);
-  } catch (error: unknown) {
-    const apiError = error as { data?: { message?: string } };
-    passwordError.value = apiError?.data?.message ?? 'Failed to change password. Check your current password and try again.';
-  } finally {
-    isChangingPassword.value = false;
-  }
-}
-
-async function handleDeleteAccount() {
-  const confirmed = confirm(
-    'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.'
-  );
-  if (!confirmed) return;
-
-  deleteError.value = '';
-  isDeletingAccount.value = true;
-  try {
-    await $fetch(`${config.public.apiBaseUrl}/api/auth/delete-user`, {
-      method: 'POST',
-      credentials: 'include',
-    });
-    const isAuthenticated = useState<boolean | null>('auth:authenticated');
-    isAuthenticated.value = false;
-    router.replace('/');
-  } catch (error: unknown) {
-    const apiError = error as { data?: { message?: string } };
-    deleteError.value = apiError?.data?.message ?? 'Failed to delete account. Please try again.';
-  } finally {
-    isDeletingAccount.value = false;
-  }
-}
-
 onMounted(async () => {
-  await Promise.all([
-    profileStore.loadProfile(),
-    billingStore.loadBalance(),
-  ]);
+  await profileStore.loadProfile();
   populateForm();
 });
 </script>
 
 <style scoped>
-.profile-page {
+.creator-profile-page {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2.5rem 2rem 4rem;
@@ -544,21 +310,6 @@ onMounted(async () => {
   gap: 1.5rem;
 }
 
-/* ── Row 1: Platforms + Subscription ── */
-.profile-row--top {
-  display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 1.5rem;
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .profile-row--top {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ── Section base ── */
 .profile-section {
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -579,7 +330,6 @@ onMounted(async () => {
   margin: 0 0 1.25rem;
 }
 
-/* ── Connected Platforms ── */
 .platforms-list {
   display: flex;
   flex-direction: column;
@@ -675,68 +425,7 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-/* ── Subscription ── */
-.profile-section--subscription {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.375rem 0;
-}
-
-.info-row + .info-row {
-  border-top: 1px solid #f3f4f6;
-}
-
-.info-label {
-  font-size: 0.875rem;
-  color: #6b7280;
-}
-
-.info-value {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #111827;
-}
-
-.credits-progress-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.credits-progress__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.credits-progress__stat {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: #6366f1;
-}
-
-.credits-progress__bar {
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.credits-progress__fill {
-  height: 100%;
-  background: linear-gradient(90deg, #6366f1, #818cf8);
-  border-radius: 9999px;
-  transition: width 0.4s ease;
-}
-
-/* ── Creator Profile form ── */
+/* Form */
 .loading-state,
 .empty-state {
   color: #6b7280;
@@ -850,7 +539,6 @@ onMounted(async () => {
   color: #ef4444;
 }
 
-/* ── Buttons ── */
 .btn {
   padding: 0.5rem 1rem;
   border: none;
@@ -875,22 +563,6 @@ onMounted(async () => {
   background: #4f46e5;
 }
 
-.btn--secondary {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.btn--danger {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-}
-
-.placeholder-actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
 .save-message {
   font-size: 0.8125rem;
   color: #059669;
@@ -899,52 +571,5 @@ onMounted(async () => {
 
 .save-message--error {
   color: #dc2626;
-}
-
-/* ── Account actions ── */
-.account-action {
-  border-top: 1px solid #f3f4f6;
-  padding-top: 1.25rem;
-  margin-top: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.account-action--danger {
-  border-top-color: #fee2e2;
-}
-
-.account-action__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.account-action__title {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #111827;
-  margin-bottom: 0.125rem;
-}
-
-.account-action__title--danger {
-  color: #dc2626;
-}
-
-.account-action__desc {
-  font-size: 0.8125rem;
-  color: #9ca3af;
-}
-
-.account-subform {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1.25rem;
-  background: #f9fafb;
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
 }
 </style>

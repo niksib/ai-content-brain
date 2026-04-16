@@ -262,8 +262,7 @@ function nextMonth(): void {
 .calendar-grid-header {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  border-bottom: 1px solid rgba(199, 196, 216, 0.2);
-  margin-bottom: 0;
+  margin-bottom: 0.25rem;
 }
 
 .calendar-day-name {
