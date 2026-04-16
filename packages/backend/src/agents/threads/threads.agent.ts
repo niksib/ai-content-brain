@@ -110,6 +110,21 @@ After drafting, count the characters in your post:
 
 Never truncate mid-thought. Never number posts ("1/3"). Never exceed 500 chars in any single post.
 
+**IMAGE SUGGESTION — always include:**
+Posts with a photo get 60% higher engagement on Threads. After writing the text, decide what visual would make this post land harder — and include an imageSuggestion in the body.
+
+Choose the type that fits the post:
+- **real_photo** — an authentic photo the creator should take or already has: workspace, product in hand, a real moment, a person, an event
+- **screenshot** — a screen capture: product UI, analytics dashboard, a result, a conversation, an app screen
+- **illustration** — an AI-generated image or designed graphic: abstract concepts, metaphors, visual comparisons that don't exist in real life
+- **collage** — multiple images combined: brand logos side by side, before/after, a grid of examples
+
+The brief must be specific and actionable — not "add a relevant photo", but exactly what to shoot or create and why it supports the post:
+- Bad: "A photo related to the post topic"
+- Good: "Real photo of your desk setup with your laptop and coffee — shows the authentic work-from-home context the post is about"
+- Good: "Screenshot of your product's onboarding screen — the reader just read a claim about it, now show them proof"
+- Good: "Collage of Apple and Google logos side by side — the post is literally comparing them, make it visual"
+
 ${SELF_CRITIQUE}
 
 When done, call save_produced_content with:
@@ -117,7 +132,8 @@ When done, call save_produced_content with:
 - userId: the CURRENT USER ID from your system prompt
 - platform: "threads"
 - format: "text_post"
-- body: JSON string — either { "text": "..." } for a single post OR { "posts": ["...", "..."] } for a thread`;
+- body: JSON string — either { "text": "..." } for a single post OR { "posts": ["...", "..."] } for a thread
+- imageSuggestion: { "type": "real_photo|screenshot|illustration|collage", "brief": "..." } — pass as a separate parameter, never inside body`;
   }
 
   getTools(options?: AgentToolOptions): AgentToolSet {

@@ -22,6 +22,11 @@ export interface SessionMessage {
   createdAt: string;
 }
 
+export interface ImageSuggestion {
+  type: 'real_photo' | 'screenshot' | 'illustration' | 'collage';
+  brief: string;
+}
+
 export interface ProducedContentBody {
   // text_post (Threads, LinkedIn) — single post
   text?: string;
@@ -54,6 +59,7 @@ export interface ProducedContent {
   platform: string;
   format: string;
   body: ProducedContentBody;
+  imageSuggestion?: ImageSuggestion | null;
   createdAt: string;
 }
 

@@ -44,16 +44,16 @@ const fill = computed(() => FILLS[props.platform]);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 6px;
   flex-shrink: 0;
 }
 
 .platform-icon svg,
 .platform-icon img {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .platform-icon--threads {

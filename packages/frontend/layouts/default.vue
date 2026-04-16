@@ -3,15 +3,15 @@
     <header class="app-header">
       <div class="app-header__left">
         <NuxtLink to="/dashboard" class="app-brand">
-          <span class="material-symbols-outlined app-brand__icon">auto_awesome</span>
-          <span class="app-brand__name">Creator Hub</span>
+          <img src="~/assets/waving-hand.svg" class="app-brand__icon" alt="" />
+          <span class="app-brand__name">Postrr</span>
         </NuxtLink>
         <nav class="app-nav">
           <NuxtLink to="/dashboard" class="app-nav__link" active-class="app-nav__link--active">
             Dashboard
           </NuxtLink>
-          <NuxtLink to="/library" class="app-nav__link" active-class="app-nav__link--active">
-            Library
+          <NuxtLink to="/content-calendar" class="app-nav__link" active-class="app-nav__link--active">
+            Content Calendar
           </NuxtLink>
           <NuxtLink to="/profile" class="app-nav__link" active-class="app-nav__link--active">
             Profile
@@ -114,16 +114,21 @@ async function handleLogout() {
 }
 
 .app-brand__icon {
-  color: #3525cd;
-  font-size: 28px !important;
+  width: 40px;
+  height: 40px;
+  display: block;
+  flex-shrink: 0;
 }
 
 .app-brand__name {
   font-family: 'Manrope', sans-serif;
-  font-size: 1.125rem;
+  font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #191c1e;
+  background: linear-gradient(135deg, #4F46E5, #9333ea);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* ─── Nav ─── */

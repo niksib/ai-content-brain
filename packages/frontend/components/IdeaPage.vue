@@ -61,6 +61,16 @@
         <!-- Show produced content when completed -->
         <div v-if="idea.status === 'completed' && idea.producedContent" class="idea-page__produced">
 
+          <!-- Image recommendation -->
+          <div v-if="imageSuggestion" class="idea-page__image-suggestion">
+            <div class="idea-page__image-suggestion-label">
+              <span class="material-symbols-outlined" style="font-size: 14px;">add_photo_alternate</span>
+              Image recommendation
+              <span class="idea-page__image-suggestion-type">{{ IMAGE_TYPE_LABELS[imageSuggestion.type] ?? imageSuggestion.type }}</span>
+            </div>
+            <p class="idea-page__image-suggestion-brief">{{ imageSuggestion.brief }}</p>
+          </div>
+
           <!-- THREADS POST CARD (single or multi-thread) -->
           <template v-if="isThreadsTextPost && contentBody">
             <div class="edit-status-bar">
@@ -276,6 +286,7 @@
           <template v-else>
             <pre class="idea-page__produced-content">{{ idea.producedContent.body }}</pre>
           </template>
+
         </div>
 
         <!-- Completed but empty content (generation failed silently) -->
@@ -308,7 +319,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 import ThreadsPublish from '~/components/threads/ThreadsPublish.vue';
-import { useSessionStore, type SessionIdea, type ProducedContentBody } from '~/stores/session';
+import { useSessionStore, type SessionIdea, type ProducedContentBody, type ImageSuggestion } from '~/stores/session';
 import { useApiClient } from '~/services/api';
 
 const props = defineProps<{
@@ -380,6 +391,19 @@ const threadsPublishText = computed((): string => {
     return body.text;
   }
   return '';
+});
+
+const IMAGE_TYPE_LABELS: Record<string, string> = {
+  real_photo: 'Real photo',
+  screenshot: 'Screenshot',
+  illustration: 'Illustration',
+  collage: 'Collage',
+};
+
+const imageSuggestion = computed<ImageSuggestion | null>(() => {
+  const s = idea.value?.producedContent?.imageSuggestion;
+  if (!s || typeof s !== 'object') return null;
+  return s as ImageSuggestion;
 });
 
 const contentBody = computed<ProducedContentBody | null>(() => {
@@ -1245,5 +1269,45 @@ onMounted(async () => {
   font-size: 0.6875rem;
   color: #059669;
   font-weight: 500;
+}
+
+/* ─── Image recommendation ─── */
+.idea-page__image-suggestion {
+  margin-top: 1rem;
+  padding: 0.875rem 1rem;
+  background: rgba(79, 70, 229, 0.04);
+  border: 1px solid rgba(79, 70, 229, 0.14);
+  border-radius: 10px;
+}
+
+.idea-page__image-suggestion-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #4f46e5;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+
+.idea-page__image-suggestion-type {
+  margin-left: auto;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  color: #4f46e5;
+  background: rgba(79, 70, 229, 0.1);
+  padding: 0.125rem 0.4rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.idea-page__image-suggestion-brief {
+  font-size: 0.875rem;
+  color: #464555;
+  line-height: 1.5;
+  margin: 0;
 }
 </style>

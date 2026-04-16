@@ -98,6 +98,19 @@ export const saveProducedContentTool: Anthropic.Tool = {
         description: "Content format",
       },
       body: { type: "string", description: "The produced content body as a JSON string" },
+      imageSuggestion: {
+        type: "object",
+        description: "Optional visual recommendation to attach alongside the post. Stored separately from the post body — never put it inside body.",
+        properties: {
+          type: {
+            type: "string",
+            enum: ["real_photo", "screenshot", "illustration", "collage"],
+            description: "Type of visual",
+          },
+          brief: { type: "string", description: "Specific, actionable description of what to shoot or create" },
+        },
+        required: ["type", "brief"],
+      },
     },
     required: ["contentIdeaId", "userId", "platform", "format", "body"],
   },
@@ -212,16 +225,49 @@ export function makeSaveProducedContent(onContentSaved?: (contentIdeaId: string)
   };
 }
 
+function normalizeThreadsBody(parsedBody: unknown): unknown {
+  if (
+    typeof parsedBody !== "object" ||
+    parsedBody === null ||
+    !("posts" in parsedBody)
+  ) {
+    return parsedBody;
+  }
+
+  const posts = (parsedBody as { posts: unknown }).posts;
+  if (!Array.isArray(posts)) return parsedBody;
+
+  const validPosts = posts.filter((p): p is string => typeof p === "string");
+
+  // If only one post → no thread needed
+  if (validPosts.length <= 1) {
+    return { text: validPosts[0] ?? "" };
+  }
+
+  // If all posts combined (joined with double newline) fit in 500 chars → merge
+  const merged = validPosts.join("\n\n");
+  if (merged.length <= 500) {
+    return { text: merged };
+  }
+
+  return { posts: validPosts };
+}
+
 export async function executeSaveProducedContent(input: Record<string, unknown>): Promise<string> {
-  const { contentIdeaId, userId, platform, format, body } = input as {
+  const { contentIdeaId, userId, platform, format, body, imageSuggestion } = input as {
     contentIdeaId: string;
     userId: string;
     platform: string;
     format: string;
     body: string;
+    imageSuggestion?: { type: string; brief: string };
   };
 
-  const parsedBody = JSON.parse(body);
+  let parsedBody = JSON.parse(body);
+
+  if (platform === "threads") {
+    parsedBody = normalizeThreadsBody(parsedBody);
+  }
 
   await prisma.$transaction([
     prisma.producedContent.upsert({
@@ -232,11 +278,13 @@ export async function executeSaveProducedContent(input: Record<string, unknown>)
         platform: platform as Platform,
         format: format as ContentFormat,
         body: parsedBody,
+        ...(imageSuggestion !== undefined && { imageSuggestion }),
       },
       update: {
         platform: platform as Platform,
         format: format as ContentFormat,
         body: parsedBody,
+        ...(imageSuggestion !== undefined && { imageSuggestion }),
       },
     }),
     prisma.contentIdea.update({

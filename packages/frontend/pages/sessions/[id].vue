@@ -225,94 +225,44 @@
 
           <!-- Idea grid -->
           <div v-else class="ideas-grid">
-            <!-- Real idea cards -->
-            <article
+            <!-- Unified idea cards -->
+            <ContentIdeaCard
               v-for="idea in store.ideas"
               :key="idea.id"
-              class="idea-card"
-              :class="{
-                'idea-card--approved': idea.status === 'approved',
-                'idea-card--producing': idea.status === 'producing',
-                'idea-card--completed': idea.status === 'completed',
-                'idea-card--rejected': idea.status === 'rejected',
-                'idea-card--updated': store.recentlyUpdatedIdeaIds.has(idea.id),
-              }"
-              @mouseenter="store.recentlyUpdatedIdeaIds.has(idea.id) && store.clearUpdatedIdea(idea.id)"
-            >
-              <div class="idea-card__top">
-                <div class="idea-card__meta">
-                  <PlatformIcon :platform="(idea.platform as any)" />
-                  <span class="idea-card__platform-name">{{ platformLabel(idea.platform) }}</span>
-                  <span class="idea-card__format-badge">{{ formatLabel(idea.format) }}</span>
-                </div>
-                <!-- Connected account — right side of the top row -->
-                <div v-if="idea.platform === 'threads' && threadsAccount" class="idea-card__account-inline">
-                  <img
-                    v-if="threadsAccount.profilePictureUrl"
-                    :src="threadsAccount.profilePictureUrl"
-                    class="idea-card__account-avatar"
-                    alt="Threads avatar"
-                  />
-                  <div v-else class="idea-card__account-avatar-placeholder"></div>
-                  <span class="idea-card__account-username">@{{ threadsAccount.username }}</span>
-                </div>
-                <span v-if="store.recentlyUpdatedIdeaIds.has(idea.id)" class="idea-card__updated-badge">
-                  Updated
-                </span>
-                <span v-else-if="idea.publishStatus === 'posted'" class="idea-card__publish-badge idea-card__publish-badge--posted">
-                  Posted
-                </span>
-                <span v-else-if="idea.publishStatus === 'scheduled'" class="idea-card__publish-badge idea-card__publish-badge--scheduled">
-                  Scheduled
-                </span>
-              </div>
-              <h4 class="idea-card__title">{{ idea.angle }}</h4>
-              <p class="idea-card__body">{{ idea.description }}</p>
-
-              <div class="idea-card__actions">
-                <template v-if="idea.status === 'proposed'">
-                  <button
-                    class="idea-card__btn idea-card__btn--approve"
-                    @click="handleApproveIdea(idea.id)"
-                  >Approve</button>
-                  <button
-                    class="idea-card__btn idea-card__btn--reject"
-                    @click="handleRejectIdea(idea.id)"
-                  >Reject</button>
-                </template>
-
-                <template v-else-if="idea.status === 'producing'">
-                  <button class="idea-card__btn idea-card__btn--producing" disabled>
-                    <span class="idea-card__spinner"></span>
-                    AI agent working on your idea
-                  </button>
-                </template>
-
-                <template v-else-if="idea.status === 'completed'">
-                  <button
-                    class="idea-card__btn idea-card__btn--view"
-                    @click="store.selectedIdeaId = idea.id"
-                  >View content &rarr;</button>
-                </template>
-              </div>
-            </article>
+              :idea-id="idea.id"
+              :platform="(idea.platform as any)"
+              :format="idea.format"
+              :angle="idea.angle"
+              :description="idea.description"
+              :status="idea.status"
+              :publish-status="idea.publishStatus"
+              :avatar-url="idea.platform === 'threads' ? (threadsAccount?.profilePictureUrl ?? null) : null"
+              :username="idea.platform === 'threads' ? (threadsAccount?.username ?? null) : null"
+              :is-updating="store.recentlyUpdatedIdeaIds.has(idea.id)"
+              variant="session"
+              @select="store.selectedIdeaId = $event"
+              @approve="handleApproveIdea"
+              @reject="handleRejectIdea"
+              @seen="store.clearUpdatedIdea($event)"
+            />
 
             <!-- Skeleton cards — pendingIdeas is high-water mark, skeletons = pending - arrived -->
             <div
               v-for="n in skeletonCount"
               :key="`skeleton-${n}`"
-              class="idea-card idea-card--skeleton"
+              class="idea-card-skeleton"
             >
-              <div class="idea-card__top">
-                <div class="idea-card__meta">
-                  <span class="skeleton-block skeleton-block--icon"></span>
-                  <span class="skeleton-block skeleton-block--badge"></span>
+              <div class="idea-card-skeleton__header">
+                <span class="skeleton-block skeleton-block--avatar"></span>
+                <div class="idea-card-skeleton__identity">
+                  <span class="skeleton-block skeleton-block--name"></span>
+                  <span class="skeleton-block skeleton-block--meta"></span>
                 </div>
               </div>
               <span class="skeleton-block skeleton-block--title"></span>
               <span class="skeleton-block skeleton-block--body"></span>
               <span class="skeleton-block skeleton-block--body skeleton-block--body-short"></span>
-              <div class="idea-card__actions">
+              <div class="idea-card-skeleton__footer">
                 <span class="skeleton-block skeleton-block--btn"></span>
                 <span class="skeleton-block skeleton-block--btn"></span>
               </div>
@@ -335,6 +285,7 @@ import { useProfileStore } from '~/stores/profile';
 import OrbRecorder from '~/components/OrbRecorder.vue';
 import IdeaPage from '~/components/IdeaPage.vue';
 import PlatformIcon from '~/components/PlatformIcon.vue';
+import ContentIdeaCard from '~/components/ContentIdeaCard.vue';
 import { useMarkdown } from '~/composables/useMarkdown';
 import { useVoiceRecorder } from '~/composables/useVoiceRecorder';
 
@@ -436,15 +387,6 @@ const PLATFORM_LABELS: Record<string, string> = {
   tiktok: 'TikTok',
   instagram: 'Instagram',
 };
-const FORMAT_LABELS: Record<string, string> = {
-  text_post: 'Post',
-  text_with_image: 'Post + Image',
-  image_series: 'Image Series',
-  video_script: 'Video',
-  carousel: 'Carousel',
-  stories: 'Story',
-};
-
 // ─── Idea context helpers ───
 function ideaAngle(ideaId: string): string {
   return store.ideas.find((i) => i.id === ideaId)?.angle ?? '';
@@ -458,12 +400,7 @@ function agentNameForIdea(ideaId: string): string {
   if (!idea) return 'Platform Agent';
   return PLATFORM_AGENT_NAMES[idea.platform] ?? `${idea.platform} Agent`;
 }
-function platformLabel(platform: string): string {
-  return PLATFORM_LABELS[platform] ?? platform;
-}
-function formatLabel(format: string): string {
-  return FORMAT_LABELS[format] ?? format;
-}
+
 const isInitializing = ref(true);
 const messagesContainerRef = ref<HTMLElement | null>(null);
 const isUserRecording = ref(false);
@@ -1223,223 +1160,6 @@ onMounted(async () => {
 .ideas-grid::-webkit-scrollbar-track { background: transparent; }
 .ideas-grid::-webkit-scrollbar-thumb { background: #e2dfff; border-radius: 10px; }
 
-.idea-card {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 1.75rem;
-  box-shadow: 0 4px 16px rgba(25, 28, 30, 0.05);
-  border: 1px solid rgba(199, 196, 216, 0.15);
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.idea-card:hover {
-  border-color: rgba(199, 196, 216, 0.4);
-  box-shadow: 0 8px 24px rgba(25, 28, 30, 0.08);
-}
-
-.idea-card--approved {
-  border-color: rgba(0, 106, 97, 0.3);
-  background: rgba(134, 242, 228, 0.07);
-}
-
-.idea-card--updated {
-  border-color: #a5b4fc;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-.idea-card__publish-badge {
-  margin-left: auto;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
-.idea-card__publish-badge--posted {
-  color: #065f46;
-  background: #d1fae5;
-}
-
-.idea-card__publish-badge--scheduled {
-  color: #4338ca;
-  background: #eef2ff;
-}
-
-.idea-card__account-inline {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: auto;
-}
-
-.idea-card__account-avatar {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.idea-card__account-avatar-placeholder {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #e5e7eb;
-  flex-shrink: 0;
-}
-
-.idea-card__account-username {
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-
-.idea-card__updated-badge {
-  margin-left: auto;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: #4f46e5;
-  background: #eef2ff;
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
-.idea-card--rejected {
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-.idea-card--producing {
-  border-color: rgba(245, 158, 11, 0.3);
-  background: rgba(255, 251, 235, 0.5);
-}
-
-.idea-card--completed {
-  border-color: rgba(53, 37, 205, 0.2);
-  background: rgba(238, 242, 255, 0.4);
-}
-
-.idea-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.idea-card__category-badge {
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  background: #e2dfff;
-  color: #3525cd;
-  padding: 0.25rem 0.625rem;
-  border-radius: 6px;
-}
-
-
-.idea-card__title {
-  font-family: 'Manrope', sans-serif;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #191c1e;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-  margin: 0;
-}
-
-.idea-card__body {
-  font-size: 0.8125rem;
-  color: #464555;
-  line-height: 1.65;
-  flex: 1;
-  margin: 0;
-}
-
-.idea-card__actions {
-  display: flex;
-  gap: 0.625rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid #eceef0;
-}
-
-.idea-card__btn {
-  flex: 1;
-  padding: 0.5625rem 0;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  transition: all 0.15s;
-}
-
-.idea-card__btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.idea-card__btn--approve {
-  background: linear-gradient(135deg, #3525cd, #4f46e5);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(53, 37, 205, 0.2);
-}
-
-.idea-card__btn--approve:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(53, 37, 205, 0.3);
-  transform: translateY(-1px);
-}
-
-.idea-card__btn--reject {
-  background: #e6e8ea;
-  color: #464555;
-}
-
-.idea-card__btn--reject:hover:not(:disabled) {
-  background: #d8dadc;
-}
-
-.idea-card__btn--producing {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  background: #fef3c7;
-  color: #92400e;
-  cursor: not-allowed;
-  opacity: 1;
-}
-
-.idea-card__spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid #f59e0b;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.idea-card__btn--view {
-  background: linear-gradient(135deg, #3525cd, #4f46e5);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(53, 37, 205, 0.2);
-}
-
-.idea-card__btn--view:hover {
-  box-shadow: 0 4px 12px rgba(53, 37, 205, 0.3);
-  transform: translateY(-1px);
-}
-
 .workspace-detail {
   height: 100%;
   overflow-y: auto;
@@ -1451,8 +1171,36 @@ onMounted(async () => {
   100% { background-position: 400px 0; }
 }
 
-.idea-card--skeleton {
+.idea-card-skeleton {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: 1px solid rgba(199, 196, 216, 0.15);
+  box-shadow: 0 12px 32px -4px rgba(25, 28, 30, 0.06);
   pointer-events: none;
+}
+
+.idea-card-skeleton__header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.idea-card-skeleton__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.idea-card-skeleton__footer {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(199, 196, 216, 0.2);
 }
 
 .skeleton-block {
@@ -1463,29 +1211,31 @@ onMounted(async () => {
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
-.skeleton-block--icon {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+.skeleton-block--avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   flex-shrink: 0;
 }
 
-.skeleton-block--badge {
-  width: 64px;
-  height: 20px;
-  border-radius: 6px;
+.skeleton-block--name {
+  width: 90px;
+  height: 13px;
+}
+
+.skeleton-block--meta {
+  width: 60px;
+  height: 10px;
 }
 
 .skeleton-block--title {
   width: 85%;
   height: 16px;
-  margin-top: 0.25rem;
 }
 
 .skeleton-block--body {
   width: 100%;
   height: 12px;
-  margin-top: 0.5rem;
 }
 
 .skeleton-block--body-short {
@@ -1495,7 +1245,7 @@ onMounted(async () => {
 .skeleton-block--btn {
   flex: 1;
   height: 34px;
-  border-radius: 8px;
+  border-radius: 9999px;
 }
 
 /* Loading placeholder card */

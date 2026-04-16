@@ -217,7 +217,8 @@ model ProducedContent {
   platform      Platform
   format        ContentFormat
 
-  body          Json
+  body            Json
+  imageSuggestion Json?
 
   createdAt     DateTime    @default(now())
 }

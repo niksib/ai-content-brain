@@ -48,6 +48,7 @@ ideaRoutes.get("/sessions/:id/ideas", requireAuth, async (context) => {
     include: {
       ideas: {
         orderBy: { createdAt: "asc" },
+        include: { producedContent: true },
       },
     },
   });

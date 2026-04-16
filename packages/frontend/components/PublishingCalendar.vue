@@ -1,6 +1,6 @@
 <template>
-  <!-- ── Content Calendar ── -->
   <section class="calendar-section">
+    <!-- Header -->
     <div class="calendar-section__header">
       <div class="calendar-section__header-left">
         <h3 class="calendar-section__title">Content Calendar</h3>
@@ -16,48 +16,60 @@
       </div>
     </div>
 
-    <div class="calendar-grid">
-      <!-- Day headers -->
+    <!-- Day names -->
+    <div class="calendar-grid-header">
       <div v-for="day in dayNames" :key="day" class="calendar-day-name">{{ day }}</div>
+    </div>
 
-      <!-- Empty leading cells -->
-      <div
-        v-for="n in leadingDays"
-        :key="`empty-${n}`"
-        class="calendar-cell calendar-cell--empty"
-      />
+    <!-- Calendar body -->
+    <div class="calendar-body custom-scrollbar">
+      <div class="calendar-grid">
+        <!-- Empty leading cells -->
+        <div
+          v-for="n in leadingDays"
+          :key="`empty-${n}`"
+          class="calendar-cell calendar-cell--inactive"
+        />
 
-      <!-- Day cells -->
-      <div
-        v-for="day in daysInMonth"
-        :key="day.number"
-        class="calendar-cell"
-        :class="{
-          'calendar-cell--today': day.isToday,
-          'calendar-cell--has-posts': day.items.length > 0 && !day.isToday,
-          'calendar-cell--empty-day': day.items.length === 0 && !day.isToday,
-        }"
-        :style="{ cursor: day.items.length > 0 || day.isToday ? 'pointer' : undefined }"
-      >
-        <div class="calendar-cell__header">
-          <span class="calendar-cell__number">{{ day.number }}</span>
-          <span v-if="day.isToday" class="calendar-cell__today-badge">Today</span>
-        </div>
+        <!-- Day cells -->
+        <div
+          v-for="day in daysInMonth"
+          :key="day.number"
+          class="calendar-cell"
+          :class="{
+            'calendar-cell--today': day.isToday,
+            'calendar-cell--weekend': day.isWeekend,
+            'calendar-cell--empty': day.items.length === 0 && !day.isToday,
+          }"
+        >
+          <!-- Day number -->
+          <div class="calendar-cell__header">
+            <span class="calendar-cell__number">{{ day.number }}</span>
+            <span v-if="day.isToday" class="calendar-cell__today-label">Today</span>
+          </div>
 
-        <div v-if="day.items.length > 0" class="calendar-cell__chips">
-          <div
-            v-for="item in day.items"
-            :key="item.id"
-            class="calendar-cell__chip"
-            :class="`calendar-cell__chip--${item.contentIdea.publishStatus}`"
-            @click.stop="emit('navigate', item)"
-          >
-            <PlatformIcon :platform="item.platform" :size="12" />
-            <span class="calendar-cell__chip-title">{{ item.contentIdea.angle }}</span>
+          <!-- Content chips -->
+          <div v-if="day.items.length > 0" class="calendar-cell__chips">
+            <div
+              v-for="item in day.items"
+              :key="item.id"
+              class="calendar-chip"
+              :class="chipClass(item)"
+              @click.stop="emit('navigate', item)"
+            >
+              <!-- Chip header: platform icon + format | status badge -->
+              <div class="calendar-chip__header">
+                <div class="calendar-chip__platform">
+                  <PlatformIcon :platform="(item.platform as any)" :size="10" />
+                  <span class="calendar-chip__format">{{ formatLabel(item.format) }}</span>
+                </div>
+                <span class="calendar-chip__status">{{ chipStatusLabel(item) }}</span>
+              </div>
+              <!-- Chip body: title -->
+              <p class="calendar-chip__title">{{ item.contentIdea.angle }}</p>
+            </div>
           </div>
         </div>
-
-        <span v-else-if="!day.isToday" class="material-symbols-outlined calendar-cell__add-icon">add</span>
       </div>
     </div>
   </section>
@@ -81,14 +93,13 @@ const emit = defineEmits<{
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-
 const currentMonthLabel = computed(() => {
   return new Date(props.currentYear, props.currentMonth, 1)
     .toLocaleString('en-US', { month: 'long', year: 'numeric' });
 });
 
 const leadingDays = computed(() => {
-  return new Date(props.currentYear, props.currentMonth, 1).getDay(); // 0 = Sunday
+  return new Date(props.currentYear, props.currentMonth, 1).getDay();
 });
 
 const daysInMonth = computed(() => {
@@ -100,7 +111,12 @@ const daysInMonth = computed(() => {
   return Array.from({ length: total }, (_, i) => {
     const number = i + 1;
     const isToday = todayIsThisMonth && today.getDate() === number;
+    // Day of week for the cell: offset by leadingDays
+    const dayOfWeek = (leadingDays.value + i) % 7;
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
     const items = props.items.filter((item) => {
+      // scheduled → use scheduledAt, posted/ready → use createdAt
       const iso = item.contentIdea.publishStatus === 'scheduled' && item.contentIdea.scheduledAt
         ? item.contentIdea.scheduledAt
         : item.createdAt;
@@ -109,9 +125,35 @@ const daysInMonth = computed(() => {
         d.getMonth() === props.currentMonth &&
         d.getDate() === number;
     });
-    return { number, isToday, items };
+
+    return { number, isToday, isWeekend, items };
   });
 });
+
+const FORMAT_LABELS: Record<string, string> = {
+  text_post: 'Post',
+  text_with_image: 'Post+img',
+  image_series: 'Images',
+  video_script: 'Video',
+  carousel: 'Carousel',
+  stories: 'Story',
+};
+
+function formatLabel(format: string): string {
+  return FORMAT_LABELS[format] ?? format;
+}
+
+function chipStatusLabel(item: LibraryItem): string {
+  if (item.contentIdea.publishStatus === 'posted') return 'Posted';
+  if (item.contentIdea.publishStatus === 'scheduled') return 'Sched';
+  return 'Ready';
+}
+
+function chipClass(item: LibraryItem): string {
+  if (item.contentIdea.publishStatus === 'posted') return 'calendar-chip--posted';
+  if (item.contentIdea.publishStatus === 'scheduled') return 'calendar-chip--scheduled';
+  return 'calendar-chip--ready';
+}
 
 function prevMonth(): void {
   let month = props.currentMonth - 1;
@@ -129,43 +171,45 @@ function nextMonth(): void {
 </script>
 
 <style scoped>
-/* ── Taken exactly from dashboard.vue calendar section ── */
-
+/* ── Section wrapper ── */
 .calendar-section {
   background: #ffffff;
-  border-radius: 32px;
-  padding: 2.5rem;
+  border-radius: 24px;
+  padding: 2rem;
   box-shadow: 0 12px 32px -4px rgba(25, 28, 30, 0.06);
-  border: 1px solid rgba(241, 241, 241, 0.8);
+  border: 1px solid rgba(199, 196, 216, 0.12);
+  overflow: hidden;
 }
 
+/* ── Header ── */
 .calendar-section__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .calendar-section__header-left {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.875rem;
 }
 
 .calendar-section__title {
   font-family: 'Manrope', sans-serif;
-  font-size: 1.5rem;
+  font-size: 1.375rem;
   font-weight: 700;
   color: #191c1e;
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .calendar-section__badge {
-  padding: 0.3rem 0.875rem;
+  padding: 0.25rem 0.75rem;
   background: rgba(53, 37, 205, 0.07);
   color: #3525cd;
   border-radius: 9999px;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -173,14 +217,14 @@ function nextMonth(): void {
 
 .calendar-section__nav {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.375rem;
 }
 
 .calendar-nav-btn {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e0e3e5;
   background: #fff;
   cursor: pointer;
   display: flex;
@@ -194,109 +238,97 @@ function nextMonth(): void {
   background: #f2f4f6;
 }
 
-.calendar-grid {
+/* ── Grid header (day names) ── */
+.calendar-grid-header {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 0.625rem;
+  border-bottom: 1px solid rgba(199, 196, 216, 0.2);
+  margin-bottom: 0;
 }
 
 .calendar-day-name {
   text-align: center;
-  font-size: 0.6875rem;
+  padding: 0.5rem 0;
+  font-size: 0.625rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #9ca3af;
-  padding-bottom: 0.75rem;
+  letter-spacing: 0.1em;
+  color: rgba(70, 69, 85, 0.5);
 }
 
+/* ── Calendar body ── */
+.calendar-body {
+  overflow-x: auto;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: rgba(199, 196, 216, 0.15);
+  min-width: 700px;
+}
+
+/* ── Day cells ── */
 .calendar-cell {
-  min-height: 120px;
-  border-radius: 16px;
-  padding: 1rem;
-  cursor: default;
+  min-height: 140px;
+  padding: 0.5rem;
+  background: #f7f9fb;
   display: flex;
   flex-direction: column;
-  transition: background 0.15s, border-color 0.15s;
-  position: relative;
-  overflow: hidden;
+  gap: 0.25rem;
+  border: 1px solid rgba(199, 196, 216, 0.3);
 }
 
-.calendar-cell--empty {
-  background: #fafafa;
-  opacity: 0.35;
+.calendar-cell--inactive {
+  background: rgba(242, 244, 246, 0.4);
+  border-color: rgba(199, 196, 216, 0.15);
   pointer-events: none;
 }
 
-.calendar-cell--empty-day {
-  background: #f7f9fb;
-  border: 1.5px dashed #d1d5db;
-}
-
-.calendar-cell--empty-day:hover {
-  border-color: rgba(53, 37, 205, 0.4);
-}
-
-.calendar-cell--has-posts {
+.calendar-cell--weekend {
   background: #f2f4f6;
-  cursor: pointer !important;
-}
-
-.calendar-cell--has-posts:hover {
-  background: rgba(53, 37, 205, 0.05);
 }
 
 .calendar-cell--today {
-  background: #3525cd;
-  color: #fff;
-  box-shadow: 0 8px 24px rgba(53, 37, 205, 0.35);
-  z-index: 2;
-  cursor: pointer;
-  outline: 3px solid rgba(53, 37, 205, 0.4);
-  outline-offset: 2px;
+  background: rgba(53, 37, 205, 0.04);
+  border-color: rgba(53, 37, 205, 0.3);
 }
 
-.calendar-cell--today:hover {
-  background: #2f1fb5;
+.calendar-cell--empty {
+  background: #f7f9fb;
 }
 
+/* ── Cell header ── */
 .calendar-cell__header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .calendar-cell__number {
+  font-size: 0.6875rem;
   font-weight: 700;
-  font-size: 0.9375rem;
-  color: inherit;
+  color: #464555;
+  line-height: 1;
 }
 
 .calendar-cell--today .calendar-cell__number {
-  font-size: 1.25rem;
+  color: #3525cd;
   font-weight: 900;
 }
 
-.calendar-cell__today-badge {
-  font-size: 0.625rem;
-  font-weight: 900;
+.calendar-cell__today-label {
+  font-size: 0.5625rem;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
+  color: #3525cd;
+  opacity: 0.7;
 }
 
-.calendar-cell__add-icon {
-  color: #d1d5db;
-  font-size: 24px !important;
-  margin: auto;
-}
-
-/* ── Post chips ── */
-
+/* ── Chips container ── */
 .calendar-cell__chips {
   display: flex;
   flex-direction: column;
@@ -304,43 +336,97 @@ function nextMonth(): void {
   overflow: hidden;
 }
 
-.calendar-cell__chip {
+/* ── Content chip ── */
+.calendar-chip {
+  background: #ffffff;
+  border: 1px solid rgba(199, 196, 216, 0.2);
+  border-radius: 6px;
+  padding: 0.3125rem 0.375rem;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 1px 3px rgba(25, 28, 30, 0.05);
+}
+
+.calendar-chip:hover {
+  border-color: rgba(53, 37, 205, 0.3);
+  box-shadow: 0 2px 6px rgba(53, 37, 205, 0.08);
+}
+
+/* Chip header: platform icon + format | status badge */
+.calendar-chip__header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.25rem;
-  padding: 0.2rem 0.375rem;
-  border-radius: 6px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: opacity 0.15s;
+  margin-bottom: 0.25rem;
 }
 
-.calendar-cell__chip:hover {
-  opacity: 0.75;
+.calendar-chip__platform {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 0;
 }
 
-.calendar-cell__chip--scheduled {
-  background: #eef2ff;
+.calendar-chip__format {
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: #777587;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
-.calendar-cell__chip--posted {
-  background: #f0fdf4;
+/* Status badge inside chip */
+.calendar-chip__status {
+  font-size: 0.4rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.0625rem 0.25rem;
+  border-radius: 3px;
+  flex-shrink: 0;
 }
 
-.calendar-cell__chip-title {
+.calendar-chip--scheduled .calendar-chip__status {
+  background: #e2dfff;
+  color: #3323cc;
+}
+
+.calendar-chip--posted .calendar-chip__status {
+  background: #86f2e4;
+  color: #006f66;
+}
+
+.calendar-chip--ready .calendar-chip__status {
+  background: #ffdbcc;
+  color: #7b2f00;
+}
+
+/* Chip title */
+.calendar-chip__title {
   font-size: 0.625rem;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: #191c1e;
   line-height: 1.3;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.calendar-cell__chip--scheduled .calendar-cell__chip-title {
-  color: #4338ca;
+/* ── Custom scrollbar ── */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
 }
 
-.calendar-cell__chip--posted .calendar-cell__chip-title {
-  color: #166534;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #c7c4d8;
+  border-radius: 10px;
 }
 </style>
