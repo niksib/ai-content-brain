@@ -2,28 +2,30 @@
   <div class="ob-question">
     <div class="ob-chips-row">
       <OptionChip
-        v-for="chip in question.chips"
-        :key="chip"
-        :selected="selected.includes(chip)"
-        @toggle="toggle(chip)"
+        v-for="option in question.options"
+        :key="option"
+        :selected="selected.includes(option)"
+        @toggle="toggle(option)"
       >
-        {{ chip }}
+        {{ option }}
       </OptionChip>
     </div>
 
-    <OnboardingComposer
-      v-model="text"
-      placeholder="Add your own take… (optional)"
-      :show-send="false"
-      @recording-change="$emit('recording-change', $event)"
-    />
+    <div class="ob-question__controls">
+      <OnboardingComposer
+        v-model="text"
+        placeholder="Add your own take… (optional)"
+        :show-send="false"
+        @recording-change="$emit('recording-change', $event)"
+      />
 
-    <StepIndicator :current="index" :total="total" />
+      <StepIndicator :current="index" :total="total" />
 
-    <div class="ob-question__next">
-      <NextButton :disabled="!canAdvance" @click="advance">
-        {{ isLast ? 'Wrap up' : 'Next' }}
-      </NextButton>
+      <div class="ob-question__next">
+        <NextButton :disabled="!canAdvance" @click="advance">
+          {{ isLast ? 'Wrap up' : 'Next' }}
+        </NextButton>
+      </div>
     </div>
   </div>
 </template>
@@ -80,7 +82,17 @@ function advance() {
 .ob-chips-row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
+}
+
+.ob-question__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
 }
 
 .ob-question__next {

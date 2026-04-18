@@ -89,7 +89,7 @@ withDefaults(defineProps<{
   justify-content: center;
   gap: 28px;
   padding: 40px 32px;
-  max-width: 620px;
+  max-width: 880px;
   margin: 0 auto;
 }
 
@@ -110,7 +110,6 @@ withDefaults(defineProps<{
   align-items: stretch;
   gap: 12px;
   width: 100%;
-  max-width: 460px;
 }
 
 @media (max-width: 600px) {

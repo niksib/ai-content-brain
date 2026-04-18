@@ -2,45 +2,72 @@
   <div class="ob-analyze-feed">
     <div
       v-for="(step, i) in visibleSteps"
-      :key="step.text"
+      :key="step"
       class="ob-analyze-row"
-      :class="i === visibleSteps.length - 1 && !allDone ? 'ob-analyze-row--progress' : 'ob-analyze-row--done'"
+      :class="isSpinning(i) ? 'ob-analyze-row--progress' : 'ob-analyze-row--done'"
     >
       <div class="ob-analyze-row__icon">
         <span class="material-symbols-outlined">
-          {{ i === visibleSteps.length - 1 && !allDone ? 'progress_activity' : 'check' }}
+          {{ isSpinning(i) ? 'progress_activity' : 'check' }}
         </span>
       </div>
-      <span>{{ step.text }}</span>
+      <span>{{ step }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 
+const props = withDefaults(
+  defineProps<{ complete?: boolean; steps?: readonly string[]; stepDurationMs?: number }>(),
+  {
+    steps: () => [
+      'Looking at your profile',
+      'Reading your posts',
+      'Working out your rhythm',
+      'Picking up how you write',
+    ],
+    stepDurationMs: 5000,
+  },
+);
 const emit = defineEmits<{ complete: [] }>();
 
-const steps = [
-  { text: 'Looking at your profile', delay: 0 },
-  { text: 'Reading your posts', delay: 1400 },
-  { text: 'Working out your rhythm', delay: 3000 },
-  { text: 'Picking up how you write', delay: 4800 },
-];
+const FINAL_HOLD_MS = 500;
 
-const visibleCount = ref(0);
-const allDone = ref(false);
+const visibleCount = ref(1);
+const finished = ref(false);
 const timers: ReturnType<typeof setTimeout>[] = [];
 
-const visibleSteps = computed(() => steps.slice(0, visibleCount.value));
+const visibleSteps = computed(() => props.steps.slice(0, visibleCount.value));
+
+function isSpinning(index: number): boolean {
+  if (finished.value) return false;
+  return index === visibleCount.value - 1;
+}
+
+function advance(): void {
+  if (visibleCount.value >= props.steps.length) return;
+  visibleCount.value += 1;
+  if (visibleCount.value < props.steps.length) {
+    timers.push(setTimeout(advance, props.stepDurationMs));
+  }
+}
 
 onMounted(() => {
-  steps.forEach((s, i) => {
-    timers.push(setTimeout(() => { visibleCount.value = i + 1; }, s.delay));
-  });
-  timers.push(setTimeout(() => { allDone.value = true; }, 6600));
-  timers.push(setTimeout(() => emit('complete'), 7000));
+  timers.push(setTimeout(advance, props.stepDurationMs));
 });
+
+watch(
+  () => props.complete,
+  (isComplete) => {
+    if (!isComplete || finished.value) return;
+    visibleCount.value = props.steps.length;
+    finished.value = true;
+    timers.push(setTimeout(() => emit('complete'), FINAL_HOLD_MS));
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
   timers.forEach(clearTimeout);
@@ -61,6 +88,7 @@ onBeforeUnmount(() => {
 .ob-analyze-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   font-family: 'JetBrains Mono', 'Courier New', monospace;
   font-size: 12px;

@@ -272,9 +272,7 @@ const apiBaseUrl = config.public.apiBaseUrl as string;
 const threadsAuthUrl = `${apiBaseUrl}/api/threads/auth`;
 let styleAnalysisPoller: ReturnType<typeof setInterval> | null = null;
 
-const hasThreadsPlatform = computed(() =>
-  profileStore.profile?.platforms.some(p => p.toLowerCase() === 'threads') ?? false
-);
+const hasThreadsPlatform = computed(() => true);
 
 const threadsConnected = computed(() => threadsAccount.value !== null);
 const styleAnalyzed = computed(() => threadsAccount.value?.styleAnalyzed ?? false);
@@ -313,7 +311,7 @@ const onboardingSteps = computed(() => {
 const completedStepsCount = computed(() => onboardingSteps.value.filter(Boolean).length);
 const totalStepsCount = computed(() => onboardingSteps.value.length);
 const showOnboardingBlock = computed(
-  () => profileStore.profile !== null && completedStepsCount.value < totalStepsCount.value
+  () => profileStore.isOnboarded && completedStepsCount.value < totalStepsCount.value
 );
 
 async function loadThreadsAccount(): Promise<void> {

@@ -6,7 +6,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (isAuthenticated.value === null) {
     try {
       const config = useRuntimeConfig();
-      await $fetch(`${config.public.apiBaseUrl}/api/onboarding/status`, {
+      await $fetch(`${config.public.apiBaseUrl}/api/profile`, {
         credentials: 'include',
       });
       isAuthenticated.value = true;

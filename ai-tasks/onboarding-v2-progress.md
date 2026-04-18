@@ -65,57 +65,82 @@ Frontend runs on stub state — no backend wiring yet:
 
 ---
 
-## Next (backend phases per `onboarding-v2.md`)
+## Done (2026-04-18) — Phase 1 backend foundation
 
-Work proceeds in this order:
+### Decisions resolved
+- Onboarding does not deduct credits (no `requireCredits` on onboarding routes).
+- Voice STT (Groq Whisper) stays out of credit ledger — out-of-band cost.
+- "Continue without Threads" tertiary link kept on Connect step as is.
+- Post-trial paywall behavior deferred to a separate billing epic.
 
-1. **Phase 1 — Prisma migration + foundation services**
-   - Drop `CreatorProfile`. Add `MemoryBlock` (userId, key, title, description, content) + `OnboardingSession` (currentStep, threadsAnalysis, generatedQuestions, answers, summary, completedAt).
-   - Extend `CreditTransaction` with model + input_uncached / input_cached / cache_write / output token breakdown + cost_cents.
-   - Trial balance: auto-create `CreditBalance { balance: 150 }` on signup via `trial_grant` transaction.
-   - Canonical keys seed at `packages/backend/src/memory/canonical-keys.ts`.
-   - Services: `memory.service.ts` (getMemoryMap / readMemory / upsertMemoryBlock / getAllBlocks / deleteMemoryBlock), `llm-cost.ts` (MODEL_RATES + calculateCostCents + deductCredits).
-   - Requires-credits middleware refactor: estimate → actual deduction from Anthropic usage response.
+### Schema changes (migration `20260418150621_add_memory_blocks_and_billing_fields`)
+- Added `MemoryBlock(userId, key, title, description, content, …)` with `@@unique([userId, key])`.
+- Added `OnboardingSession(userId @unique, currentStep, threadsAnalysis Json?, generatedQuestions Json?, answers Json?, summary?, clarification?, startedAt, completedAt?, lastActiveAt)`.
+- Extended `CreditTransaction` with optional `model`, `inputUncachedTokens`, `inputCachedTokens`, `cacheWriteTokens`, `outputTokens`, `costCents`.
+- Added enum values `trial_grant`, `agent_call` to `CreditTransactionType`.
+- **Note:** `CreatorProfile` is intentionally NOT dropped yet — 18 files still reference it. Drop is scheduled for Phase 4 once StrategistAgent + platform agents migrate to memory blocks via `buildLegacyProfile()` adapter.
 
-2. **Phase 2 — Onboarding agent + analysis pipeline**
-   - Rewrite `StyleAnalysisAgent` to return pre-filled memory blocks.
-   - Rewrite `OnboardingAgent` to generate personalized questions + options in same Claude call (with canonical keys as seed).
-   - `onboarding.service.ts`: startSession, getSession (resume), runAnalysis, runAnalysisFallback, saveAnswer, generateSummary, applyClarification, complete.
-   - Default questions hardcoded at `packages/backend/src/onboarding/default-questions.ts` for fallback path.
-   - REST routes at `packages/backend/src/routes/onboarding.ts`.
-   - Prompt caching mandatory for system prompts.
+### New modules
+- `packages/backend/src/memory/canonical-keys.ts` — `CANONICAL_KEYS` const (10 entries), `CanonicalMemoryKey` type, `isCanonicalKey()`, `getCanonicalKey()`.
+- `packages/backend/src/services/memory.service.ts` — `MemoryService` with `getMemoryMap`, `readMemory`, `getAllBlocks`, `upsertMemoryBlock`, `deleteMemoryBlock` (canonical keys protected).
+- `packages/backend/src/services/llm-cost.ts` — `MODEL_RATES` (Opus 4.7 / Sonnet 4.6 / Haiku 4.5), `normalizeUsage()`, `calculateCostCents()`, `deductCreditsForLlmCall()` writes a single `CreditTransaction` and decrements balance atomically.
+- `packages/backend/src/services/trial-grant.service.ts` — `grantTrialCredits(userId)` creates `CreditBalance { balance: 150 }` + `trial_grant` transaction. Idempotent (skips if balance row exists).
 
-3. **Phase 3 — Frontend wiring**
-   - Replace mocked flow in `pages/onboarding.vue` with real API calls via new `services/onboarding.ts` + `stores/onboarding.ts` (Pinia).
-   - Resume logic on mount: fetch `/onboarding/session`, render at correct step.
-   - Wire fallback steps to real triggers.
+### Auth wiring
+- `packages/backend/src/lib/auth.ts` — added `databaseHooks.user.create.after` to call `grantTrialCredits` on signup.
 
-4. **Phase 4 — StrategistAgent refactor**
-   - Replace `loadContext()` full-profile load with memory-map-only + `read_memory` tool.
-   - Platform agents (Threads / IG / LI / Video) use `buildLegacyProfile(userId)` adapter from memory blocks.
-   - Remove `save_creator_profile` tool.
-
-5. **Phase 5 — Creator Profile page refactor**
-   - `GET /memory` + `PATCH /memory/:key` + `DELETE /memory/:key` (non-canonical only).
-   - Rewrite `pages/creator-profile.vue` to edit memory blocks (canonical block first in fixed order, non-canonical below).
-
-6. **Phase 6/7 — Tests + rollout**
-   - DB is drop-and-recreate since no prod users.
+### Status
+- Backend `tsc --noEmit` passes clean.
+- Migration applied to local dev DB.
+- `requireCredits` middleware NOT refactored yet — kept simple `cost: number` form. Will revisit when wiring it into agent calls (Phase 2/4) where the post-call deduction pattern applies.
 
 ---
 
-## Pending decisions (need user input before continuing)
+## Done (2026-04-18) — Phases 2 / 3 / 4 / 5 (full vertical slice)
 
-- Post-trial paywall behavior: hard block on 0 credits, or grace period / warning? (From `onboarding-v2.md` open questions.)
-- Voice STT billing: charge Whisper via Groq as part of credit ledger, or tolerate as out-of-band cost?
-- "Continue without Threads" link: keep as visible tertiary, or de-emphasize to nudge OAuth?
+### Phase 2 — Onboarding agent + analysis pipeline
+- `packages/backend/src/onboarding/default-questions.ts` — fallback question set keyed to canonical memory keys (`niche`, `goal`, `audience`, `voice_tone`).
+- `agents/style-analysis/style-analysis.agent.ts` + `.claude/CLAUDE.md` — rewritten. Single tool `extract_creator_signals` returns `{ blocks, toneExamples }`. Skill prompt rewritten to extract memory blocks instead of `CreatorProfile`.
+- `agents/onboarding/onboarding.agent.ts` + `.claude/CLAUDE.md` — two-phase Ori. Phase A `generate_questions` (≤4 personalized), Phase B `save_memory_blocks` (final blocks + 3-5 sentence summary, includes `onboarding_transcript` verbatim). No em-dashes.
+- `services/onboarding.service.ts` — `OnboardingService` (`getOrCreateSession`, `getSession`, `runAnalysis`, `runAnalysisFallback`, `saveAnswer`, `generateSummary`, `applyClarification`, `complete`). All Claude calls use `claude-sonnet-4-6` with `cache_control: ephemeral` and forced `tool_choice`. Falls back to `DEFAULT_QUESTIONS` if Threads has fewer than 3 usable posts. `complete()` writes blocks via `memoryService.upsertMemoryBlock`, clears cache via `Prisma.JsonNull`.
+- `routes/onboarding.ts` — 8 endpoints (`GET /session`, `POST /start`, `/analyze`, `/analyze/fallback`, `/answer`, `/summary`, `/clarify`, `/complete`). `requireAuth` only — onboarding stays free.
+
+### Phase 4 — StrategistAgent + platform agents + drop CreatorProfile
+- `agents/adapters/profile-from-memory.ts` — `LegacyCreatorProfile` interface + `buildLegacyProfile(userId)` (maps memory blocks back to old shape) + `formatLegacyProfileForPrompt`.
+- `agents/tools/read-memory.ts` — `readMemoryTool` + `makeReadMemory(userId)` executor.
+- `agents/strategist/strategist.agent.ts` + `.claude/CLAUDE.md` — `loadContext()` now calls `loadStrategistSessionContext` (memory map + 30-day content history). Tools: `[webSearchTool, readMemoryTool, saveContentIdeaTool, updateContentIdeaTool]`.
+- `tools/content.ts` — added `loadStrategistSessionContext(userId)`. Removed `getSessionContextTool`, `getContentHistoryTool`, and their executors.
+- All four platform agents (`threads`, `instagram`, `linkedin`, `video`) — `loadContext()` now reads memory blocks via the adapter, no other changes needed (they keep working with the `LegacyCreatorProfile` shape).
+- `routes/threads.ts` — removed `analyzeWritingStyleFromThreads` fire-and-forget call.
+- Deleted: `tools/creator-profile.ts`, `services/style-analysis.service.ts`.
+- Migration `20260418200000_drop_creator_profile` — drops `CreatorProfile` table + `CreatorStage` enum.
+
+### Phase 5 — Memory routes + Creator Profile page
+- `routes/memory.ts` — `GET /memory` (blocks + canonical catalog), `PATCH /memory/:key` (upsert), `DELETE /memory/:key` (non-canonical only). Wired into `index.ts`.
+- `routes/profile.ts` — slimmed to identity-only (`{ email, name, isAdmin }`).
+- `packages/frontend/stores/profile.ts` — rewritten. Exposes `userEmail`, `userName`, `isAdmin`, `memoryBlocks`, `canonicalKeys`, `isOnboarded`, `loadProfile`, `loadMemory`, `upsertBlock`, `deleteBlock`.
+- `packages/frontend/pages/creator-profile.vue` — rewritten as memory-block editor. Canonical blocks render first in catalog order, custom blocks below. Per-block save (PATCH) + delete (only for non-canonical).
+- `packages/frontend/pages/dashboard.vue` — replaced removed `profileStore.profile` checks (`hasThreadsPlatform = true` constant, `showOnboardingBlock` keyed off `profileStore.isOnboarded`).
+
+### Phase 3 — Frontend onboarding wiring
+- `services/onboarding.ts` — typed client for all 8 backend endpoints.
+- `stores/onboarding.ts` — Pinia store with state machine (`session`, `loading`, `error`, computed `step`/`questions`/`answers`/`summaryText`/`isComplete`). Actions: `ensureSession`, `startConnectFlow`, `runAnalysis`, `runFallback`, `answerQuestion`, `generateSummary`, `clarifySummary`, `completeOnboarding`, `reset`.
+- `pages/onboarding.vue` — rewritten to drive off the store. Flow: ensureSession → Connect → Threads OAuth or Skip → Analyzing (real backend call masked by the existing animated step) → dynamic `QuestionStep` per backend-returned question → SummaryStep with real summary text + clarify path → Done. Returning users resume at the first unanswered question.
+- `components/onboarding/steps/SummaryStep.vue` — accepts `summaryText` + `loading` props, emits `save` and `clarify`.
+- `components/onboarding/steps/QuestionStep.vue` — switched from `chips` to `options` to match backend shape.
+- `components/onboarding/questions.ts` — reduced to the shared `OnboardingQuestion` interface (`key`, `prompt`, `options`, optional `bubbleContext`).
+- `middleware/auth.global.ts` — auth check now hits `/api/profile` (the removed `/api/onboarding/status` endpoint is gone).
+
+### Status
+- Backend `tsc --noEmit` clean.
+- Frontend `nuxt typecheck` clean for everything touched (two pre-existing errors in `components/LibraryBacklogCard.vue` and `stores/session.ts` are unrelated to this epic).
+- Migrations applied locally (`20260418200000_drop_creator_profile`).
+- Prisma client regenerated under Node 22.
 
 ---
 
-## How to resume on another machine
+## What's left
 
-1. `git pull`
-2. `pnpm install` at repo root
-3. `pnpm --filter @daily-content-brain/frontend dev`, open `/onboarding`, click through mocked flow to confirm visual state still works.
-4. Read `ai-tasks/onboarding-v2.md` for the full file-by-file backend plan.
-5. Start with Phase 1 (Prisma migration). Ask user on the three pending decisions above before deep backend work if they haven't been answered.
+- **Phase 6 — manual test pass on the real flow.** Connect Threads OAuth round-trip, verify analysis populates blocks, confirm `read_memory` works in a real strategist session, edit a block on the Creator Profile page and confirm Strategist picks it up next session.
+- **Pre-existing typecheck noise** in `components/LibraryBacklogCard.vue` and `stores/session.ts` — out of scope for onboarding-v2 but worth a follow-up cleanup pass.
+- **Post-trial paywall behavior** — still deferred to a separate billing epic.

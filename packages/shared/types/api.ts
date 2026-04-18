@@ -12,8 +12,6 @@ export type SessionStatus = 'active' | 'completed';
 
 export type MessageRole = 'user' | 'assistant';
 
-export type CreatorStage = 'starting' | 'growing' | 'established';
-
 export type CreditTransactionType =
   | 'subscription_grant'
   | 'topup_purchase'
@@ -153,35 +151,6 @@ export interface ProducedContentDTO {
   createdAt: string;
 }
 
-// ==================== CREATOR PROFILE ====================
-
-export interface CreatorProfileDTO {
-  id: string;
-  platforms: Platform[];
-  niche: string;
-  topics: string[];
-  audienceDescription: string;
-  audiencePainPoints: string | null;
-  stage: CreatorStage;
-  toneOfVoice: string;
-  toneExamples: string[];
-  goals: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface UpdateCreatorProfileRequest {
-  platforms?: Platform[];
-  niche?: string;
-  topics?: string[];
-  audienceDescription?: string;
-  audiencePainPoints?: string | null;
-  stage?: CreatorStage;
-  toneOfVoice?: string;
-  toneExamples?: string[];
-  goals?: string[];
-}
-
 // ==================== BILLING ====================
 
 export interface CreditBalanceDTO {
@@ -201,10 +170,3 @@ export interface CreateCheckoutRequest {
   priceId: string;
 }
 
-// ==================== ONBOARDING ====================
-
-export interface OnboardingStatusResponse {
-  completed: boolean;
-  hasProfile: boolean;
-  sessionId: string | null;
-}

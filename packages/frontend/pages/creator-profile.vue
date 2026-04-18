@@ -1,6 +1,5 @@
 <template>
   <div class="creator-profile-page">
-
     <!-- Connected Platforms -->
     <section class="profile-section">
       <h2 class="section-title">Connected Platforms</h2>
@@ -17,7 +16,6 @@
               <PlatformIcon :platform="platform" />
             </div>
             <span class="platform-row__name">{{ PLATFORM_NAMES[platform] }}</span>
-            <span v-if="isActivePlatform(platform)" class="platform-badge">Active</span>
           </div>
           <div class="platform-row__right">
             <ThreadsConnect v-if="platform === 'threads'" />
@@ -27,162 +25,70 @@
       </div>
     </section>
 
-    <!-- Creator Profile form -->
+    <!-- Memory blocks -->
     <section class="profile-section">
-      <h2 class="section-title">Creator Profile</h2>
+      <h2 class="section-title">Creator Memory</h2>
+      <p class="section-subtitle">Edit any block to refine how Postrr understands your voice, audience, goals, and content focus.</p>
 
-      <div v-if="profileStore.isLoading" class="loading-state">Loading profile...</div>
+      <div v-if="profileStore.isLoading" class="loading-state">Loading memory blocks…</div>
 
-      <div v-else-if="!profileStore.profile" class="empty-state">
-        <p>No profile found. Complete onboarding first.</p>
+      <div v-else-if="profileStore.memoryBlocks.length === 0 && profileStore.canonicalKeys.length === 0" class="empty-state">
+        <p>No memory yet. Complete onboarding first.</p>
         <NuxtLink to="/onboarding" class="btn btn--primary">Start Onboarding</NuxtLink>
       </div>
 
-      <form v-else class="profile-form" @submit.prevent="handleSave">
-        <div class="form-group">
-          <label class="form-label">Platforms</label>
-          <div class="chip-selector">
+      <div v-else class="blocks-list">
+        <article
+          v-for="entry in displayBlocks"
+          :key="entry.key"
+          class="block-card"
+        >
+          <header class="block-card__header">
+            <div>
+              <h3 class="block-card__title">{{ entry.title }}</h3>
+              <p class="block-card__description">{{ entry.description }}</p>
+            </div>
             <button
-              v-for="platform in ALL_PLATFORMS"
-              :key="platform"
+              v-if="!isCanonical(entry.key) && hasContent(entry.key)"
               type="button"
-              class="chip"
-              :class="{ 'chip--active': form.platforms.includes(platform) }"
-              @click="togglePlatform(platform)"
+              class="block-card__delete"
+              @click="onDelete(entry.key)"
             >
-              {{ PLATFORM_NAMES[platform] }}
+              Remove
+            </button>
+          </header>
+
+          <textarea
+            v-model="drafts[entry.key]"
+            class="form-textarea"
+            rows="4"
+            :placeholder="entry.description"
+          />
+
+          <div class="block-card__footer">
+            <span class="block-card__key">{{ entry.key }}</span>
+            <button
+              type="button"
+              class="btn btn--primary block-card__save"
+              :disabled="!isDirty(entry.key) || profileStore.isSaving"
+              @click="onSave(entry.key)"
+            >
+              Save
             </button>
           </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="niche">Niche</label>
-          <input
-            id="niche"
-            v-model="form.niche"
-            type="text"
-            class="form-input"
-            placeholder="e.g. Personal finance for millennials"
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Topics</label>
-          <div class="tag-input-wrapper">
-            <div class="tags-list">
-              <span v-for="(topic, index) in form.topics" :key="index" class="tag">
-                {{ topic }}
-                <button type="button" class="tag-remove" @click="removeTopic(index)">&times;</button>
-              </span>
-            </div>
-            <input
-              v-model="newTopic"
-              type="text"
-              class="form-input"
-              placeholder="Add topic and press Enter"
-              @keydown.enter.prevent="addTopic"
-            />
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="audienceDescription">Audience Description</label>
-          <textarea
-            id="audienceDescription"
-            v-model="form.audienceDescription"
-            class="form-textarea"
-            rows="3"
-            placeholder="Describe your target audience"
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="audiencePainPoints">Audience Pain Points</label>
-          <textarea
-            id="audiencePainPoints"
-            v-model="form.audiencePainPoints"
-            class="form-textarea"
-            rows="2"
-            placeholder="What problems does your audience face?"
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="stage">Stage</label>
-          <select id="stage" v-model="form.stage" class="form-select">
-            <option value="starting">Starting</option>
-            <option value="growing">Growing</option>
-            <option value="established">Established</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Content Language</label>
-          <div class="chip-selector">
-            <button
-              v-for="lang in LANGUAGES"
-              :key="lang"
-              type="button"
-              class="chip"
-              :class="{ 'chip--active': form.contentLanguage === lang }"
-              @click="form.contentLanguage = lang"
-            >
-              {{ lang }}
-            </button>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="toneOfVoice">Tone of Voice</label>
-          <textarea
-            id="toneOfVoice"
-            v-model="form.toneOfVoice"
-            class="form-textarea"
-            rows="2"
-            placeholder="Describe your writing tone"
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Goals</label>
-          <div class="tag-input-wrapper">
-            <div class="tags-list">
-              <span v-for="(goal, index) in form.goals" :key="index" class="tag">
-                {{ goal }}
-                <button type="button" class="tag-remove" @click="removeGoal(index)">&times;</button>
-              </span>
-            </div>
-            <input
-              v-model="newGoal"
-              type="text"
-              class="form-input"
-              placeholder="Add goal and press Enter"
-              @keydown.enter.prevent="addGoal"
-            />
-          </div>
-        </div>
-
-        <button type="submit" class="btn btn--primary" :disabled="profileStore.isSaving">
-          {{ profileStore.isSaving ? 'Saving...' : 'Save Profile' }}
-        </button>
-
-        <p v-if="saveMessage" class="save-message" :class="{ 'save-message--error': saveError }">
-          {{ saveMessage }}
-        </p>
-      </form>
+        </article>
+      </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted } from 'vue';
-import { useProfileStore, type ProfileUpdateData } from '~/stores/profile';
+import { ref, reactive, watch, computed, onMounted } from 'vue';
+import { useProfileStore, type MemoryBlock, type CanonicalKey } from '~/stores/profile';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 import ThreadsConnect from '~/components/threads/ThreadsConnect.vue';
 
-definePageMeta({
-  layout: 'default',
-});
+definePageMeta({ layout: 'default' });
 
 const profileStore = useProfileStore();
 
@@ -196,107 +102,108 @@ const PLATFORM_NAMES: Record<Platform, string> = {
   instagram: 'Instagram',
 };
 
-function isActivePlatform(platform: Platform): boolean {
-  return (form.platforms as string[]).includes(platform);
+interface DisplayBlock {
+  key: string;
+  title: string;
+  description: string;
+  content: string;
 }
 
-const LANGUAGES = ['Russian', 'English', 'Ukrainian', 'Spanish', 'German', 'French', 'Other'];
+const drafts = reactive<Record<string, string>>({});
+const baseline = ref<Record<string, string>>({});
 
-const form = reactive({
-  platforms: [] as string[],
-  niche: '',
-  topics: [] as string[],
-  audienceDescription: '',
-  audiencePainPoints: '',
-  stage: 'starting' as 'starting' | 'growing' | 'established',
-  contentLanguage: '',
-  toneOfVoice: '',
-  goals: [] as string[],
+const blockMap = computed<Record<string, MemoryBlock>>(() => {
+  const map: Record<string, MemoryBlock> = {};
+  for (const block of profileStore.memoryBlocks) {
+    map[block.key] = block;
+  }
+  return map;
 });
 
-const newTopic = ref('');
-const newGoal = ref('');
-const saveMessage = ref('');
-const saveError = ref(false);
-
-function populateForm() {
-  const profile = profileStore.profile;
-  if (!profile) return;
-
-  form.platforms = profile.platforms.map((p) => p.toLowerCase());
-  form.niche = profile.niche;
-  form.topics = [...profile.topics];
-  form.audienceDescription = profile.audienceDescription;
-  form.audiencePainPoints = profile.audiencePainPoints || '';
-  form.stage = profile.stage;
-  form.contentLanguage = profile.contentLanguage || '';
-  form.toneOfVoice = profile.toneOfVoice;
-  form.goals = [...profile.goals];
-}
-
-watch(() => profileStore.profile, populateForm, { immediate: true });
-
-function togglePlatform(platform: string) {
-  const index = form.platforms.indexOf(platform);
-  if (index >= 0) {
-    form.platforms.splice(index, 1);
-  } else {
-    form.platforms.push(platform);
+const canonicalMap = computed<Record<string, CanonicalKey>>(() => {
+  const map: Record<string, CanonicalKey> = {};
+  for (const entry of profileStore.canonicalKeys) {
+    map[entry.key] = entry;
   }
-}
+  return map;
+});
 
-function addTopic() {
-  const trimmed = newTopic.value.trim();
-  if (trimmed && !form.topics.includes(trimmed)) {
-    form.topics.push(trimmed);
+const displayBlocks = computed<DisplayBlock[]>(() => {
+  const seen = new Set<string>();
+  const result: DisplayBlock[] = [];
+
+  for (const canonical of profileStore.canonicalKeys) {
+    const block = blockMap.value[canonical.key];
+    result.push({
+      key: canonical.key,
+      title: canonical.title,
+      description: canonical.description,
+      content: block?.content ?? '',
+    });
+    seen.add(canonical.key);
   }
-  newTopic.value = '';
-}
 
-function removeTopic(index: number) {
-  form.topics.splice(index, 1);
-}
-
-function addGoal() {
-  const trimmed = newGoal.value.trim();
-  if (trimmed && !form.goals.includes(trimmed)) {
-    form.goals.push(trimmed);
+  for (const block of profileStore.memoryBlocks) {
+    if (seen.has(block.key)) continue;
+    result.push({
+      key: block.key,
+      title: block.title,
+      description: block.description,
+      content: block.content,
+    });
   }
-  newGoal.value = '';
+
+  return result;
+});
+
+function isCanonical(key: string): boolean {
+  return Boolean(canonicalMap.value[key]);
 }
 
-function removeGoal(index: number) {
-  form.goals.splice(index, 1);
+function hasContent(key: string): boolean {
+  return Boolean(blockMap.value[key]);
 }
 
-async function handleSave() {
-  saveMessage.value = '';
-  saveError.value = false;
+function isDirty(key: string): boolean {
+  return (drafts[key] ?? '') !== (baseline.value[key] ?? '');
+}
 
-  const data: ProfileUpdateData = {
-    platforms: form.platforms,
-    niche: form.niche,
-    topics: form.topics,
-    audienceDescription: form.audienceDescription,
-    audiencePainPoints: form.audiencePainPoints || null,
-    stage: form.stage,
-    contentLanguage: form.contentLanguage,
-    toneOfVoice: form.toneOfVoice,
-    goals: form.goals,
-  };
-
-  try {
-    await profileStore.updateProfile(data);
-    saveMessage.value = 'Profile saved successfully';
-  } catch {
-    saveError.value = true;
-    saveMessage.value = 'Failed to save profile. Please try again.';
+function syncDrafts(): void {
+  const next: Record<string, string> = {};
+  for (const entry of displayBlocks.value) {
+    next[entry.key] = entry.content;
   }
+  baseline.value = next;
+  for (const key of Object.keys(drafts)) delete drafts[key];
+  for (const [key, value] of Object.entries(next)) drafts[key] = value;
+}
+
+watch(
+  () => [profileStore.memoryBlocks, profileStore.canonicalKeys],
+  syncDrafts,
+  { immediate: true, deep: true },
+);
+
+async function onSave(key: string): Promise<void> {
+  const content = drafts[key]?.trim();
+  if (!content) return;
+  const canonical = canonicalMap.value[key];
+  const existing = blockMap.value[key];
+  await profileStore.upsertBlock({
+    key,
+    title: existing?.title ?? canonical?.title ?? key,
+    description: existing?.description ?? canonical?.description ?? '',
+    content,
+  });
+}
+
+async function onDelete(key: string): Promise<void> {
+  if (isCanonical(key)) return;
+  await profileStore.deleteBlock(key);
 }
 
 onMounted(async () => {
   await profileStore.loadProfile();
-  populateForm();
 });
 </script>
 
@@ -333,7 +240,6 @@ onMounted(async () => {
 .platforms-list {
   display: flex;
   flex-direction: column;
-  gap: 0;
 }
 
 .platform-row {
@@ -396,17 +302,6 @@ onMounted(async () => {
   color: #111827;
 }
 
-.platform-badge {
-  font-size: 0.625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: #dcfce7;
-  color: #16a34a;
-  padding: 0.2rem 0.5rem;
-  border-radius: 9999px;
-}
-
 .platform-row__right {
   flex-shrink: 0;
 }
@@ -421,11 +316,10 @@ onMounted(async () => {
   color: #fff;
   cursor: not-allowed;
   opacity: 0.4;
-  transition: all 0.15s;
   white-space: nowrap;
 }
 
-/* Form */
+/* Blocks */
 .loading-state,
 .empty-state {
   color: #6b7280;
@@ -433,110 +327,80 @@ onMounted(async () => {
   padding: 2rem 0;
 }
 
-.profile-form {
+.blocks-list {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
-.form-group {
+.block-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  background: #fafafa;
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.75rem;
 }
 
-.form-label {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #374151;
+.block-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.form-input,
-.form-textarea,
-.form-select {
+.block-card__title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.25rem;
+}
+
+.block-card__description {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.block-card__delete {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  color: #ef4444;
+  cursor: pointer;
+}
+
+.block-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.block-card__key {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6875rem;
+  color: #9ca3af;
+}
+
+.form-textarea {
   padding: 0.5rem 0.75rem;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 0.875rem;
   color: #111827;
   background: #fff;
-  transition: border-color 0.15s;
+  resize: vertical;
+  width: 100%;
 }
 
-.form-input:focus,
-.form-textarea:focus,
-.form-select:focus {
+.form-textarea:focus {
   outline: none;
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-.form-textarea {
-  resize: vertical;
-}
-
-.chip-selector {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.chip {
-  padding: 0.375rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 20px;
-  background: #fff;
-  font-size: 0.8125rem;
-  color: #374151;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.chip:hover {
-  border-color: #6366f1;
-}
-
-.chip--active {
-  background: #6366f1;
-  border-color: #6366f1;
-  color: #fff;
-}
-
-.tag-input-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.tags-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  background: #f3f4f6;
-  border-radius: 6px;
-  font-size: 0.8125rem;
-  color: #374151;
-}
-
-.tag-remove {
-  background: none;
-  border: none;
-  color: #9ca3af;
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-  padding: 0;
-}
-
-.tag-remove:hover {
-  color: #ef4444;
 }
 
 .btn {
@@ -561,15 +425,5 @@ onMounted(async () => {
 
 .btn--primary:hover:not(:disabled) {
   background: #4f46e5;
-}
-
-.save-message {
-  font-size: 0.8125rem;
-  color: #059669;
-  margin: 0;
-}
-
-.save-message--error {
-  color: #dc2626;
 }
 </style>

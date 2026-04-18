@@ -5,8 +5,9 @@ import {
   makeSaveContentIdea,
   updateContentIdeaTool,
   makeUpdateContentIdea,
-  executeGetSessionContext,
+  loadStrategistSessionContext,
 } from "../../tools/content.js";
+import { readMemoryTool, makeReadMemory } from "../tools/read-memory.js";
 
 export class StrategistAgent extends BaseAgent {
   private constructor(userId: string, chatSessionId: string) {
@@ -20,18 +21,17 @@ export class StrategistAgent extends BaseAgent {
     return BaseAgent.initialize(new StrategistAgent(userId, chatSessionId));
   }
 
-  // Loads creator profile + last 30 days of content history before first run
   protected async loadContext(): Promise<string> {
-    const sessionContext = await executeGetSessionContext({ userId: this.userId });
-    return `## Session Context\n${sessionContext}`;
+    return loadStrategistSessionContext(this.userId);
   }
 
   getTools(options: AgentToolOptions = {}): AgentToolSet {
     const webSearchTool = { type: "web_search_20250305", name: "web_search" } as unknown as Anthropic.Tool;
 
     return {
-      definitions: [webSearchTool, saveContentIdeaTool, updateContentIdeaTool],
+      definitions: [webSearchTool, readMemoryTool, saveContentIdeaTool, updateContentIdeaTool],
       executors: {
+        read_memory: makeReadMemory(this.userId),
         save_content_idea: makeSaveContentIdea(options.onIdeaSaved),
         update_content_idea: makeUpdateContentIdea(options.onIdeaUpdating, options.onIdeaUpdated),
       },

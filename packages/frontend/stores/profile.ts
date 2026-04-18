@@ -1,84 +1,98 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useApiClient } from '~/services/api';
 
-export interface CreatorProfile {
-  id: string;
-  userId: string;
-  platforms: string[];
-  niche: string;
-  topics: string[];
-  audienceDescription: string;
-  audiencePainPoints: string | null;
-  stage: 'starting' | 'growing' | 'established';
-  toneOfVoice: string;
-  toneExamples: string[];
-  goals: string[];
-  rawNotes: string;
-  contentLanguage: string;
-  createdAt: string;
-  updatedAt: string;
+export interface MemoryBlock {
+  key: string;
+  title: string;
+  description: string;
+  content: string;
 }
 
-export type ProfileUpdateData = Partial<
-  Pick<
-    CreatorProfile,
-    | 'platforms'
-    | 'niche'
-    | 'topics'
-    | 'audienceDescription'
-    | 'audiencePainPoints'
-    | 'stage'
-    | 'toneOfVoice'
-    | 'toneExamples'
-    | 'goals'
-    | 'contentLanguage'
-  >
->;
+export interface CanonicalKey {
+  key: string;
+  title: string;
+  description: string;
+}
+
+interface ProfileResponse {
+  email: string;
+  name: string;
+  isAdmin: boolean;
+}
+
+interface MemoryResponse {
+  blocks: MemoryBlock[];
+  canonicalKeys: CanonicalKey[];
+}
 
 export const useProfileStore = defineStore('profile', () => {
   const apiClient = useApiClient();
 
-  const profile = ref<CreatorProfile | null>(null);
   const userEmail = ref('');
   const userName = ref('');
   const isAdmin = ref(false);
+  const memoryBlocks = ref<MemoryBlock[]>([]);
+  const canonicalKeys = ref<CanonicalKey[]>([]);
   const isLoading = ref(false);
   const isSaving = ref(false);
+
+  const isOnboarded = computed(() => memoryBlocks.value.length > 0);
 
   async function loadProfile(): Promise<void> {
     isLoading.value = true;
     try {
-      const response = await apiClient.get<{ profile: CreatorProfile; email: string; name: string; isAdmin: boolean }>('/api/profile');
-      profile.value = response.profile;
-      userEmail.value = response.email || '';
-      userName.value = response.name || '';
-      isAdmin.value = response.isAdmin ?? false;
-    } catch {
-      profile.value = null;
+      const [profile, memory] = await Promise.all([
+        apiClient.get<ProfileResponse>('/api/profile'),
+        apiClient.get<MemoryResponse>('/api/memory').catch(() => ({ blocks: [], canonicalKeys: [] })),
+      ]);
+      userEmail.value = profile.email || '';
+      userName.value = profile.name || '';
+      isAdmin.value = profile.isAdmin ?? false;
+      memoryBlocks.value = memory.blocks;
+      canonicalKeys.value = memory.canonicalKeys;
     } finally {
       isLoading.value = false;
     }
   }
 
-  async function updateProfile(data: ProfileUpdateData): Promise<void> {
+  async function loadMemory(): Promise<void> {
+    const memory = await apiClient.get<MemoryResponse>('/api/memory');
+    memoryBlocks.value = memory.blocks;
+    canonicalKeys.value = memory.canonicalKeys;
+  }
+
+  async function upsertBlock(block: MemoryBlock): Promise<void> {
     isSaving.value = true;
     try {
-      const response = await apiClient.patch<{ profile: CreatorProfile }>('/api/profile', data);
-      profile.value = response.profile;
+      await apiClient.patch(`/api/memory/${encodeURIComponent(block.key)}`, {
+        title: block.title,
+        description: block.description,
+        content: block.content,
+      });
+      await loadMemory();
     } finally {
       isSaving.value = false;
     }
   }
 
+  async function deleteBlock(key: string): Promise<void> {
+    await apiClient.del(`/api/memory/${encodeURIComponent(key)}`);
+    await loadMemory();
+  }
+
   return {
-    profile,
     userEmail,
     userName,
     isAdmin,
+    memoryBlocks,
+    canonicalKeys,
     isLoading,
     isSaving,
+    isOnboarded,
     loadProfile,
-    updateProfile,
+    loadMemory,
+    upsertBlock,
+    deleteBlock,
   };
 });

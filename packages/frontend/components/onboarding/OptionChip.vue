@@ -25,9 +25,10 @@ defineEmits<{ toggle: [] }>();
   font-weight: 500;
   color: #464555;
   transition: all 0.15s;
-  text-align: left;
+  text-align: center;
   line-height: 1.35;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .ob-chip:hover {

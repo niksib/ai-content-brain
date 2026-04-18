@@ -1,18 +1,11 @@
 <template>
   <div class="ob-done">
     <span class="material-symbols-outlined ob-done__spinner">progress_activity</span>
-    Redirecting to dashboard…
+    Saving your profile…
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
-
-const emit = defineEmits<{ complete: [] }>();
-
-onMounted(() => {
-  setTimeout(() => emit('complete'), 1800);
-});
 </script>
 
 <style scoped>

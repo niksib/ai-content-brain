@@ -497,10 +497,10 @@ export class ThreadsApiService {
   async fetchUserPosts(
     threadsUserId: string,
     accessToken: string,
-    limit: number = 20
+    limit: number = 30
   ): Promise<ThreadsPost[]> {
     const params = new URLSearchParams({
-      fields: "id,text,timestamp",
+      fields: "id,text,timestamp,is_reply",
       limit: String(limit),
       access_token: accessToken,
     });
@@ -514,11 +514,11 @@ export class ThreadsApiService {
     }
 
     const data = await response.json() as {
-      data: Array<{ id: string; text?: string; timestamp: string }>;
+      data: Array<{ id: string; text?: string; timestamp: string; is_reply?: boolean }>;
     };
 
     return data.data
-      .filter((post) => post.text && post.text.trim().length > 0)
+      .filter((post) => !post.is_reply && post.text && post.text.trim().length > 0)
       .map((post) => ({
         id: post.id,
         text: post.text!.trim(),

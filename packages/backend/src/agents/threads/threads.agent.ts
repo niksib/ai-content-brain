@@ -1,5 +1,5 @@
 import { BaseAgent, PlatformAgent, type AgentToolSet, type AgentToolOptions } from "../base.agent.js";
-import { executeGetCreatorProfile } from "../../tools/creator-profile.js";
+import { buildLegacyProfile, formatLegacyProfileForPrompt } from "../adapters/profile-from-memory.js";
 import { saveProducedContentTool, makeSaveProducedContent } from "../../tools/content.js";
 import type { ContentIdea } from "../../generated/prisma/client.js";
 
@@ -31,8 +31,8 @@ export class ThreadsAgent extends PlatformAgent {
   }
 
   protected async loadContext(): Promise<string> {
-    const profile = await executeGetCreatorProfile({ userId: this.userId });
-    return `## Creator Profile\n${profile}`;
+    const profile = await buildLegacyProfile(this.userId);
+    return `## Creator Profile\n${formatLegacyProfileForPrompt(profile)}`;
   }
 
   buildProductionPrompt(): string {

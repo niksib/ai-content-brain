@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { threadsApiService, THREADS_BASE_URL } from "../services/threads-api.service.js";
-import { analyzeWritingStyleFromThreads } from "../services/style-analysis.service.js";
 import type { AppEnv } from "../types/hono.js";
 
 function signOAuthState(userId: string): string {
@@ -81,6 +80,8 @@ threadsRoutes.get("/threads/callback", async (context) => {
         userId: verifiedUserId,
         threadsUserId: userInfo.id,
         username: userInfo.username,
+        name: userInfo.name ?? null,
+        biography: userInfo.biography ?? null,
         profilePictureUrl: userInfo.profilePictureUrl ?? null,
         accessToken: tokenData.accessToken,
         tokenExpiresAt,
@@ -89,18 +90,21 @@ threadsRoutes.get("/threads/callback", async (context) => {
       update: {
         threadsUserId: userInfo.id,
         username: userInfo.username,
+        name: userInfo.name ?? null,
+        biography: userInfo.biography ?? null,
         profilePictureUrl: userInfo.profilePictureUrl ?? null,
         accessToken: tokenData.accessToken,
         tokenExpiresAt,
       },
     });
 
-    // Fire-and-forget: analyze writing style from the user's recent posts
-    analyzeWritingStyleFromThreads(verifiedUserId).catch((analysisError) => {
-      console.error("[threads/callback] Style analysis failed:", analysisError);
+    const onboardingSession = await prisma.onboardingSession.findUnique({
+      where: { userId: verifiedUserId },
+      select: { completedAt: true },
     });
+    const returnPath = onboardingSession?.completedAt ? "/dashboard" : "/onboarding";
 
-    return context.redirect(`${frontendUrl}/dashboard?threads_connected=true`);
+    return context.redirect(`${frontendUrl}${returnPath}?threads_connected=true`);
   } catch (connectError) {
     console.error("[threads/callback] Failed to connect Threads account:", connectError);
     return context.redirect(`${frontendUrl}/profile?threads_error=connection_failed`);

@@ -19,8 +19,10 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  sessions      Session[]
-  accounts      Account[]
+  sessions          Session[]
+  accounts          Account[]
+  memoryBlocks      MemoryBlock[]
+  onboardingSession OnboardingSession?
 }
 
 model Session {
@@ -61,34 +63,39 @@ model Verification {
   updatedAt  DateTime @updatedAt
 }
 
-// ==================== CREATOR PROFILE ====================
+// ==================== MEMORY BLOCKS ====================
 
-model CreatorProfile {
-  id        String   @id @default(cuid())
-  userId    String   @unique
+model MemoryBlock {
+  id          String   @id @default(cuid())
+  userId      String
+  key         String
+  title       String
+  description String
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  platforms String[]
-  niche     String
-  topics    String[]
-
-  audienceDescription String
-  audiencePainPoints  String?
-  stage               CreatorStage
-
-  toneOfVoice     String
-  toneExamples    String[]
-  goals           String[]
-  rawNotes        String
-  contentLanguage String   @default("Russian")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@unique([userId, key])
+  @@index([userId])
 }
 
-enum CreatorStage {
-  starting
-  growing
-  established
+// ==================== ONBOARDING SESSION ====================
+
+model OnboardingSession {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  currentStep        String
+  threadsAnalysis    Json?
+  generatedQuestions Json?
+  answers            Json?
+  summary            String?
+  clarification      String?
+  analysisStartedAt  DateTime?
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  lastActiveAt       DateTime  @updatedAt
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ==================== CHAT SESSION ====================
@@ -239,15 +246,24 @@ model CreditTransaction {
   type      CreditTransactionType
   reference String?
 
+  model               String?
+  inputUncachedTokens Int?
+  inputCachedTokens   Int?
+  cacheWriteTokens    Int?
+  outputTokens        Int?
+  costCents           Int?
+
   createdAt DateTime              @default(now())
 }
 
 enum CreditTransactionType {
+  trial_grant
   subscription_grant
   topup_purchase
   voice_processing
   content_plan
   content_production
+  agent_call
 }
 
 // ==================== MEDIA FILES ====================
@@ -275,6 +291,8 @@ model ThreadsAccount {
   userId            String   @unique
   threadsUserId     String
   username          String   @default("")
+  name              String?
+  biography         String?
   profilePictureUrl String?
   accessToken       String
   tokenExpiresAt    DateTime

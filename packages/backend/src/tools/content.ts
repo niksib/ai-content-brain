@@ -2,37 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import type { ContentIdea } from "../generated/prisma/client.js";
 import type { Platform, ContentFormat } from "../generated/prisma/enums.js";
 import type Anthropic from "@anthropic-ai/sdk";
-
-// ── Tool definitions (Anthropic Messages API format) ────────────────────────
-
-// Combined tool: fetches creator profile + last 30 days of content history in one call.
-// Use this at the start of every strategy session — it replaces calling
-// get_creator_profile and get_content_history separately.
-export const getSessionContextTool: Anthropic.Tool = {
-  name: "get_session_context",
-  description:
-    "Load everything needed to start a strategy session: the creator's profile (niche, platforms, tone, audience) AND their content history for the last 30 days. Always call this first — it replaces calling get_creator_profile and get_content_history separately.",
-  input_schema: {
-    type: "object",
-    properties: {
-      userId: { type: "string", description: "The user ID (provided in the system prompt as CURRENT USER ID)" },
-    },
-    required: ["userId"],
-  },
-};
-
-export const getContentHistoryTool: Anthropic.Tool = {
-  name: "get_content_history",
-  description:
-    "Get the user's content ideas from the last 30 days. Useful for understanding what content has already been planned or produced.",
-  input_schema: {
-    type: "object",
-    properties: {
-      userId: { type: "string", description: "The user ID to fetch content history for" },
-    },
-    required: ["userId"],
-  },
-};
+import { memoryService } from "../services/memory.service.js";
 
 export const saveContentIdeaTool: Anthropic.Tool = {
   name: "save_content_idea",
@@ -116,15 +86,14 @@ export const saveProducedContentTool: Anthropic.Tool = {
   },
 };
 
-// ── Executors ───────────────────────────────────────────────────────────────
+// ── Strategist context loader ──────────────────────────────────────────────
 
-export async function executeGetSessionContext(input: Record<string, unknown>): Promise<string> {
-  const userId = input.userId as string;
+export async function loadStrategistSessionContext(userId: string): Promise<string> {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const [profile, ideas] = await Promise.all([
-    prisma.creatorProfile.findUnique({ where: { userId } }),
+  const [memoryMap, ideas] = await Promise.all([
+    memoryService.getMemoryMap(userId),
     prisma.contentIdea.findMany({
       where: { userId, createdAt: { gte: thirtyDaysAgo } },
       include: { producedContent: true },
@@ -132,24 +101,32 @@ export async function executeGetSessionContext(input: Record<string, unknown>): 
     }),
   ]);
 
-  return JSON.stringify({
-    profile: profile ?? { found: false, message: "No creator profile found." },
-    contentHistory: ideas,
-  });
-}
+  const memoryLines =
+    memoryMap.length === 0
+      ? "(empty — onboarding may be incomplete)"
+      : memoryMap
+          .map((entry) => `- ${entry.key}: ${entry.title} — ${entry.description}`)
+          .join("\n");
 
-export async function executeGetContentHistory(input: Record<string, unknown>): Promise<string> {
-  const userId = input.userId as string;
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const historyLines =
+    ideas.length === 0
+      ? "(no content from the last 30 days)"
+      : ideas
+          .map(
+            (idea) =>
+              `- [${idea.platform}/${idea.format}] ${idea.angle} — status: ${idea.status}`
+          )
+          .join("\n");
 
-  const ideas = await prisma.contentIdea.findMany({
-    where: { userId, createdAt: { gte: thirtyDaysAgo } },
-    include: { producedContent: true },
-    orderBy: { createdAt: "desc" },
-  });
-
-  return JSON.stringify(ideas);
+  return [
+    "## Memory Map",
+    memoryLines,
+    "",
+    "Use the read_memory tool to fetch the full content of any block above when needed.",
+    "",
+    "## Content History (last 30 days)",
+    historyLines,
+  ].join("\n");
 }
 
 export function makeSaveContentIdea(onIdeaSaved?: (idea: ContentIdea) => void) {

@@ -6,113 +6,145 @@
   >
     <Transition name="ob-screen" mode="out-in">
       <ConnectStep
-        v-if="step === 'connect'"
+        v-if="viewStep === 'connect'"
         key="connect"
-        @connect="goto('analyzing')"
-        @skip="goto('oauth-fail')"
+        :loading="connecting"
+        @connect="onConnectThreads"
+        @skip="onSkipThreads"
       />
 
       <AnalyzingStep
-        v-else-if="step === 'analyzing'"
+        v-else-if="viewStep === 'analyzing'"
         key="analyzing"
-        @complete="goto('question-0')"
+        :complete="analysisReady"
+        @complete="onAnalysisComplete"
+      />
+
+      <AnalyzingStep
+        v-else-if="viewStep === 'finalizing'"
+        key="finalizing"
+        :steps="FINALIZING_STEPS"
+        :step-duration-ms="2200"
+        :complete="finalizingReady"
+        @complete="onFinalizingComplete"
       />
 
       <QuestionStep
-        v-else-if="step.startsWith('question-')"
-        :key="step"
-        :question="ONBOARDING_QUESTIONS[questionIndex]"
+        v-else-if="viewStep === 'question' && currentQuestion"
+        :key="`question-${questionIndex}`"
+        :question="currentQuestion"
         :index="questionIndex"
-        :total="ONBOARDING_QUESTIONS.length"
+        :total="onboarding.questions.length"
         @next="onQuestionNext"
         @recording-change="isRecording = $event"
       />
 
       <SummaryStep
-        v-else-if="step === 'summary'"
+        v-else-if="viewStep === 'summary'"
         key="summary"
+        :summary-text="onboarding.summaryText"
+        :loading="onboarding.loading"
+        :already-refined="onboarding.alreadyRefined"
         @save="onSummarySave"
+        @clarify="onSummaryClarify"
         @recording-change="isRecording = $event"
       />
 
       <DoneStep
-        v-else-if="step === 'done'"
+        v-else-if="viewStep === 'done'"
         key="done"
-        @complete="finish"
-      />
-
-      <OAuthFailStep
-        v-else-if="step === 'oauth-fail'"
-        key="oauth-fail"
-        @start="goto('question-0')"
-        @retry="goto('connect')"
-      />
-
-      <EmptyStep
-        v-else-if="step === 'empty'"
-        key="empty"
-        @start="goto('question-0')"
       />
 
       <ErrorStep
-        v-else-if="step === 'error'"
+        v-else-if="viewStep === 'error'"
         key="error"
-        @retry="goto('analyzing')"
-        @restart="goto('connect')"
-      />
-
-      <ReturningStep
-        v-else-if="step === 'returning'"
-        key="returning"
-        @continue="goto('question-2')"
-        @restart="goto('connect')"
+        @retry="onRetry"
+        @restart="onRestart"
       />
     </Transition>
   </OnboardingLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import OnboardingLayout from '~/components/onboarding/OnboardingLayout.vue';
 import ConnectStep from '~/components/onboarding/steps/ConnectStep.vue';
 import AnalyzingStep from '~/components/onboarding/steps/AnalyzingStep.vue';
 import QuestionStep from '~/components/onboarding/steps/QuestionStep.vue';
 import SummaryStep from '~/components/onboarding/steps/SummaryStep.vue';
 import DoneStep from '~/components/onboarding/steps/DoneStep.vue';
-import OAuthFailStep from '~/components/onboarding/steps/OAuthFailStep.vue';
-import EmptyStep from '~/components/onboarding/steps/EmptyStep.vue';
 import ErrorStep from '~/components/onboarding/steps/ErrorStep.vue';
-import ReturningStep from '~/components/onboarding/steps/ReturningStep.vue';
-import { ONBOARDING_QUESTIONS } from '~/components/onboarding/questions';
+import { useOnboardingStore } from '~/stores/onboarding';
 
-type Step =
+type ViewStep =
   | 'connect'
   | 'analyzing'
-  | `question-${number}`
+  | 'question'
+  | 'finalizing'
   | 'summary'
   | 'done'
-  | 'oauth-fail'
-  | 'empty'
-  | 'error'
-  | 'returning';
+  | 'error';
 
-const step = ref<Step>('connect');
+const FINALIZING_STEPS = [
+  'Reading your answers',
+  'Lining things up with your posts',
+  'Putting your profile together',
+] as const;
+
+const onboarding = useOnboardingStore();
+const route = useRoute();
+
 const isRecording = ref(false);
-const answers = ref<Record<string, { selected: string[]; text: string }>>({});
+const questionIndex = ref(0);
+const localStep = ref<ViewStep | null>(null);
+const connecting = ref(false);
+const analysisReady = ref(false);
+const finalizingReady = ref(false);
 
-const questionIndex = computed(() => {
-  const match = /^question-(\d+)$/.exec(step.value);
-  return match ? Number(match[1]) : 0;
+const ANALYSIS_POLL_INTERVAL_MS = 2500;
+let analysisPollHandle: ReturnType<typeof setInterval> | null = null;
+
+function stopAnalysisPolling(): void {
+  if (analysisPollHandle !== null) {
+    clearInterval(analysisPollHandle);
+    analysisPollHandle = null;
+  }
+}
+
+function startAnalysisPolling(): void {
+  if (analysisPollHandle !== null) return;
+  analysisPollHandle = setInterval(() => {
+    void onboarding.refreshSession();
+  }, ANALYSIS_POLL_INTERVAL_MS);
+}
+
+const currentQuestion = computed(
+  () => onboarding.questions[questionIndex.value] ?? null,
+);
+
+const viewStep = computed<ViewStep>(() => {
+  if (onboarding.error) return 'error';
+  if (localStep.value) return localStep.value;
+
+  switch (onboarding.step) {
+    case 'connect': return 'connect';
+    case 'analyzing': return 'analyzing';
+    case 'questions': return 'question';
+    case 'summary': return 'summary';
+    case 'done': return 'done';
+    default: return 'connect';
+  }
 });
 
 const orbState = computed<'idle' | 'thinking' | 'speaking' | 'listening'>(() => {
   if (isRecording.value) return 'listening';
-  switch (step.value) {
+  switch (viewStep.value) {
     case 'connect':
     case 'done':
     case 'error':
       return 'idle';
     case 'analyzing':
+    case 'finalizing':
       return 'thinking';
     default:
       return 'speaking';
@@ -120,64 +152,189 @@ const orbState = computed<'idle' | 'thinking' | 'speaking' | 'listening'>(() => 
 });
 
 const bubbleText = computed(() => {
-  switch (step.value) {
+  switch (viewStep.value) {
     case 'connect':
       return "Hi, I'm Ori, your Postrr copilot. Before we start making posts together, I want to actually understand you as a creator. Connect Threads so I can spend a moment with your account, your voice, your topics, your audience, and skip the questions I can answer just by looking.";
     case 'analyzing':
-      return "One moment while I get to know you as a creator.";
-    case 'summary':
-      return "You write about AI development for fellow indie builders. You want to grow an audience before launching Postrr, and you prefer a direct technical tone with dry humor. Focus this month: shipping the MVP in public.";
+      return 'One moment while I get to know you as a creator.';
+    case 'finalizing':
+      return "Got your answers. Let me put together what I learned about you.";
+    case 'summary': {
+      const summary = onboarding.summaryText
+        || "Here's what I gathered about you.";
+      return `${summary}\n\nIf I got something wrong, write it in the field below and I'll fix it.`;
+    }
     case 'done':
-      return "Saving your profile and taking you to the dashboard, you can keep working with your posts there.";
-    case 'oauth-fail':
-      return "No sweat, we can do this together instead. Four quick questions and I'll have enough to get started.";
-    case 'empty':
-      return "Looks like your profile is brand new, nothing to read yet. Let's build your voice from scratch with a few questions.";
+      return "Saving your Creator Profile and taking you to your dashboard.";
     case 'error':
-      return "I lost connection for a moment. Your answers are safe, want me to pick up where we left off?";
-    case 'returning':
-      return "Good to see you again. You got through 2 of 4 questions, want to pick up where we left off?";
+      return onboarding.error
+        ?? 'I lost connection for a moment. Want me to pick up where we left off?';
+    case 'question':
+      return currentQuestion.value?.bubbleContext
+        || currentQuestion.value?.prompt
+        || '';
     default:
-      return ONBOARDING_QUESTIONS[questionIndex.value]?.prompt ?? '';
+      return '';
   }
 });
 
 const bubbleMeta = computed(() => {
-  switch (step.value) {
+  switch (viewStep.value) {
     case 'connect': return 'Ori';
     case 'analyzing': return 'Ori · analyzing';
+    case 'finalizing': return 'Ori · writing your profile';
     case 'summary': return "Here's what I heard";
-    case 'done': return 'All set';
-    case 'oauth-fail': return 'No worries';
-    case 'empty': return 'Fresh account';
+    case 'done': return 'Saving';
     case 'error': return 'Hiccup on my end';
-    case 'returning': return 'Welcome back';
-    default:
-      return `Question ${questionIndex.value + 1} of ${ONBOARDING_QUESTIONS.length}`;
+    case 'question':
+      return `Question ${questionIndex.value + 1} of ${onboarding.questions.length}`;
+    default: return 'Ori';
   }
 });
 
-function goto(next: Step) {
-  step.value = next;
+onMounted(async () => {
+  await onboarding.ensureSession();
+
+  const justConnected = route.query.threads_connected === 'true';
+  if (
+    (justConnected && onboarding.step === 'connect') ||
+    onboarding.step === 'analyzing'
+  ) {
+    // Backend atomically claims; if already analyzing (non-stale) it no-ops.
+    await onboarding.runAnalysis();
+  }
+
+  if (onboarding.step === 'analyzing') {
+    startAnalysisPolling();
+    return;
+  }
+
+  if (onboarding.step === 'questions') {
+    questionIndex.value = findFirstUnanswered();
+  }
+});
+
+watch(
+  () => onboarding.step,
+  (nextStep, previousStep) => {
+    if (nextStep === 'analyzing' && previousStep !== 'analyzing') {
+      analysisReady.value = false;
+      startAnalysisPolling();
+      return;
+    }
+    if (previousStep === 'analyzing' && nextStep !== 'analyzing') {
+      stopAnalysisPolling();
+      if (nextStep === 'questions') {
+        questionIndex.value = findFirstUnanswered();
+      }
+      // Hold the analyzing view until AnalyzingStep emits complete.
+      localStep.value = 'analyzing';
+      analysisReady.value = true;
+    }
+  },
+);
+
+onBeforeUnmount(() => {
+  stopAnalysisPolling();
+});
+
+function findFirstUnanswered(): number {
+  for (let i = 0; i < onboarding.questions.length; i++) {
+    const question = onboarding.questions[i];
+    if (!onboarding.answers[question.key]) return i;
+  }
+  return Math.max(0, onboarding.questions.length - 1);
 }
 
-function onQuestionNext(payload: { selected: string[]; text: string }) {
-  const q = ONBOARDING_QUESTIONS[questionIndex.value];
-  answers.value[q.key] = payload;
-  const nextIdx = questionIndex.value + 1;
-  if (nextIdx < ONBOARDING_QUESTIONS.length) {
-    goto(`question-${nextIdx}` as Step);
-  } else {
-    goto('summary');
+async function onConnectThreads() {
+  if (connecting.value) return;
+  connecting.value = true;
+  try {
+    await onboarding.ensureSession();
+  } catch {
+    connecting.value = false;
+    return;
+  }
+  const config = useRuntimeConfig();
+  window.location.href = `${config.public.apiBaseUrl}/api/threads/auth`;
+}
+
+async function onSkipThreads() {
+  await onboarding.ensureSession();
+  localStep.value = 'analyzing';
+  await onboarding.runFallback();
+  localStep.value = null;
+}
+
+function onAnalysisComplete() {
+  analysisReady.value = false;
+  localStep.value = null;
+  if (onboarding.step === 'questions') {
+    questionIndex.value = findFirstUnanswered();
   }
 }
 
-function onSummarySave(_clarification: string) {
-  goto('done');
+async function onQuestionNext(payload: { selected: string[]; text: string }) {
+  if (!currentQuestion.value) return;
+  await onboarding.answerQuestion(currentQuestion.value.key, payload);
+  const nextIdx = questionIndex.value + 1;
+  if (nextIdx < onboarding.questions.length) {
+    questionIndex.value = nextIdx;
+    return;
+  }
+  localStep.value = 'finalizing';
+  finalizingReady.value = false;
+  await onboarding.generateSummary();
+  if (onboarding.error) {
+    localStep.value = null;
+    return;
+  }
+  finalizingReady.value = true;
 }
 
-function finish() {
+function onFinalizingComplete() {
+  finalizingReady.value = false;
+  localStep.value = null;
+}
+
+async function onSummarySave() {
+  localStep.value = 'done';
+  await onboarding.completeOnboarding();
+  if (onboarding.error) {
+    localStep.value = null;
+    return;
+  }
   navigateTo('/dashboard');
+}
+
+async function onSummaryClarify(clarification: string) {
+  if (!clarification) return;
+  localStep.value = 'done';
+  await onboarding.clarifySummary(clarification);
+  if (onboarding.error) {
+    localStep.value = null;
+    return;
+  }
+  await onboarding.completeOnboarding();
+  if (onboarding.error) {
+    localStep.value = null;
+    return;
+  }
+  navigateTo('/dashboard');
+}
+
+async function onRetry() {
+  onboarding.error = null;
+  if (onboarding.step === 'analyzing' || !onboarding.session) {
+    await onboarding.runAnalysis();
+  }
+}
+
+async function onRestart() {
+  onboarding.reset();
+  await onboarding.ensureSession();
+  localStep.value = null;
+  questionIndex.value = 0;
 }
 
 definePageMeta({ layout: false });

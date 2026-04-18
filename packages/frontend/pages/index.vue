@@ -464,8 +464,11 @@ async function handleAuthSubmit() {
     }
     const isAuthenticated = useState<boolean | null>('auth:authenticated');
     isAuthenticated.value = null;
-    const data = await $fetch<{ completed: boolean }>(`${baseURL}/api/onboarding/status`, { credentials: 'include' });
-    router.replace(data.completed ? '/dashboard' : '/onboarding');
+    const data = await $fetch<{ session: { completedAt: string | null } | null }>(
+      `${baseURL}/api/onboarding/session`,
+      { credentials: 'include' },
+    );
+    router.replace(data.session?.completedAt ? '/dashboard' : '/onboarding');
   } catch (err: unknown) {
     const apiError = err as { data?: { message?: string } };
     authError.value = apiError?.data?.message || 'Something went wrong. Please try again.';
@@ -491,10 +494,11 @@ const workflowSteps = [
 
 onMounted(async () => {
   try {
-    const data = await $fetch<{ completed: boolean }>(`${baseURL}/api/onboarding/status`, {
-      credentials: 'include',
-    });
-    if (data.completed) {
+    const data = await $fetch<{ session: { completedAt: string | null } | null }>(
+      `${baseURL}/api/onboarding/session`,
+      { credentials: 'include' },
+    );
+    if (data.session?.completedAt) {
       router.replace('/dashboard');
     } else {
       router.replace('/onboarding');

@@ -1,73 +1,100 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
-import { prisma } from "../lib/prisma.js";
-import type { AppEnv } from "../types/hono.js";
 import {
-  processOnboardingAnswers,
-  type OnboardingSubmission,
+  onboardingService,
+  OnboardingBusinessRuleError,
+  type QuestionAnswer,
 } from "../services/onboarding.service.js";
+import type { AppEnv } from "../types/hono.js";
 
 export const onboardingRoutes = new Hono<AppEnv>();
 
-// Check if onboarding is complete
-onboardingRoutes.get("/onboarding/status", requireAuth, async (context) => {
+onboardingRoutes.get("/onboarding/session", requireAuth, async (context) => {
   const user = context.get("user");
-  const profile = await prisma.creatorProfile.findUnique({
-    where: { userId: user.id },
-  });
-  return context.json({
-    completed: !!profile,
-    profile: profile || null,
-  });
+  const session = await onboardingService.getSession(user.id);
+  return context.json({ session });
 });
 
-// Submit quiz answers for agent review + profile creation
-onboardingRoutes.post("/onboarding/submit", requireAuth, async (context) => {
+onboardingRoutes.post("/onboarding/session/start", requireAuth, async (context) => {
   const user = context.get("user");
-  const body = await context.req.json() as OnboardingSubmission;
+  const session = await onboardingService.getOrCreateSession(user.id);
+  return context.json({ session });
+});
 
-  if (!body.quiz || typeof body.quiz !== "object") {
-    return context.json({ error: "quiz object is required" }, 400);
-  }
+onboardingRoutes.post("/onboarding/session/analyze", requireAuth, async (context) => {
+  const user = context.get("user");
+  const session = await onboardingService.runAnalysis(user.id);
+  return context.json({ session });
+});
 
-  const { quiz } = body;
+onboardingRoutes.post("/onboarding/session/analyze/fallback", requireAuth, async (context) => {
+  const user = context.get("user");
+  const session = await onboardingService.runAnalysisFallback(user.id);
+  return context.json({ session });
+});
 
-  if (!Array.isArray(quiz.platforms) || quiz.platforms.length === 0) {
-    return context.json({ error: "quiz.platforms is required" }, 400);
-  }
-  if (!quiz.stage) {
-    return context.json({ error: "quiz.stage is required" }, 400);
-  }
-  if (!Array.isArray(quiz.topics) || quiz.topics.length === 0) {
-    return context.json({ error: "quiz.topics is required" }, 400);
-  }
-  if (!quiz.audience?.trim()) {
-    return context.json({ error: "quiz.audience is required" }, 400);
-  }
-  if (!quiz.goal) {
-    return context.json({ error: "quiz.goal is required" }, 400);
-  }
-  if (!Array.isArray(quiz.toneStyles) || quiz.toneStyles.length === 0) {
-    return context.json({ error: "quiz.toneStyles is required" }, 400);
-  }
-  if (!quiz.toneExample?.trim()) {
-    return context.json({ error: "quiz.toneExample is required" }, 400);
+onboardingRoutes.post("/onboarding/session/answer", requireAuth, async (context) => {
+  const user = context.get("user");
+  const body = (await context.req.json()) as {
+    questionKey?: string;
+    selected?: string[];
+    text?: string;
+  };
+
+  if (!body.questionKey) {
+    return context.json({ error: "questionKey is required" }, 400);
   }
 
+  const answer: QuestionAnswer = {
+    selected: Array.isArray(body.selected) ? body.selected : [],
+    text: typeof body.text === "string" ? body.text : "",
+  };
+
+  if (answer.selected.length === 0 && !answer.text.trim()) {
+    return context.json({ error: "Provide at least one selection or free text" }, 400);
+  }
+
+  const session = await onboardingService.saveAnswer(user.id, body.questionKey, answer);
+  return context.json({ session });
+});
+
+onboardingRoutes.post("/onboarding/session/summary", requireAuth, async (context) => {
+  const user = context.get("user");
   try {
-    const result = await processOnboardingAnswers(user.id, body);
-    return context.json(result);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    const isOverloaded = message.toLowerCase().includes("overloaded");
-    console.error("[onboarding/submit]", err);
-    return context.json(
-      {
-        error: isOverloaded
-          ? "Service temporarily overloaded. Please try again."
-          : "Something went wrong.",
-      },
-      503
-    );
+    const session = await onboardingService.generateSummary(user.id);
+    return context.json({ session });
+  } catch (error) {
+    console.error("[onboarding/summary]", error);
+    return context.json({ error: "Failed to generate summary" }, 503);
+  }
+});
+
+onboardingRoutes.post("/onboarding/session/clarify", requireAuth, async (context) => {
+  const user = context.get("user");
+  const body = (await context.req.json()) as { clarification?: string };
+  const clarification = (body.clarification ?? "").trim();
+  if (!clarification) {
+    return context.json({ error: "clarification is required" }, 400);
+  }
+  try {
+    const session = await onboardingService.applyClarification(user.id, clarification);
+    return context.json({ session });
+  } catch (caughtError) {
+    if (caughtError instanceof OnboardingBusinessRuleError) {
+      return context.json({ error: caughtError.message, code: caughtError.code }, caughtError.httpStatus as 409);
+    }
+    console.error("[onboarding/clarify]", caughtError);
+    return context.json({ error: "Failed to apply clarification" }, 503);
+  }
+});
+
+onboardingRoutes.post("/onboarding/session/complete", requireAuth, async (context) => {
+  const user = context.get("user");
+  try {
+    const session = await onboardingService.complete(user.id);
+    return context.json({ session });
+  } catch (error) {
+    console.error("[onboarding/complete]", error);
+    return context.json({ error: "Failed to complete onboarding" }, 500);
   }
 });
