@@ -256,7 +256,7 @@ async function onConnectThreads() {
     return;
   }
   const config = useRuntimeConfig();
-  window.location.href = `${config.public.apiBaseUrl}/api/threads/auth`;
+  await navigateTo(`${config.public.apiBaseUrl}/api/threads/auth`, { external: true });
 }
 
 async function onSkipThreads() {
@@ -337,7 +337,7 @@ async function onRestart() {
   questionIndex.value = 0;
 }
 
-definePageMeta({ layout: false });
+definePageMeta({ layout: false, ssr: false });
 </script>
 
 <style scoped>

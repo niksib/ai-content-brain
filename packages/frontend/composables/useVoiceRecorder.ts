@@ -17,6 +17,7 @@ export function useVoiceRecorder() {
   }
 
   async function startRecording(): Promise<void> {
+    if (!import.meta.client) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 

@@ -57,7 +57,7 @@ export const useBillingStore = defineStore('billing', () => {
       mode,
     });
     if (response.url) {
-      window.location.href = response.url;
+      await navigateTo(response.url, { external: true });
     }
   }
 

@@ -1,12 +1,6 @@
 <template>
   <div>
-    <!-- Loading state while checking auth -->
-    <div v-if="isChecking" class="auth-check">
-      <div class="auth-check__spinner"></div>
-    </div>
-
-    <template v-else>
-      <!-- ═══════════════════ LANDING PAGE ═══════════════════ -->
+    <!-- ═══════════════════ LANDING PAGE ═══════════════════ -->
       <div class="page">
 
         <!-- NAV -->
@@ -23,11 +17,16 @@
               <a href="#pricing">Pricing</a>
             </div>
             <div class="nav-cta">
-              <button class="btn-ghost" @click="goToAuth('login')">Sign in</button>
-              <button class="btn-primary" @click="goToAuth('register')">
-                Start free
-                <span class="material-symbols-outlined" style="font-size:16px">arrow_forward</span>
-              </button>
+              <template v-if="isLoggedIn">
+                <NuxtLink to="/dashboard" class="btn-primary">Go to dashboard</NuxtLink>
+              </template>
+              <template v-else>
+                <button class="btn-ghost" @click="goToAuth('login')">Sign in</button>
+                <button class="btn-primary" @click="goToAuth('register')">
+                  Start free
+                  <span class="material-symbols-outlined" style="font-size:16px">arrow_forward</span>
+                </button>
+              </template>
             </div>
           </div>
         </nav>
@@ -539,7 +538,6 @@
           </form>
         </div>
       </div>
-    </template>
   </div>
 </template>
 
@@ -567,10 +565,27 @@ const route = useRoute();
 const config = useRuntimeConfig();
 const baseURL = config.public.apiBaseUrl as string;
 
-const isChecking = ref(true);
 const activePlatform = ref('threads');
 
-const showAuth = computed(() => route.query.mode === 'register' || route.query.mode === 'login');
+const authState = useState<boolean | null>('auth:authenticated', () => null);
+
+const { data: authResult } = await useAsyncData('home-auth', async () => {
+  const headers = import.meta.server ? useRequestHeaders(['cookie']) : {};
+  try {
+    await $fetch(`${baseURL}/api/onboarding/session`, { credentials: 'include', headers });
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+authState.value = authResult.value ?? false;
+
+const isLoggedIn = computed(() => authState.value === true);
+
+const showAuth = computed(() =>
+  !isLoggedIn.value && (route.query.mode === 'register' || route.query.mode === 'login'),
+);
 const authMode = computed<'login' | 'register'>(() =>
   route.query.mode === 'login' ? 'login' : 'register',
 );
@@ -606,8 +621,7 @@ async function handleAuthSubmit() {
         credentials: 'include',
       });
     }
-    const isAuthenticated = useState<boolean | null>('auth:authenticated');
-    isAuthenticated.value = null;
+    authState.value = null;
     const data = await $fetch<{ session: { completedAt: string | null } | null }>(
       `${baseURL}/api/onboarding/session`,
       { credentials: 'include' },
@@ -621,27 +635,6 @@ async function handleAuthSubmit() {
   }
 }
 
-onMounted(async () => {
-  const isAuthenticated = useState<boolean | null>('auth:authenticated');
-  if (isAuthenticated.value === false) {
-    isChecking.value = false;
-    return;
-  }
-
-  try {
-    const data = await $fetch<{ session: { completedAt: string | null } | null }>(
-      `${baseURL}/api/onboarding/session`,
-      { credentials: 'include' },
-    );
-    if (data.session?.completedAt) {
-      router.replace('/dashboard');
-    } else {
-      router.replace('/onboarding');
-    }
-  } catch {
-    isChecking.value = false;
-  }
-});
 
 // ─── Static data ───────────────────────────────────────────────
 
@@ -1657,21 +1650,6 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0;
 }
 
-/* ═══════════════════════════════════════════════════════
-   AUTH CHECK SPINNER
-   ═══════════════════════════════════════════════════════ */
-.auth-check {
-  position: fixed; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--surface);
-}
-.auth-check__spinner {
-  width: 40px; height: 40px;
-  border: 3px solid var(--primary-fixed);
-  border-top-color: var(--primary);
-  border-radius: 50%; animation: spin 0.7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ═══════════════════════════════════════════════════════
    RESPONSIVE

@@ -22,6 +22,11 @@ export function useTypewriter(source: () => string, speed = 16) {
         done.value = true;
         return;
       }
+      if (!import.meta.client) {
+        typed.value = text;
+        done.value = true;
+        return;
+      }
       let i = 0;
       intervalId = setInterval(() => {
         i++;

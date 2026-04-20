@@ -257,6 +257,7 @@ interface ThreadsAccount {
 
 definePageMeta({
   layout: 'default',
+  ssr: false,
 });
 
 const dashboardStore = useDashboardStore();

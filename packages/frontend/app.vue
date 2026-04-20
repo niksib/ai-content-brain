@@ -4,6 +4,27 @@
   </NuxtLayout>
 </template>
 
+<script setup lang="ts">
+onMounted(() => {
+  const markReady = () => document.documentElement.classList.add('material-symbols-ready');
+
+  if (document.fonts.check('24px "Material Symbols Outlined"')) {
+    markReady();
+    return;
+  }
+
+  const onLoadingDone = () => {
+    if (document.fonts.check('24px "Material Symbols Outlined"')) {
+      markReady();
+      document.fonts.removeEventListener('loadingdone', onLoadingDone);
+    }
+  };
+
+  document.fonts.addEventListener('loadingdone', onLoadingDone);
+  setTimeout(markReady, 4000); // fallback if font never loads
+});
+</script>
+
 <style>
 /* ─── Design System CSS Variables ─── */
 :root {

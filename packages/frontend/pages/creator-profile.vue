@@ -88,7 +88,7 @@ import { useProfileStore, type MemoryBlock, type CanonicalKey } from '~/stores/p
 import PlatformIcon from '~/components/PlatformIcon.vue';
 import ThreadsConnect from '~/components/threads/ThreadsConnect.vue';
 
-definePageMeta({ layout: 'default' });
+definePageMeta({ layout: 'default', ssr: false });
 
 const profileStore = useProfileStore();
 

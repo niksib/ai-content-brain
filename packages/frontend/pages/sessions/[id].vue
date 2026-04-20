@@ -294,6 +294,7 @@ import { useVoiceRecorder } from '~/composables/useVoiceRecorder';
 
 definePageMeta({
   layout: 'default',
+  ssr: false,
 });
 
 const route = useRoute();

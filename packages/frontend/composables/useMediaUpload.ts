@@ -34,6 +34,7 @@ export function useMediaUpload(): UseMediaUploadReturn {
   }
 
   async function upload(file: File): Promise<UploadedMediaFile | null> {
+    if (!import.meta.client) return null;
     isUploading.value = true;
     progress.value = 0;
     error.value = null;

@@ -162,7 +162,7 @@ function togglePopover(): void {
     const rect = scheduleButtonEl.value.getBoundingClientRect();
     popoverStyle.value = {
       position: 'fixed',
-      bottom: `${window.innerHeight - rect.top + 6}px`,
+      bottom: `${(import.meta.client ? window.innerHeight : 800) - rect.top + 6}px`,
       left: `${rect.left}px`,
       zIndex: '9999',
     };

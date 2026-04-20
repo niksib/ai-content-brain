@@ -134,6 +134,7 @@ import { useBillingStore } from '~/stores/billing';
 
 definePageMeta({
   layout: 'default',
+  ssr: false,
 });
 
 const config = useRuntimeConfig();

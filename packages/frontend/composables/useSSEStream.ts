@@ -69,6 +69,7 @@ export function useSSEStream() {
   }
 
   async function streamMessage(url: string, body: object, method = 'POST'): Promise<void> {
+    if (!import.meta.client) return;
     if (abortController) {
       abortController.abort();
     }

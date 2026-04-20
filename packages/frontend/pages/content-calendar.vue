@@ -19,7 +19,7 @@ import { ref, onMounted } from 'vue';
 import { useLibraryStore, type LibraryItem } from '~/stores/library';
 import PublishingCalendar from '~/components/PublishingCalendar.vue';
 
-definePageMeta({ layout: 'default' });
+definePageMeta({ layout: 'default', ssr: false });
 
 const store = useLibraryStore();
 const router = useRouter();
