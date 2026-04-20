@@ -144,29 +144,60 @@
                     @keydown.enter.exact.prevent="($event.target as HTMLElement).blur()"
                   />
 
-                  <!-- Per-post media attachment -->
+                  <!-- Per-post media attachment (supports up to 20 files for carousel) -->
                   <div class="thread-post__media">
-                    <div v-if="postsMedia[index]" class="thread-post__media-preview">
-                      <img
-                        v-if="postsMedia[index]!.mimeType.startsWith('image/')"
-                        :src="postsMedia[index]!.url"
-                        class="thread-post__media-thumb"
-                        alt="attached media"
-                      />
-                      <div v-else class="thread-post__media-video">
-                        <span class="material-symbols-outlined" style="font-size:16px;">videocam</span>
-                        <span>{{ postsMedia[index]!.mimeType.includes('mp4') ? 'MP4' : 'MOV' }}</span>
-                      </div>
-                      <button
-                        type="button"
-                        class="thread-post__media-remove"
-                        title="Remove media"
-                        @click="removePostMedia(index)"
+                    <!-- Existing files -->
+                    <div v-if="postsMedia[index]?.length" class="thread-post__media-thumbs">
+                      <div
+                        v-for="(file, fileIdx) in postsMedia[index]"
+                        :key="file.id"
+                        class="thread-post__media-preview"
                       >
-                        <span class="material-symbols-outlined" style="font-size:14px;">close</span>
-                      </button>
+                        <img
+                          v-if="file.mimeType.startsWith('image/')"
+                          :src="file.url"
+                          class="thread-post__media-thumb"
+                          alt="attached media"
+                        />
+                        <div v-else class="thread-post__media-video">
+                          <span class="material-symbols-outlined" style="font-size:16px;">videocam</span>
+                          <span>{{ file.mimeType.includes('mp4') ? 'MP4' : 'MOV' }}</span>
+                        </div>
+                        <button
+                          type="button"
+                          class="thread-post__media-remove"
+                          title="Remove"
+                          @click="removePostMedia(index, fileIdx)"
+                        >
+                          <span class="material-symbols-outlined" style="font-size:14px;">close</span>
+                        </button>
+                      </div>
+
+                      <!-- Upload progress while adding more -->
+                      <div v-if="postsMediaUploading[index]" class="thread-post__media-progress">
+                        <div class="thread-post__media-bar">
+                          <div class="thread-post__media-fill" :style="{ width: `${postsMediaProgress[index] ?? 0}%` }" />
+                        </div>
+                      </div>
+
+                      <!-- Add more button (max 20) -->
+                      <label
+                        v-else-if="(postsMedia[index]?.length ?? 0) < 20"
+                        class="thread-post__media-add-more"
+                        title="Add another file"
+                      >
+                        <span class="material-symbols-outlined" style="font-size:16px;">add</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,video/mp4,video/quicktime"
+                          multiple
+                          style="display:none"
+                          @change="onPostFileSelected(index, $event)"
+                        />
+                      </label>
                     </div>
 
+                    <!-- Progress (first upload, no files yet) -->
                     <div v-else-if="postsMediaUploading[index]" class="thread-post__media-progress">
                       <div class="thread-post__media-bar">
                         <div class="thread-post__media-fill" :style="{ width: `${postsMediaProgress[index] ?? 0}%` }" />
@@ -174,12 +205,14 @@
                       <span class="thread-post__media-progress-label">{{ postsMediaProgress[index] ?? 0 }}%</span>
                     </div>
 
+                    <!-- Initial attach button -->
                     <label v-else class="thread-post__media-attach">
                       <span class="material-symbols-outlined" style="font-size:15px;">add_photo_alternate</span>
                       Add media
                       <input
                         type="file"
                         accept="image/jpeg,image/png,video/mp4,video/quicktime"
+                        multiple
                         style="display:none"
                         @change="onPostFileSelected(index, $event)"
                       />
@@ -467,8 +500,8 @@ const threadsPublishText = computed((): string => {
   return '';
 });
 
-// ─── Per-post media (multi-thread attachments) ───
-const postsMedia = ref<Array<UploadedMediaFile | null>>([]);
+// ─── Per-post media (multi-thread attachments, up to 20 per post for carousel) ───
+const postsMedia = ref<Array<UploadedMediaFile[] | null>>([]);
 const postsMediaUploading = reactive<Record<number, boolean>>({});
 const postsMediaProgress = reactive<Record<number, number>>({});
 
@@ -479,46 +512,64 @@ function ensureMediaSlots(count: number): void {
 
 async function onPostFileSelected(index: number, event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
+  const files = Array.from(input.files ?? []);
+  if (files.length === 0) return;
   input.value = '';
 
-  const uploader = useMediaUpload();
+  const existing = postsMedia.value[index] ?? [];
+  const slots = Math.min(files.length, 20 - existing.length);
+  if (slots <= 0) return;
+
   postsMediaUploading[index] = true;
   postsMediaProgress[index] = 0;
 
-  const stopWatch = watch(
-    uploader.progress,
-    (value) => { postsMediaProgress[index] = value; }
-  );
-
   try {
-    const result = await uploader.upload(file);
-    if (result) {
-      ensureMediaSlots(editableThreadPosts.value.length);
-      postsMedia.value[index] = result;
+    for (let i = 0; i < slots; i++) {
+      const uploader = useMediaUpload();
+      const stopWatch = watch(uploader.progress, (value) => {
+        postsMediaProgress[index] = Math.round(((i + value / 100) / slots) * 100);
+      });
+      const result = await uploader.upload(files[i]);
+      stopWatch();
+      if (result) {
+        ensureMediaSlots(editableThreadPosts.value.length);
+        postsMedia.value[index] = [...(postsMedia.value[index] ?? []), result];
+      }
     }
   } finally {
-    stopWatch();
     postsMediaUploading[index] = false;
     postsMediaProgress[index] = 0;
   }
 }
 
-function removePostMedia(index: number): void {
-  if (postsMedia.value[index]) postsMedia.value[index] = null;
+function removePostMedia(postIndex: number, fileIndex: number): void {
+  const files = postsMedia.value[postIndex];
+  if (!files) return;
+  const updated = files.filter((_, i) => i !== fileIndex);
+  postsMedia.value[postIndex] = updated.length > 0 ? updated : null;
 }
 
 const threadsPublishPostsMedia = computed(() => {
-  if (!threadsPublishPosts.value) return null;
-  return threadsPublishPosts.value.map((_text, index) => {
-    const media = postsMedia.value[index];
-    if (!media) return null;
+  const count = editableThreadPosts.value.length;
+  if (count === 0) return null;
+  const result = Array.from({ length: count }, (_, index) => {
+    const files = postsMedia.value[index];
+    if (!files || files.length === 0) return null;
+    if (files.length === 1) {
+      return {
+        mediaType: files[0].mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE',
+        mediaUrl: files[0].url,
+      } as { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string };
+    }
     return {
-      mediaType: media.mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE',
-      mediaUrl: media.url,
-    } as { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string };
+      carouselItems: files.map(f => ({
+        mediaType: (f.mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE') as 'IMAGE' | 'VIDEO',
+        mediaUrl: f.url,
+      })),
+    };
   });
+  if (result.every(item => item === null)) return null;
+  return result;
 });
 
 const IMAGE_TYPE_LABELS: Record<string, string> = {
@@ -1433,6 +1484,31 @@ onMounted(async () => {
   font-weight: 700;
   color: #464555;
   white-space: nowrap;
+}
+
+.thread-post__media-thumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.thread-post__media-add-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1.5px dashed #c7c4d8;
+  border-radius: 8px;
+  color: #777587;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.thread-post__media-add-more:hover {
+  border-color: #3525cd;
+  color: #3525cd;
 }
 
 .thread-post__publish {

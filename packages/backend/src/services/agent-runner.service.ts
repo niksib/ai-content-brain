@@ -96,10 +96,28 @@ export class AgentRunnerService {
 
             const executor = executors[block.name];
             let resultContent: string;
+            let isError = false;
 
             if (executor) {
-              resultContent = await executor(block.input as Record<string, unknown>);
+              try {
+                resultContent = await executor(block.input as Record<string, unknown>);
+              } catch (toolError) {
+                isError = true;
+                const message =
+                  toolError instanceof Error ? toolError.message : String(toolError);
+                resultContent = JSON.stringify({
+                  success: false,
+                  error: "tool_execution_failed",
+                  tool: block.name,
+                  message,
+                });
+                console.error(
+                  `[${agent.constructor.name}] Tool ${block.name} threw:`,
+                  toolError
+                );
+              }
             } else {
+              isError = true;
               resultContent = JSON.stringify({ error: `Unknown tool: ${block.name}` });
               console.warn(`[${agent.constructor.name}] Unknown tool called: ${block.name}`);
             }
@@ -108,6 +126,7 @@ export class AgentRunnerService {
               type: "tool_result",
               tool_use_id: block.id,
               content: resultContent,
+              ...(isError && { is_error: true }),
             });
           }
 

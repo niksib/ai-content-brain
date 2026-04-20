@@ -98,10 +98,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 
+type SingleMedia = { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string };
+type CarouselMedia = { carouselItems: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string }> };
+type PostMedia = SingleMedia | CarouselMedia;
+
 const props = defineProps<{
   text: string;
   posts?: string[] | null;
-  postsMedia?: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string } | null> | null;
+  postsMedia?: Array<PostMedia | null> | null;
   contentIdeaId?: string;
   publishStatus?: 'posted' | 'scheduled' | null;
   scheduledAt?: string | null;
@@ -194,9 +198,11 @@ onUnmounted(() => {
 function buildThreadPayload() {
   return (props.posts ?? []).map((text, index) => {
     const media = props.postsMedia?.[index];
-    if (media) {
-      return { text, mediaType: media.mediaType, mediaUrl: media.mediaUrl };
-    }
+    if (!media) return { text };
+    if ('mediaType' in media) return { text, mediaType: media.mediaType, mediaUrl: media.mediaUrl };
+    // carousel in thread chain → use first item only (API doesn't support carousel per reply)
+    const first = media.carouselItems[0];
+    if (first) return { text, mediaType: first.mediaType, mediaUrl: first.mediaUrl };
     return { text };
   });
 }
@@ -220,8 +226,12 @@ async function publishNow(): Promise<void> {
       };
       const singleMedia = props.postsMedia?.[0];
       if (singleMedia) {
-        publishBody.mediaUrl = singleMedia.mediaUrl;
-        publishBody.mediaType = singleMedia.mediaType;
+        if ('carouselItems' in singleMedia) {
+          publishBody.carouselItems = singleMedia.carouselItems;
+        } else {
+          publishBody.mediaUrl = singleMedia.mediaUrl;
+          publishBody.mediaType = singleMedia.mediaType;
+        }
       }
       const result = await $fetch<{ postId: string }>(`${apiBaseUrl}/api/threads/publish`, {
         method: 'POST',

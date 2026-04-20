@@ -104,24 +104,6 @@
                 </div>
               </div>
 
-              <!-- Emerging post cards - rotate through 3 sets of 4 -->
-              <div v-for="(post, i) in heroPosts" :key="i" :class="`post post--${['tr','br','bl','tl'][i]}`">
-                <div class="post-card">
-                  <div class="post-head">
-                    <span :class="`pg pg-${post.platform}`">
-                      <svg v-if="post.platform === 'linkedin'" viewBox="0 0 24 24" fill="white" width="14" height="14"><path d="M7.5 9.5h-3v10h3v-10zm-1.5-4.5a1.75 1.75 0 100 3.5 1.75 1.75 0 000-3.5zm13.5 7.7c0-2.5-1.3-3.8-3-3.8-1.4 0-2 .75-2.4 1.3v-1.2h-3v10h3v-5.5c0-1 .15-2.3 1.55-2.3 1.4 0 1.55 1.3 1.55 2.3v5.5h3v-6z"/></svg>
-                      <svg v-else-if="post.platform === 'threads'" viewBox="0 0 192 192" fill="white" width="14" height="14"><path d="M141.537 88.988c-.62-.296-1.248-.581-1.885-.852-1.104-20.344-12.215-32.007-30.872-32.127-9.05-.054-16.58 3.802-21.223 10.955l9.97 6.805c3.483-5.277 8.93-6.406 12.821-6.406.056 0 .112 0 .167.001 4.744.03 8.255 1.403 10.426 4.082 1.563 1.93 2.642 4.572 3.237 7.922-4.45-.744-9.257-.977-14.407-.689-14.554.827-23.896 9.222-23.264 20.874.316 5.84 3.235 10.814 8.21 14.01 4.203 2.704 9.6 4.024 15.154 3.735 7.335-.403 13.082-3.205 17.099-8.307 3.085-3.958 4.93-9.092 5.66-15.613 3.02 1.835 5.253 4.25 6.48 7.148 2.1 4.947 2.22 13.071-4.412 19.707-5.83 5.83-12.85 8.38-23.383 8.43-11.661-.086-20.463-3.835-26.186-11.147C81.82 108.77 78.8 97.69 78.693 86.001c.108-11.687 3.126-22.769 8.471-31.223 5.723-7.311 14.525-11.06 26.186-11.146 11.649.086 20.57 3.849 26.516 11.185 2.914 3.605 5.111 8.138 6.573 13.365l11.94-3.31c-1.775-6.43-4.572-11.969-8.391-16.686-7.623-9.415-18.766-14.24-33.121-14.34h-.082c-14.326.1-25.343 4.942-32.744 14.394C77.484 57.593 74.073 70.16 73.972 86.04v.008c.1 15.88 3.512 28.452 10.067 36.803 7.401 9.451 18.418 14.293 32.744 14.394h.082c12.731-.09 21.716-3.414 29.115-10.812 9.684-9.69 9.39-21.822 6.195-29.304-2.302-5.402-6.733-9.789-12.638-12.14zm-29.014 16.4c-6.22.352-12.707-2.442-13.022-8.258-.22-4.136 2.904-8.76 13.385-9.367 1.2-.07 2.378-.103 3.528-.103 3.78 0 7.326.364 10.55 1.059-1.204 15.077-8.17 16.408-14.441 16.669z"/></svg>
-                      <svg v-else-if="post.platform === 'instagram'" viewBox="0 0 24 24" fill="none" width="14" height="14"><rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="white" stroke-width="1.6"/><circle cx="12" cy="12" r="4" stroke="white" stroke-width="1.6"/><circle cx="17.5" cy="6.5" r="1.1" fill="white"/></svg>
-                      <svg v-else-if="post.platform === 'x'" viewBox="0 0 24 24" fill="white" width="13" height="13"><path d="M18.244 2H21l-6.53 7.464L22 22h-6.29l-4.933-6.44L5.06 22H2.303l6.98-7.977L2 2h6.412l4.462 5.9L18.244 2zm-1.103 18.25h1.71L7.04 3.62H5.2l11.94 16.63z"/></svg>
-                    </span>
-                    <div class="post-head-text">
-                      <div class="post-author">{{ post.author }}</div>
-                      <div class="post-meta">{{ post.handle }}{{ post.handle ? ' · ' : '' }}{{ post.meta }}</div>
-                    </div>
-                  </div>
-                  <div class="post-body">{{ post.body }}</div>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -176,29 +158,29 @@
                 <em>Not like AI.</em>
               </h2>
               <p class="voice-lead">
-                Every creator has a cadence - the words they favor, the sentence lengths,
-                the tells. HeyPostrr learns yours over a 4-minute onboarding and remembers it forever.
+                Everyone writes differently. The words you use. How long your sentences are.
+                The little quirks. HeyPostrr learns yours in 4 minutes and keeps it forever.
               </p>
               <ul class="voice-bullets">
                 <li>
                   <span class="material-symbols-outlined">auto_awesome</span>
                   <div>
-                    <b>Vocabulary lock</b>
-                    <span>Uses your words. Kills the AI-isms ("unlock", "leverage", "game-changer").</span>
+                    <b>Your words</b>
+                    <span>Uses the words you actually say. No "unlock", "leverage", or "game-changer".</span>
                   </div>
                 </li>
                 <li>
                   <span class="material-symbols-outlined">graphic_eq</span>
                   <div>
-                    <b>Pacing match</b>
-                    <span>Matches your sentence length and rhythm. Short sentences stay short.</span>
+                    <b>Your rhythm</b>
+                    <span>Matches how long your sentences are. Short stays short.</span>
                   </div>
                 </li>
                 <li>
                   <span class="material-symbols-outlined">fingerprint</span>
                   <div>
-                    <b>Tells &amp; tics</b>
-                    <span>Keeps the one-word paragraphs, the em-dashes, the half-jokes.</span>
+                    <b>Your style</b>
+                    <span>Keeps the one-word lines, the dashes, the half-jokes.</span>
                   </div>
                 </li>
               </ul>
@@ -210,9 +192,7 @@
                   <span class="material-symbols-outlined" style="font-size:16px;color:var(--warn)">error</span>
                 </div>
                 <p>
-                  Unlocking success requires a multifaceted approach to systematic integration.
-                  Here are 5 ways to optimize your workflow for maximum leverage in today's
-                  fast-paced digital landscape.
+                  Here are 5 game-changing ways to optimize your workflow and unlock peak productivity in today's fast-paced world.
                 </p>
               </div>
               <div class="compare-arrow">
@@ -228,12 +208,12 @@
                   <span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);font-variation-settings:'FILL' 1">check_circle</span>
                 </div>
                 <p>
-                  I don't do 5am.<br><br>
-                  But when I'm focused at 8, I'm unstoppable.<br><br>
-                  Intention beats a schedule. Every time.
+                  I deleted 5 productivity apps this month.<br><br>
+                  Got more done than ever.<br><br>
+                  Turns out the best system is the one you actually use. Mine is a notebook.
                 </p>
                 <div class="compare-tags">
-                  <span class="tag">your cadence</span>
+                  <span class="tag">your words</span>
                   <span class="tag">your rhythm</span>
                   <span class="tag">your voice</span>
                 </div>
@@ -251,8 +231,8 @@
               <em>Four native drafts.</em>
             </h2>
             <p class="section-lede">
-              Not the same caption copy-pasted. One voice note - four native drafts,
-              each with the right hook, pacing, and form for the platform.
+              Not the same post copy-pasted everywhere. One voice note becomes four different posts -
+              each one written the way that platform actually works.
             </p>
           </div>
 
@@ -311,7 +291,7 @@
                   </div>
                   <div style="flex:1; min-width:0">
                     <div class="mock-name">
-                      sara.creates
+                      sara.wellness
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#999" stroke-width="2" style="margin-left:2px"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>
                       <span class="mock-time">2h</span>
                     </div>
@@ -394,7 +374,7 @@
                   <div class="mock-reel-caption">pov: you have a "perfect" morning routine and you're more exhausted than ever<br><br>your rest needs rest too. save this if you've been adding habits instead of removing pressure 👇<br><span style="opacity:0.65;font-size:0.65em">#burnout #wellnesscoach #morningroutine #selfcare</span></div>
                   <div class="mock-reel-meta">
                     <span class="dot" />
-                    <span>sara.creates · Original audio</span>
+                    <span>sara.wellness · Original audio</span>
                   </div>
                 </div>
               </div>
@@ -408,7 +388,7 @@
                   <div style="flex:1; min-width:0">
                     <div class="mock-name">
                       Sara | Wellness Coach
-                      <span class="mock-handle">@sara.creates</span>
+                      <span class="mock-handle">@sara.wellness</span>
                       <span class="mock-dot">·</span>
                       <span class="mock-handle">Apr 18</span>
                     </div>
@@ -491,7 +471,7 @@
               <em>already in your head.</em>
             </h2>
             <p class="final-sub">
-              Talk for 60 seconds. We'll turn it into posts that sound exactly like you.
+              Talk for 60 seconds. We'll turn it into posts that sound just like you.
             </p>
             <!-- Arrow pointing DOWN from subtitle to button -->
             <div class="final-hand">
@@ -641,36 +621,12 @@ async function handleAuthSubmit() {
   }
 }
 
-// ─── Hero posts ──────────────────────────────────────────────────
-
-interface HeroPost {
-  platform: 'linkedin' | 'threads' | 'instagram' | 'x'
-  author: string
-  handle: string
-  meta: string
-  body: string
-}
-
-const heroPosts: HeroPost[] = [
-  {
-    platform: 'linkedin', author: 'Mykola | Building HeyPostrr', handle: 'Founder', meta: '2m',
-    body: '6 months of "I\'ll start posting this week."\n\nOne commute with HeyPostrr.\n\nShe messaged me at 11pm: "I have 3 posts ready. I don\'t know what to do with myself."\n\nThe thought is always there. The page is just in the way.',
-  },
-  {
-    platform: 'threads', author: '@sara.creates', handle: '', meta: '4m',
-    body: 'the things you say in voice memos > everything you\'ve ever typed\n\nwriting filters out all the good stuff before it even gets out\n\nstop drafting. start talking.',
-  },
-  {
-    platform: 'instagram', author: 'mia.creates', handle: '', meta: '3h',
-    body: 'pov: you skipped the gym, went for a walk instead, and had your best content week yet 🧠\n\nrest isn\'t failure. sometimes it\'s the whole strategy.\n\nsave this for the days your "perfect" plan falls apart 👇\n\n#fitnesscoach #contentcreator #mindset',
-  },
-  {
-    platform: 'x', author: '@jake.builds', handle: '', meta: '1h',
-    body: '3 features shipped this week.\n\n1 post about the process.\n\nthe post outperformed every feature announcement combined.\n\ndistribution is the product.',
-  },
-]
-
 onMounted(async () => {
+  const isAuthenticated = useState<boolean | null>('auth:authenticated');
+  if (isAuthenticated.value === false) {
+    isChecking.value = false;
+    return;
+  }
 
   try {
     const data = await $fetch<{ session: { completedAt: string | null } | null }>(
@@ -692,17 +648,17 @@ onMounted(async () => {
 const THOUGHTS = [
   "ok so the airport layover yesterday made me realize",
   "I think my pricing page is totally wrong",
-  "nobody talks about the boring part between launch and traction",
-  "what if I just documented the whole messy process",
+  "nobody talks about the boring part between launch and getting users",
+  "what if I just shared the whole messy process",
   "my best ideas always come mid-walk, why is that",
   "writing is thinking slowed down enough to catch yourself",
-  "hot take - most advice online is just memoir in disguise",
+  "hot take - most advice online is just someone's story in disguise",
   "I was in the shower and realized we built the wrong feature",
   "also - reply to Cheyenne about the timeline, she's waiting",
   "don't forget: call mom",
   "maybe post about what happened at the coffee meeting",
   "everyone's talking about AI but nobody's talking about taste",
-  "the real moat is just showing up when nobody cares yet",
+  "the real secret is just showing up when nobody cares yet",
 ];
 
 const thoughtChips = computed(() =>
@@ -737,10 +693,10 @@ const waveformBars = computed(() =>
 );
 
 const loopSteps = [
-  { n: '01', title: 'Speak',   sub: 'Talk to HeyPostrr like a friend. Walk, drive, shower - doesn\'t matter.',   icon: 'mic' },
-  { n: '02', title: 'Distill', sub: 'We pull the sharpest ideas from the ramble. No fluff, no bullet-soup.',  icon: 'filter_alt' },
-  { n: '03', title: 'Shape',   sub: 'Each idea becomes platform-native. LinkedIn long-form. Threads hook. Reel script.', icon: 'tune' },
-  { n: '04', title: 'Publish', sub: 'Approve in one tap. We post, or schedule, or hand you the draft.',       icon: 'rocket_launch' },
+  { n: '01', title: 'Talk',    sub: 'Just say what\'s on your mind. Walking, driving, showering - doesn\'t matter.',     icon: 'mic' },
+  { n: '02', title: 'We listen', sub: 'We find the best ideas in what you said. No filler, no fake wisdom.',              icon: 'filter_alt' },
+  { n: '03', title: 'We write',  sub: 'Each idea becomes a post made for its platform. Long for LinkedIn. Short for X.',   icon: 'tune' },
+  { n: '04', title: 'You post',  sub: 'Tap to approve. We post it, schedule it, or save the draft for later.',             icon: 'rocket_launch' },
 ];
 
 const platformTabs = [
@@ -756,7 +712,7 @@ const pricingPlans = [
     price: '$0',
     per: '/forever',
     tag: 'Try it',
-    highlights: ['5 voice sessions / month', '2 connected platforms', 'Basic voice training'],
+    highlights: ['5 voice notes per month', '2 connected platforms', 'Basic voice matching'],
     cta: 'Start free',
     feature: false,
   },
@@ -765,7 +721,7 @@ const pricingPlans = [
     price: '$19',
     per: '/month',
     tag: 'Most creators pick this',
-    highlights: ['Unlimited voice sessions', 'All platforms connected', 'Full voice fingerprint', 'Scheduled publishing', 'Post analytics'],
+    highlights: ['Unlimited voice notes', 'All platforms connected', 'Full voice match', 'Schedule posts', 'Post stats'],
     cta: 'Start 14-day trial',
     feature: true,
   },
@@ -774,7 +730,7 @@ const pricingPlans = [
     price: '$49',
     per: '/month',
     tag: 'Teams & agencies',
-    highlights: ['Everything in Creator', '3 seats included', 'Shared brand voices', 'Approval workflows'],
+    highlights: ['Everything in Creator', '3 team members', 'Shared team voices', 'Approval flows'],
     cta: 'Talk to us',
     feature: false,
   },
@@ -963,13 +919,14 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   font-size: clamp(56px, 7.2vw, 110px);
   margin: 0 0 28px;
   overflow: visible;
-  padding-left: 6px;
-  margin-left: -6px;
+  padding: 0 20px 10px;
+  margin-left: -20px;
+  margin-right: -20px;
 }
 .hero-title em {
   background: linear-gradient(135deg, var(--primary), var(--accent));
   -webkit-background-clip: text; background-clip: text; color: transparent;
-  display: inline-block; padding-left: 4px; margin-left: -4px;
+  display: inline-block; padding: 0 18px 8px; margin: 0 -18px;
 }
 .hero-sub {
   font-size: 20px; line-height: 1.55;

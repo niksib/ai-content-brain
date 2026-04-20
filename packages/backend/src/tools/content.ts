@@ -88,15 +88,25 @@ export const saveProducedContentTool: Anthropic.Tool = {
 
 // ── Strategist context loader ──────────────────────────────────────────────
 
-export async function loadStrategistSessionContext(userId: string): Promise<string> {
+export async function loadStrategistSessionContext(
+  userId: string,
+  chatSessionId: string
+): Promise<string> {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const [memoryMap, ideas] = await Promise.all([
+  const [memoryMap, sessionIdeas, historyIdeas] = await Promise.all([
     memoryService.getMemoryMap(userId),
     prisma.contentIdea.findMany({
-      where: { userId, createdAt: { gte: thirtyDaysAgo } },
-      include: { producedContent: true },
+      where: { userId, contentPlan: { chatSessionId } },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.contentIdea.findMany({
+      where: {
+        userId,
+        createdAt: { gte: thirtyDaysAgo },
+        contentPlan: { chatSessionId: { not: chatSessionId } },
+      },
       orderBy: { createdAt: "desc" },
     }),
   ]);
@@ -108,13 +118,23 @@ export async function loadStrategistSessionContext(userId: string): Promise<stri
           .map((entry) => `- ${entry.key}: ${entry.title} — ${entry.description}`)
           .join("\n");
 
-  const historyLines =
-    ideas.length === 0
-      ? "(no content from the last 30 days)"
-      : ideas
+  const sessionIdeaLines =
+    sessionIdeas.length === 0
+      ? "(none yet — you have not saved any ideas in this session)"
+      : sessionIdeas
           .map(
             (idea) =>
-              `- [${idea.platform}/${idea.format}] ${idea.angle} — status: ${idea.status}`
+              `- ideaId=${idea.id} | [${idea.platform}/${idea.format}] ${idea.angle} — status: ${idea.status}`
+          )
+          .join("\n");
+
+  const historyLines =
+    historyIdeas.length === 0
+      ? "(no content from the last 30 days)"
+      : historyIdeas
+          .map(
+            (idea) =>
+              `- ideaId=${idea.id} | [${idea.platform}/${idea.format}] ${idea.angle} — status: ${idea.status}`
           )
           .join("\n");
 
@@ -124,7 +144,11 @@ export async function loadStrategistSessionContext(userId: string): Promise<stri
     "",
     "Use the read_memory tool to fetch the full content of any block above when needed.",
     "",
-    "## Content History (last 30 days)",
+    "## Current Session Ideas",
+    "These are the ideas you have already saved in THIS chat session, with their `ideaId`. When the user asks to refine an idea by topic/angle, match it to one of these and call `update_content_idea` with the matching `ideaId` — never ask the user for an ID.",
+    sessionIdeaLines,
+    "",
+    "## Content History (last 30 days, other sessions)",
     historyLines,
   ].join("\n");
 }
@@ -173,6 +197,15 @@ export function makeUpdateContentIdea(
       angle?: string;
       description?: string;
     };
+
+    const existing = await prisma.contentIdea.findUnique({ where: { id: ideaId } });
+    if (!existing) {
+      return JSON.stringify({
+        success: false,
+        error: "idea_not_found",
+        message: `No content idea with id "${ideaId}". Look up the correct ideaId in the "Current Session Ideas" section of your system prompt — never invent IDs. If the user's reference is ambiguous, ask them which idea (by topic) before retrying.`,
+      });
+    }
 
     onUpdating?.(ideaId);
 

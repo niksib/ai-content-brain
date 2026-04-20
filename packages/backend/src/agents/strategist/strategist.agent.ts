@@ -10,11 +10,14 @@ import {
 import { readMemoryTool, makeReadMemory } from "../tools/read-memory.js";
 
 export class StrategistAgent extends BaseAgent {
+  private readonly chatSessionId: string;
+
   private constructor(userId: string, chatSessionId: string) {
     super("strategist", userId, {
       chatSessionId,
       skills: ["content-filtering"],
     });
+    this.chatSessionId = chatSessionId;
   }
 
   static async create(userId: string, chatSessionId: string): Promise<StrategistAgent> {
@@ -22,7 +25,7 @@ export class StrategistAgent extends BaseAgent {
   }
 
   protected async loadContext(): Promise<string> {
-    return loadStrategistSessionContext(this.userId);
+    return loadStrategistSessionContext(this.userId, this.chatSessionId);
   }
 
   getTools(options: AgentToolOptions = {}): AgentToolSet {
