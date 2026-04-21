@@ -26,7 +26,7 @@
             @click.stop="togglePopover"
           >
             Schedule
-            <span class="material-symbols-outlined backlog-card__chevron">expand_more</span>
+            <ChevronDown :size="16" class="backlog-card__chevron" />
           </button>
 
           <Teleport to="body">
@@ -79,6 +79,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ChevronDown } from 'lucide-vue-next';
 import type { LibraryItem } from '~/stores/library';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 

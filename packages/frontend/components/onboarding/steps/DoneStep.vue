@@ -1,11 +1,12 @@
 <template>
   <div class="ob-done">
-    <span class="material-symbols-outlined ob-done__spinner">progress_activity</span>
+    <Loader :size="18" class="ob-done__spinner" />
     Saving your profile…
   </div>
 </template>
 
 <script setup lang="ts">
+import { Loader } from 'lucide-vue-next';
 </script>
 
 <style scoped>
@@ -20,7 +21,6 @@
 }
 
 .ob-done__spinner {
-  font-size: 18px;
   animation: ob-done-spin 1s linear infinite;
   color: #6366f1;
 }

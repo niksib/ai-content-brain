@@ -7,9 +7,8 @@
       :class="isSpinning(i) ? 'ob-analyze-row--progress' : 'ob-analyze-row--done'"
     >
       <div class="ob-analyze-row__icon">
-        <span class="material-symbols-outlined">
-          {{ isSpinning(i) ? 'progress_activity' : 'check' }}
-        </span>
+        <Loader v-if="isSpinning(i)" :size="16" />
+        <Check v-else :size="16" />
       </div>
       <span>{{ step }}</span>
     </div>
@@ -18,6 +17,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { Loader, Check } from 'lucide-vue-next';
 
 const props = withDefaults(
   defineProps<{ complete?: boolean; steps?: readonly string[]; stepDurationMs?: number }>(),
@@ -107,7 +107,6 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
-.ob-analyze-row__icon .material-symbols-outlined { font-size: 16px; }
 
 .ob-analyze-row--done .ob-analyze-row__icon { color: #6366f1; }
 

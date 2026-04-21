@@ -6,7 +6,7 @@
 
     <!-- Already posted -->
     <div v-else-if="publishStatus === 'posted'" class="threads-publish__posted">
-      <span class="material-symbols-outlined" style="font-size:16px;color:#10b981;">check_circle</span>
+      <CheckCircle :size="16" style="color:#10b981;" />
       Posted to Threads
     </div>
 
@@ -32,12 +32,12 @@
             @click.stop="togglePopover"
           >
             Schedule
-            <span class="material-symbols-outlined threads-publish__chevron">expand_more</span>
+            <ChevronDown :size="16" class="threads-publish__chevron" />
           </button>
 
           <!-- Scheduled: display date + Change button -->
           <div v-else class="threads-publish__scheduled-state">
-            <span class="material-symbols-outlined" style="font-size:14px;color:#6366f1;flex-shrink:0;">schedule</span>
+            <Clock :size="14" style="color:#6366f1;flex-shrink:0;" />
             <span class="threads-publish__scheduled-date">{{ scheduledDisplayText }}</span>
             <button
               ref="scheduleButtonEl"
@@ -97,6 +97,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { CheckCircle, ChevronDown, Clock } from 'lucide-vue-next';
 
 type SingleMedia = { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string };
 type CarouselMedia = { carouselItems: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string }> };
@@ -451,7 +452,6 @@ async function schedulePost(): Promise<void> {
 }
 
 .threads-publish__chevron {
-  font-size: 16px;
   line-height: 1;
 }
 

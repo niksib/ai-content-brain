@@ -6,11 +6,12 @@
     @click="$emit('click')"
   >
     <slot />
-    <span class="material-symbols-outlined">arrow_forward</span>
+    <ArrowRight :size="16" />
   </button>
 </template>
 
 <script setup lang="ts">
+import { ArrowRight } from 'lucide-vue-next';
 defineProps<{ disabled?: boolean }>();
 defineEmits<{ click: [] }>();
 </script>
@@ -42,5 +43,4 @@ defineEmits<{ click: [] }>();
   transform: none;
 }
 
-.ob-next-btn .material-symbols-outlined { font-size: 16px; }
 </style>

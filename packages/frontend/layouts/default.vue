@@ -23,7 +23,7 @@
             @click="handleStartSession"
           >
             <span v-if="isStarting" class="btn-spinner"></span>
-            <span v-else class="material-symbols-outlined text-sm">add</span>
+            <Plus v-else :size="16" />
             {{ isStarting ? 'Starting...' : 'Create New Post' }}
           </button>
         </div>
@@ -35,10 +35,7 @@
           class="flex items-center gap-3 py-2.5 px-4 rounded-lg mx-2 transition-all no-underline"
           :class="isActive(link.to) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-200/50'"
         >
-          <span
-            class="material-symbols-outlined"
-            :style="isActive(link.to) ? 'font-variation-settings: \'FILL\' 1;' : undefined"
-          >{{ link.icon }}</span>
+          <component :is="link.icon" :size="18" />
           <span class="font-medium">{{ link.label }}</span>
         </NuxtLink>
       </nav>
@@ -48,7 +45,7 @@
           class="w-full flex items-center gap-3 py-2.5 px-4 text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all text-left"
           @click="handleLogout"
         >
-          <span class="material-symbols-outlined">logout</span>
+          <LogOut :size="18" />
           <span class="font-medium">Logout</span>
         </button>
         <NuxtLink
@@ -74,7 +71,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, type Component } from 'vue';
+import { Plus, LogOut, LayoutGrid, CalendarDays, User } from 'lucide-vue-next';
 import { useDashboardStore } from '~/stores/dashboard';
 import { useBillingStore } from '~/stores/billing';
 import { useProfileStore } from '~/stores/profile';
@@ -91,13 +89,13 @@ const isStarting = ref(false);
 interface NavLink {
   to: string;
   label: string;
-  icon: string;
+  icon: Component;
 }
 
 const navLinks: NavLink[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'grid_view' },
-  { to: '/content-calendar', label: 'Content Calendar', icon: 'calendar_today' },
-  { to: '/creator-profile', label: 'Creator Profile', icon: 'person' },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
+  { to: '/content-calendar', label: 'Content Calendar', icon: CalendarDays },
+  { to: '/creator-profile', label: 'Creator Profile', icon: User },
 ];
 
 function isActive(targetPath: string): boolean {

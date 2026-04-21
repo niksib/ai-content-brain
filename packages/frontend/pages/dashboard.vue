@@ -11,7 +11,6 @@
       <!-- <div class="command-bar-wrap">
         <div class="command-bar__glow"></div>
         <div class="command-bar">
-          <span class="material-symbols-outlined command-bar__icon">auto_awesome</span>
           <input
             class="command-bar__input"
             placeholder="Ask AI to draft a concept or summarize sessions..."
@@ -30,7 +29,7 @@
         @click="handleStartSession"
       >
         <div class="action-card__icon-wrap action-card__icon-wrap--primary">
-          <span class="material-symbols-outlined" style="font-size:28px;color:#fff;">add_circle</span>
+          <PlusCircle :size="28" style="color:#fff;" />
         </div>
         <div>
           <h4 class="action-card__title action-card__title--white">Start New Session</h4>
@@ -39,12 +38,12 @@
             {{ isStarting ? 'Starting...' : 'Capture fresh ideas instantly' }}
           </p>
         </div>
-        <span class="material-symbols-outlined action-card__bg-icon">mic</span>
+        <Mic :size="120" class="action-card__bg-icon" />
       </button>
 
       <button class="action-card action-card--light">
         <div class="action-card__icon-wrap action-card__icon-wrap--indigo">
-          <span class="material-symbols-outlined" style="font-size:28px;color:#3525cd;">lightbulb</span>
+          <Lightbulb :size="28" style="color:#3525cd;" />
         </div>
         <div>
           <h4 class="action-card__title">Quick Idea</h4>
@@ -54,7 +53,7 @@
 
       <button class="action-card action-card--light">
         <div class="action-card__icon-wrap action-card__icon-wrap--teal">
-          <span class="material-symbols-outlined" style="font-size:28px;color:#006a61;">monitoring</span>
+          <TrendingUp :size="28" style="color:#006a61;" />
         </div>
         <div>
           <h4 class="action-card__title">View Analytics</h4>
@@ -78,7 +77,8 @@
         <!-- Step: Connect Threads -->
         <div v-if="hasThreadsPlatform" class="checklist-step" :class="{ 'checklist-step--done': threadsConnected }">
           <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': threadsConnected }">
-            <span class="material-symbols-outlined">{{ threadsConnected ? 'check_circle' : 'link' }}</span>
+            <CheckCircle v-if="threadsConnected" :size="20" />
+            <Link v-else :size="20" />
           </div>
           <div class="checklist-step__content">
             <p class="checklist-step__title">Connect your Threads account</p>
@@ -92,7 +92,7 @@
         <!-- Step: Analyze writing style (shows only after Threads connected) -->
         <div v-if="hasThreadsPlatform && threadsConnected" class="checklist-step" :class="{ 'checklist-step--done': styleAnalyzed }">
           <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': styleAnalyzed, 'checklist-step__icon-wrap--pending': !styleAnalyzed }">
-            <span v-if="styleAnalyzed" class="material-symbols-outlined">check_circle</span>
+            <CheckCircle v-if="styleAnalyzed" :size="20" />
             <span v-else class="checklist-step__spinner"></span>
           </div>
           <div class="checklist-step__content">
@@ -106,7 +106,9 @@
         <!-- Step: Start first session -->
         <div class="checklist-step" :class="{ 'checklist-step--done': hasAnySessions, 'checklist-step--locked': sessionStepLocked }">
           <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasAnySessions, 'checklist-step__icon-wrap--locked': sessionStepLocked }">
-            <span class="material-symbols-outlined">{{ hasAnySessions ? 'check_circle' : sessionStepLocked ? 'lock' : 'mic' }}</span>
+            <CheckCircle v-if="hasAnySessions" :size="20" />
+            <Lock v-else-if="sessionStepLocked" :size="20" />
+            <Mic v-else :size="20" />
           </div>
           <div class="checklist-step__content">
             <p class="checklist-step__title">Start your first session</p>
@@ -122,7 +124,9 @@
         <!-- Step: Publish first post -->
         <div class="checklist-step" :class="{ 'checklist-step--done': hasPublishedPost, 'checklist-step--locked': publishStepLocked }">
           <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasPublishedPost, 'checklist-step__icon-wrap--locked': publishStepLocked }">
-            <span class="material-symbols-outlined">{{ hasPublishedPost ? 'check_circle' : publishStepLocked ? 'lock' : 'rocket_launch' }}</span>
+            <CheckCircle v-if="hasPublishedPost" :size="20" />
+            <Lock v-else-if="publishStepLocked" :size="20" />
+            <Rocket v-else :size="20" />
           </div>
           <div class="checklist-step__content">
             <p class="checklist-step__title">Publish your first post</p>
@@ -153,10 +157,10 @@
         </div>
         <div class="calendar-section__nav">
           <button class="calendar-nav-btn" @click="goToPrevMonth">
-            <span class="material-symbols-outlined">chevron_left</span>
+            <ChevronLeft :size="20" />
           </button>
           <button class="calendar-nav-btn" @click="goToNextMonth">
-            <span class="material-symbols-outlined">chevron_right</span>
+            <ChevronRight :size="20" />
           </button>
         </div>
       </div>
@@ -195,7 +199,7 @@
           <template v-if="day.isToday">
             <template v-if="day.sessions.length > 0 && day.sessions[0].status === 'completed'">
               <div class="calendar-cell__done-row">
-                <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>
+                <CheckCircle :size="16" />
                 <span class="calendar-cell__done-label">Day completed</span>
               </div>
               <div class="calendar-cell__counts">
@@ -209,7 +213,7 @@
             </template>
             <template v-else>
               <div class="calendar-cell__start-session">
-                <span class="material-symbols-outlined calendar-cell__mic-icon">mic</span>
+                <Mic :size="28" class="calendar-cell__mic-icon" />
                 <span class="calendar-cell__start-label">Start Session</span>
               </div>
             </template>
@@ -217,7 +221,7 @@
 
           <template v-else-if="day.sessions.length > 0">
             <div class="calendar-cell__session-count">
-              <span class="material-symbols-outlined calendar-cell__session-icon" :style="{color: day.sessions[0].status === 'completed' ? '#16a34a' : '#6366f1'}">check_circle</span>
+              <CheckCircle :size="32" class="calendar-cell__session-icon" :style="{color: day.sessions[0].status === 'completed' ? '#16a34a' : '#6366f1'}" />
               <div class="calendar-cell__counts">
                 <CalendarCounts :session="day.sessions[0]" />
               </div>
@@ -225,7 +229,7 @@
           </template>
 
           <template v-else>
-            <span class="material-symbols-outlined calendar-cell__add-icon">add</span>
+            <Plus :size="24" class="calendar-cell__add-icon" />
           </template>
         </div>
       </div>
@@ -238,6 +242,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import {
+  PlusCircle, Mic, Lightbulb, TrendingUp, CheckCircle, Link, Lock,
+  Rocket, ChevronLeft, ChevronRight, Plus, Sparkles,
+} from 'lucide-vue-next';
 import { useDashboardStore, type CalendarSession } from '~/stores/dashboard';
 import { useBillingStore } from '~/stores/billing';
 import { useProfileStore } from '~/stores/profile';
@@ -675,7 +683,6 @@ const daysInMonth = computed(() => {
   position: absolute;
   right: -20px;
   bottom: -20px;
-  font-size: 120px !important;
   color: rgba(255, 255, 255, 0.08);
   pointer-events: none;
   transition: transform 0.3s;
@@ -932,7 +939,7 @@ const daysInMonth = computed(() => {
 }
 
 .calendar-cell__session-icon {
-  font-size: 32px !important;
+  flex-shrink: 0;
 }
 
 .calendar-cell__count-text {
@@ -950,7 +957,6 @@ const daysInMonth = computed(() => {
 
 .calendar-cell__add-icon {
   color: #d1d5db;
-  font-size: 24px !important;
   margin: auto;
 }
 
@@ -964,7 +970,6 @@ const daysInMonth = computed(() => {
 }
 
 .calendar-cell__mic-icon {
-  font-size: 28px !important;
   color: rgba(255, 255, 255, 0.9);
 }
 

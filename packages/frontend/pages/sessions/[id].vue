@@ -44,7 +44,7 @@
         <aside class="transcript-panel">
           <div class="transcript-panel__header">
             <h2 class="transcript-panel__title">
-              <span class="material-symbols-outlined" style="font-size:20px;">notes</span>
+              <FileText :size="20" />
               Session Transcript
             </h2>
             <span class="transcript-panel__badge">Live Session</span>
@@ -55,13 +55,13 @@
               <!-- User message -->
               <div v-if="msg.role === 'user'" class="transcript-msg transcript-msg--user">
                 <div class="transcript-msg__avatar transcript-msg__avatar--user">
-                  <span class="material-symbols-outlined" style="font-size:14px;">person</span>
+                  <User :size="14" />
                 </div>
                 <div class="transcript-msg__body">
                   <span class="transcript-msg__label transcript-msg__label--user">You</span>
                   <!-- Reply context: idea this message belongs to -->
                   <div v-if="msg.contentIdeaId" class="transcript-msg__reply-context">
-                    <span class="material-symbols-outlined" style="font-size:11px;">reply</span>
+                    <Reply :size="11" />
                     {{ ideaAngle(msg.contentIdeaId) }}
                   </div>
                   <div
@@ -78,7 +78,7 @@
                   :class="msg.contentIdeaId ? `transcript-msg__avatar--${ideaPlatform(msg.contentIdeaId)}` : 'transcript-msg__avatar--strategist'"
                 >
                   <PlatformIcon v-if="msg.contentIdeaId && ideaPlatform(msg.contentIdeaId)" :platform="ideaPlatform(msg.contentIdeaId)!" />
-                  <span v-else class="material-symbols-outlined" style="font-size:14px;">psychology</span>
+                  <Brain v-else :size="14" />
                 </div>
                 <div class="transcript-msg__body">
                   <span class="transcript-msg__label transcript-msg__label--ai">
@@ -102,7 +102,7 @@
                 :class="activeAgent.platform ? `transcript-msg__avatar--${activeAgent.platform}` : 'transcript-msg__avatar--strategist'"
               >
                 <PlatformIcon v-if="activeAgent.platform" :platform="activeAgent.platform" />
-                <span v-else class="material-symbols-outlined" style="font-size:14px;">psychology</span>
+                <Brain v-else :size="14" />
               </div>
               <div class="transcript-msg__body">
                 <span class="transcript-msg__label transcript-msg__label--ai">{{ activeAgent.name }}</span>
@@ -122,7 +122,7 @@
                 :class="activeAgent.platform ? `transcript-msg__avatar--${activeAgent.platform}` : 'transcript-msg__avatar--strategist'"
               >
                 <PlatformIcon v-if="activeAgent.platform" :platform="activeAgent.platform" />
-                <span v-else class="material-symbols-outlined" style="font-size:14px;">psychology</span>
+                <Brain v-else :size="14" />
               </div>
               <div class="transcript-msg__body">
                 <span class="transcript-msg__label transcript-msg__label--ai">{{ activeAgent.name }}</span>
@@ -141,7 +141,7 @@
               :class="activeAgent.platform ? `agent-indicator__avatar--${activeAgent.platform}` : 'agent-indicator__avatar--strategist'"
             >
               <PlatformIcon v-if="activeAgent.platform" :platform="activeAgent.platform" />
-              <span v-else class="material-symbols-outlined" style="font-size:13px;">{{ activeAgent.icon }}</span>
+              <component :is="activeAgent.icon" v-else :size="13" />
             </div>
             <span class="agent-indicator__name">{{ activeAgent.name }}</span>
           </div>
@@ -154,9 +154,8 @@
               title="Voice input"
               @click="toggleMicRecording"
             >
-              <span class="material-symbols-outlined" style="font-size:20px;">
-                {{ isMicRecording ? 'stop_circle' : 'mic' }}
-              </span>
+              <StopCircle v-if="isMicRecording" :size="20" />
+              <Mic v-else :size="20" />
             </button>
             <textarea
               ref="chatInputEl"
@@ -173,7 +172,7 @@
               :disabled="store.isStreaming"
               @click="submitChatInput"
             >
-              <span class="material-symbols-outlined" style="font-size:20px;">send</span>
+              <Send :size="20" />
             </button>
           </div>
         </aside>
@@ -194,7 +193,7 @@
           <template v-else>
           <div class="workspace-panel__header">
             <h3 class="workspace-panel__title">
-              <span class="material-symbols-outlined" style="font-size:20px;color:#3525cd;">lightbulb</span>
+              <Lightbulb :size="20" style="color:#3525cd;" />
               Idea Cards
             </h3>
             <div class="workspace-panel__actions">
@@ -206,7 +205,7 @@
                 :disabled="store.isStreaming"
                 @click="handleResetSession"
               >
-                <span class="material-symbols-outlined" style="font-size:16px;">delete_sweep</span>
+                <Trash2 :size="16" />
                 Reset
               </button>
             </div>
@@ -215,7 +214,7 @@
           <!-- Empty state — nothing generated yet -->
           <div v-if="store.ideas.length === 0 && skeletonCount === 0" class="workspace-empty">
             <div class="workspace-empty__icon">
-              <span class="material-symbols-outlined">auto_awesome</span>
+              <Sparkles :size="32" />
             </div>
             <h4 class="workspace-empty__title">Ideas will appear here</h4>
             <p class="workspace-empty__hint">
@@ -282,7 +281,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, onMounted, onUnmounted, watch } from 'vue';
+import { computed, ref, nextTick, onMounted, onUnmounted, watch, type Component } from 'vue';
+import { Brain, User, Reply, FileText, Mic, StopCircle, Send, Lightbulb, Trash2, Sparkles } from 'lucide-vue-next';
 import { useSessionStore } from '~/stores/session';
 import { useProfileStore } from '~/stores/profile';
 import OrbRecorder from '~/components/OrbRecorder.vue';
@@ -358,7 +358,7 @@ onUnmounted(() => { if (thinkingTimer) clearInterval(thinkingTimer); transcripti
 interface AgentInfo {
   name: string;
   platform: 'threads' | 'linkedin' | 'tiktok' | 'instagram' | null;
-  icon: string; // material symbol, used when platform is null
+  icon: Component;
 }
 
 const PLATFORM_AGENT_NAMES: Record<string, string> = {
@@ -370,17 +370,17 @@ const PLATFORM_AGENT_NAMES: Record<string, string> = {
 
 const activeAgent = computed<AgentInfo>(() => {
   if (!store.selectedIdeaId) {
-    return { name: 'Content Strategist', platform: null, icon: 'psychology' };
+    return { name: 'Content Strategist', platform: null, icon: Brain };
   }
   const idea = store.ideas.find((i) => i.id === store.selectedIdeaId);
   if (!idea) {
-    return { name: 'Content Strategist', platform: null, icon: 'psychology' };
+    return { name: 'Content Strategist', platform: null, icon: Brain };
   }
   const platform = idea.platform as AgentInfo['platform'];
   return {
     name: PLATFORM_AGENT_NAMES[idea.platform] ?? `${idea.platform} Agent`,
     platform,
-    icon: '',
+    icon: Brain,
   };
 });
 
@@ -1474,8 +1474,7 @@ onMounted(async () => {
   margin-bottom: 0.5rem;
 }
 
-.workspace-empty__icon .material-symbols-outlined {
-  font-size: 32px !important;
+.workspace-empty__icon svg {
   color: #3525cd;
   opacity: 0.6;
 }

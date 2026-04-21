@@ -8,10 +8,10 @@
       </div>
       <div class="calendar-section__nav">
         <button class="calendar-nav-btn" @click="prevMonth">
-          <span class="material-symbols-outlined">chevron_left</span>
+          <ChevronLeft :size="20" />
         </button>
         <button class="calendar-nav-btn" @click="nextMonth">
-          <span class="material-symbols-outlined">chevron_right</span>
+          <ChevronRight :size="20" />
         </button>
       </div>
     </div>
@@ -82,6 +82,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import type { LibraryItem } from '~/stores/library';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 

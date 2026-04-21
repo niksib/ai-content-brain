@@ -9,7 +9,7 @@
           alt="Threads avatar"
         />
         <div v-else class="threads-connect__avatar-placeholder">
-          <span class="material-symbols-outlined" style="font-size:16px;color:#fff;">person</span>
+          <User :size="16" style="color:#fff;" />
         </div>
         <span class="threads-connect__username">@{{ account.username }}</span>
       </div>
@@ -24,6 +24,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { User } from 'lucide-vue-next';
 
 interface ThreadsAccount {
   id: string;

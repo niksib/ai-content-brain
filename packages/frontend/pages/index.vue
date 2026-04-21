@@ -24,7 +24,7 @@
                 <button class="btn-ghost" @click="goToAuth('login')">Sign in</button>
                 <button class="btn-primary" @click="goToAuth('register')">
                   Start free
-                  <span class="material-symbols-outlined" style="font-size:16px">arrow_forward</span>
+                  <ArrowRight :size="16" />
                 </button>
               </template>
             </div>
@@ -49,7 +49,7 @@
             <div class="hero-ctas">
               <div class="hero-cta-col">
                 <button class="btn-primary btn-primary--big" @click="goToAuth('register')">
-                  <span class="material-symbols-outlined" style="font-size:18px">mic</span>
+                  <Mic :size="18" />
                   Start talking
                 </button>
                 <span class="no-card-text">No credit card required</span>
@@ -139,7 +139,7 @@
             <div v-for="(step, i) in loopSteps" :key="i" class="loop-cell">
               <div class="loop-num mono-label">{{ step.n }}</div>
               <div class="loop-icon">
-                <span class="material-symbols-outlined" style="font-size:28px;font-variation-settings:'FILL' 0,'wght' 400">{{ step.icon }}</span>
+                <component :is="step.icon" :size="28" />
               </div>
               <div class="loop-title display">{{ step.title }}</div>
               <div class="loop-sub">{{ step.sub }}</div>
@@ -162,21 +162,21 @@
               </p>
               <ul class="voice-bullets">
                 <li>
-                  <span class="material-symbols-outlined">auto_awesome</span>
+                  <Sparkles :size="20" />
                   <div>
                     <b>Your words</b>
                     <span>Uses the words you actually say. No "unlock", "leverage", or "game-changer".</span>
                   </div>
                 </li>
                 <li>
-                  <span class="material-symbols-outlined">graphic_eq</span>
+                  <Activity :size="20" />
                   <div>
                     <b>Your rhythm</b>
                     <span>Matches how long your sentences are. Short stays short.</span>
                   </div>
                 </li>
                 <li>
-                  <span class="material-symbols-outlined">fingerprint</span>
+                  <Fingerprint :size="20" />
                   <div>
                     <b>Your style</b>
                     <span>Keeps the one-word lines, the dashes, the half-jokes.</span>
@@ -188,7 +188,7 @@
               <div class="compare-card compare-card--bad">
                 <div class="compare-head">
                   <span class="mono-label" style="color: var(--warn)">Generic AI output</span>
-                  <span class="material-symbols-outlined" style="font-size:16px;color:var(--warn)">error</span>
+                  <AlertCircle :size="16" style="color:var(--warn)" />
                 </div>
                 <p>
                   Here are 5 game-changing ways to optimize your workflow and unlock peak productivity in today's fast-paced world.
@@ -204,7 +204,7 @@
               <div class="compare-card compare-card--good">
                 <div class="compare-head">
                   <span class="mono-label" style="color: var(--primary)">With HeyPostrr</span>
-                  <span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);font-variation-settings:'FILL' 1">check_circle</span>
+                  <CheckCircle :size="16" style="color:var(--primary)" />
                 </div>
                 <p>
                   I deleted 5 productivity apps this month.<br><br>
@@ -447,7 +447,7 @@
               </div>
               <ul class="plan-list">
                 <li v-for="(item, j) in plan.highlights" :key="j">
-                  <span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);font-variation-settings:'FILL' 1">check_circle</span>
+                  <CheckCircle :size="16" style="color:var(--primary)" />
                   {{ item }}
                 </li>
               </ul>
@@ -456,7 +456,7 @@
                 @click="goToAuth('register')"
               >
                 {{ plan.cta }}
-                <span class="material-symbols-outlined" style="font-size:14px">arrow_forward</span>
+                <ArrowRight :size="14" />
               </button>
             </div>
           </div>
@@ -481,7 +481,7 @@
             </div>
             <div class="final-cta-col">
               <button class="btn-primary btn-primary--big" @click="goToAuth('register')">
-                <span class="material-symbols-outlined" style="font-size:18px">mic</span>
+                <Mic :size="18" />
                 Start talking
               </button>
               <span class="no-card-text no-card-text--dark">No credit card required</span>
@@ -505,7 +505,7 @@
       <div v-if="showAuth" class="auth-overlay" @click="closeAuth">
         <div class="auth-card" @click.stop>
           <button class="auth-close" @click="closeAuth">
-            <span class="material-symbols-outlined" style="font-size:20px">close</span>
+            <X :size="20" />
           </button>
           <div class="auth-brand">
             <div class="brand-mark brand-mark--big"><div class="brand-mark-inner" /></div>
@@ -533,7 +533,7 @@
             <button type="submit" class="btn-primary auth-submit" :disabled="authLoading">
               <span v-if="authLoading" class="auth-card__spinner" />
               {{ authLoading ? 'Please wait...' : authMode === 'login' ? 'Sign in' : 'Create account' }}
-              <span v-if="!authLoading" class="material-symbols-outlined" style="font-size:16px">arrow_forward</span>
+              <ArrowRight v-if="!authLoading" :size="16" />
             </button>
           </form>
         </div>
@@ -542,6 +542,9 @@
 </template>
 
 <script setup lang="ts">
+import type { Component } from 'vue';
+import { ArrowRight, Mic, Filter, SlidersHorizontal, Rocket, Sparkles, Activity, Fingerprint, AlertCircle, CheckCircle, X } from 'lucide-vue-next';
+
 definePageMeta({ layout: false });
 
 useHead({
@@ -685,11 +688,11 @@ const waveformBars = computed(() =>
   Array.from({ length: 42 }).map((_, i) => `${12 + Math.abs(Math.sin(i * 0.7)) * 26}px`),
 );
 
-const loopSteps = [
-  { n: '01', title: 'Talk',    sub: 'Just say what\'s on your mind. Walking, driving, showering - doesn\'t matter.',     icon: 'mic' },
-  { n: '02', title: 'We listen', sub: 'We find the best ideas in what you said. No filler, no fake wisdom.',              icon: 'filter_alt' },
-  { n: '03', title: 'We write',  sub: 'Each idea becomes a post made for its platform. Long for LinkedIn. Short for X.',   icon: 'tune' },
-  { n: '04', title: 'You post',  sub: 'Tap to approve. We post it, schedule it, or save the draft for later.',             icon: 'rocket_launch' },
+const loopSteps: { n: string; title: string; sub: string; icon: Component }[] = [
+  { n: '01', title: 'Talk',       sub: 'Just say what\'s on your mind. Walking, driving, showering - doesn\'t matter.',   icon: Mic },
+  { n: '02', title: 'We listen',  sub: 'We find the best ideas in what you said. No filler, no fake wisdom.',             icon: Filter },
+  { n: '03', title: 'We write',   sub: 'Each idea becomes a post made for its platform. Long for LinkedIn. Short for X.', icon: SlidersHorizontal },
+  { n: '04', title: 'You post',   sub: 'Tap to approve. We post it, schedule it, or save the draft for later.',           icon: Rocket },
 ];
 
 const platformTabs = [
@@ -785,11 +788,6 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   font-family: 'Manrope', sans-serif;
   font-size: 11px; font-weight: 700;
   letter-spacing: 0.22em; text-transform: uppercase;
-}
-
-.material-symbols-outlined {
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  vertical-align: middle;
 }
 
 #__nuxt { position: relative; z-index: 2; }
@@ -1258,11 +1256,10 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .voice-lead { font-size: 17px; line-height: 1.6; color: var(--mute); margin: 0 0 32px; }
 .voice-bullets { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 24px; }
 .voice-bullets li { display: flex; gap: 16px; align-items: flex-start; }
-.voice-bullets li > .material-symbols-outlined {
+.voice-bullets li > svg {
   flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px;
   background: var(--primary-fixed); color: var(--primary);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px !important;
+  padding: 10px;
 }
 .voice-bullets li > div b { display: block; font-weight: 700; font-size: 15px; margin-bottom: 4px; }
 .voice-bullets li > div span { font-size: 14px; color: var(--mute); line-height: 1.5; }
@@ -1527,7 +1524,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   display: flex; flex-direction: column; gap: 12px; flex: 1;
 }
 .plan-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; }
-.plan--feature .plan-list li > .material-symbols-outlined { color: var(--accent-2) !important; }
+.plan--feature .plan-list li > svg { color: var(--accent-2); }
 .plan-cta { justify-content: center; width: 100%; }
 .plan--feature .plan-cta { background: #fff; color: var(--surface-ink); }
 .plan--feature .plan-cta:hover { background: var(--accent-2); color: #fff; }

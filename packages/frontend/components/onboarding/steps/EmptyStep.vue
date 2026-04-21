@@ -2,7 +2,7 @@
   <div class="ob-fallback">
     <div class="ob-threads-preview">
       <div class="ob-threads-preview__avatar">
-        <span class="material-symbols-outlined">person</span>
+        <User :size="20" />
       </div>
       <div class="ob-threads-preview__body">
         <div class="ob-threads-preview__title">@you · 0 posts</div>
@@ -10,13 +10,14 @@
       </div>
     </div>
 
-    <PrimaryCta icon="play_arrow" @click="$emit('start')">
+    <PrimaryCta :icon="Play" @click="$emit('start')">
       Start with 4 questions
     </PrimaryCta>
   </div>
 </template>
 
 <script setup lang="ts">
+import { Play, User } from 'lucide-vue-next';
 import PrimaryCta from '../PrimaryCta.vue';
 
 defineEmits<{ start: [] }>();
@@ -52,7 +53,6 @@ defineEmits<{ start: [] }>();
   place-items: center;
 }
 
-.ob-threads-preview__avatar .material-symbols-outlined { font-size: 20px; }
 
 .ob-threads-preview__body { line-height: 1.35; flex: 1; }
 

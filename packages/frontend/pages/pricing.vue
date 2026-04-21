@@ -18,19 +18,19 @@
         </div>
         <ul class="plan-card__features">
           <li class="plan-card__feature">
-            <span class="material-symbols-outlined plan-card__check">check_circle</span>
+            <CheckCircle :size="18" class="plan-card__check" />
             500 credits / month
           </li>
           <li class="plan-card__feature">
-            <span class="material-symbols-outlined plan-card__check">check_circle</span>
+            <CheckCircle :size="18" class="plan-card__check" />
             Up to 10 sessions
           </li>
           <li class="plan-card__feature plan-card__feature--muted">
-            <span class="material-symbols-outlined plan-card__cross">cancel</span>
+            <XCircle :size="18" class="plan-card__cross" />
             Advanced AI features
           </li>
           <li class="plan-card__feature plan-card__feature--muted">
-            <span class="material-symbols-outlined plan-card__cross">cancel</span>
+            <XCircle :size="18" class="plan-card__cross" />
             Priority support
           </li>
         </ul>
@@ -49,19 +49,19 @@
         </div>
         <ul class="plan-card__features">
           <li class="plan-card__feature">
-            <span class="material-symbols-outlined plan-card__check">check_circle</span>
+            <CheckCircle :size="18" class="plan-card__check" />
             5 000 credits / month
           </li>
           <li class="plan-card__feature">
-            <span class="material-symbols-outlined plan-card__check">check_circle</span>
+            <CheckCircle :size="18" class="plan-card__check" />
             Unlimited sessions
           </li>
           <li class="plan-card__feature">
-            <span class="material-symbols-outlined plan-card__check">check_circle</span>
+            <CheckCircle :size="18" class="plan-card__check" />
             Advanced AI features
           </li>
           <li class="plan-card__feature">
-            <span class="material-symbols-outlined plan-card__check">check_circle</span>
+            <CheckCircle :size="18" class="plan-card__check" />
             Priority support
           </li>
         </ul>
@@ -79,19 +79,19 @@
         </div>
         <ul class="plan-card__features">
           <li class="plan-card__feature">
-            <span class="material-symbols-outlined plan-card__check">check_circle</span>
+            <CheckCircle :size="18" class="plan-card__check" />
             20 000 credits / month
           </li>
           <li class="plan-card__feature">
-            <span class="material-symbols-outlined plan-card__check">check_circle</span>
+            <CheckCircle :size="18" class="plan-card__check" />
             Unlimited sessions
           </li>
           <li class="plan-card__feature">
-            <span class="material-symbols-outlined plan-card__check">check_circle</span>
+            <CheckCircle :size="18" class="plan-card__check" />
             Advanced AI features
           </li>
           <li class="plan-card__feature">
-            <span class="material-symbols-outlined plan-card__check">check_circle</span>
+            <CheckCircle :size="18" class="plan-card__check" />
             Dedicated support
           </li>
         </ul>
@@ -101,7 +101,7 @@
 
     <div class="pricing-back">
       <NuxtLink to="/dashboard" class="pricing-back__link">
-        <span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span>
+        <ArrowLeft :size="18" />
         Back to Dashboard
       </NuxtLink>
     </div>
@@ -109,6 +109,8 @@
 </template>
 
 <script setup lang="ts">
+import { CheckCircle, XCircle, ArrowLeft } from 'lucide-vue-next';
+
 definePageMeta({
   layout: 'default',
 });
@@ -281,7 +283,6 @@ useSeoMeta({ title: 'Pricing — Creator Hub' });
 }
 
 .plan-card__check {
-  font-size: 18px !important;
   color: #3525cd;
   flex-shrink: 0;
 }
@@ -291,7 +292,6 @@ useSeoMeta({ title: 'Pricing — Creator Hub' });
 }
 
 .plan-card__cross {
-  font-size: 18px !important;
   color: #d1d5db;
   flex-shrink: 0;
 }

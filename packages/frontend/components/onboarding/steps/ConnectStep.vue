@@ -1,7 +1,7 @@
 <template>
   <div class="ob-connect">
     <PrimaryCta
-      :icon="loading ? undefined : 'link'"
+      :icon="loading ? undefined : Link"
       :disabled="loading"
       @click="$emit('connect')"
     >
@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import { Link } from 'lucide-vue-next';
 import PrimaryCta from '../PrimaryCta.vue';
 
 defineProps<{ loading?: boolean }>();

@@ -12,20 +12,20 @@
         <div class="orb-recorder__overlay"></div>
         <div class="orb-recorder__content">
           <template v-if="isTranscribing">
-            <span class="material-symbols-outlined orb-icon" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">hourglass_top</span>
+            <Hourglass :size="48" class="orb-icon" />
             <span class="orb-hint">Transcribing…</span>
           </template>
           <template v-else-if="isRecording">
-            <span class="material-symbols-outlined orb-icon" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">stop_circle</span>
+            <StopCircle :size="48" class="orb-icon" />
             <span class="orb-timer">{{ recordingTime }}</span>
             <span class="orb-hint">Tap to stop</span>
           </template>
           <template v-else-if="externalState === 'processing'">
-            <span class="material-symbols-outlined orb-icon" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">auto_awesome</span>
+            <Sparkles :size="48" class="orb-icon" />
             <span class="orb-hint">Processing…</span>
           </template>
           <template v-else>
-            <span class="material-symbols-outlined orb-icon" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">mic</span>
+            <Mic :size="48" class="orb-icon" />
             <span class="orb-hint">Tap to record</span>
           </template>
         </div>
@@ -40,7 +40,7 @@
           :class="{ 'mode-toggle__btn--active': mode === 'voice' }"
           @click="switchToVoice"
         >
-          <span class="material-symbols-outlined" style="font-size:17px;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">settings_voice</span>
+          <Mic2 :size="17" />
           Voice
         </button>
         <button
@@ -75,7 +75,7 @@
           :disabled="disabled || !textInput.trim()"
           @click="submitText"
         >
-          <span class="material-symbols-outlined" style="font-size:20px;font-variation-settings:'FILL' 1,'wght' 500,'GRAD' 0,'opsz' 24;">send</span>
+          <Send :size="20" />
         </button>
       </div>
       <p class="text-composer__hint">Press ⌘↵ or Ctrl↵ to send</p>
@@ -85,6 +85,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
+import { Hourglass, StopCircle, Sparkles, Mic, Mic2, Send } from 'lucide-vue-next';
 import { useVoiceRecorder } from '~/composables/useVoiceRecorder';
 import { useVoiceService } from '~/services/voice';
 
@@ -245,7 +246,6 @@ function submitText() {
 }
 
 .orb-icon {
-  font-size: 48px !important;
   color: #fff;
   filter: drop-shadow(0 2px 8px rgba(0,0,0,0.2));
 }

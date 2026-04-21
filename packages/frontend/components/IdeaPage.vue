@@ -70,7 +70,7 @@
           <!-- Image recommendation -->
           <div v-if="imageSuggestion" class="idea-page__image-suggestion">
             <div class="idea-page__image-suggestion-label">
-              <span class="material-symbols-outlined" style="font-size: 14px;">add_photo_alternate</span>
+              <ImagePlus :size="14" />
               Image recommendation
               <span class="idea-page__image-suggestion-type">{{ IMAGE_TYPE_LABELS[imageSuggestion.type] ?? imageSuggestion.type }}</span>
             </div>
@@ -160,7 +160,7 @@
                           alt="attached media"
                         />
                         <div v-else class="thread-post__media-video">
-                          <span class="material-symbols-outlined" style="font-size:16px;">videocam</span>
+                          <Video :size="16" />
                           <span>{{ file.mimeType.includes('mp4') ? 'MP4' : 'MOV' }}</span>
                         </div>
                         <button
@@ -169,7 +169,7 @@
                           title="Remove"
                           @click="removePostMedia(index, fileIdx)"
                         >
-                          <span class="material-symbols-outlined" style="font-size:14px;">close</span>
+                          <X :size="14" />
                         </button>
                       </div>
 
@@ -186,7 +186,7 @@
                         class="thread-post__media-add-more"
                         title="Add another file"
                       >
-                        <span class="material-symbols-outlined" style="font-size:16px;">add</span>
+                        <Plus :size="16" />
                         <input
                           type="file"
                           accept="image/jpeg,image/png,video/mp4,video/quicktime"
@@ -207,7 +207,7 @@
 
                     <!-- Initial attach button -->
                     <label v-else class="thread-post__media-attach">
-                      <span class="material-symbols-outlined" style="font-size:15px;">add_photo_alternate</span>
+                      <ImagePlus :size="15" />
                       Add media
                       <input
                         type="file"
@@ -408,6 +408,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick, reactive } from 'vue';
+import { ImagePlus, Video, X, Plus } from 'lucide-vue-next';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 import ThreadsPublish from '~/components/threads/ThreadsPublish.vue';
 import { useSessionStore, type SessionIdea, type ProducedContentBody, type ImageSuggestion } from '~/stores/session';

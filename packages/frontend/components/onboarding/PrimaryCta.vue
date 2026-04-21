@@ -5,13 +5,14 @@
     :disabled="disabled"
     @click="$emit('click')"
   >
-    <span v-if="icon" class="material-symbols-outlined">{{ icon }}</span>
+    <component :is="icon" v-if="icon" :size="20" />
     <slot />
   </button>
 </template>
 
 <script setup lang="ts">
-defineProps<{ disabled?: boolean; icon?: string }>();
+import type { Component } from 'vue';
+defineProps<{ disabled?: boolean; icon?: Component }>();
 defineEmits<{ click: [] }>();
 </script>
 
@@ -53,5 +54,4 @@ defineEmits<{ click: [] }>();
   box-shadow: none;
 }
 
-.ob-primary-cta .material-symbols-outlined { font-size: 20px; }
 </style>

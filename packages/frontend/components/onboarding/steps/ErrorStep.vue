@@ -2,11 +2,11 @@
   <div class="ob-fallback">
     <div class="ob-retry-banner">
       <div class="ob-retry-banner__msg">
-        <span class="material-symbols-outlined">error_outline</span>
+        <AlertCircle :size="18" style="color:#c26a2a;" />
         Network error · progress preserved
       </div>
       <button type="button" class="ob-retry-banner__btn" @click="$emit('retry')">
-        <span class="material-symbols-outlined">refresh</span>
+        <RefreshCw :size="14" />
         Retry
       </button>
     </div>
@@ -18,6 +18,7 @@
 </template>
 
 <script setup lang="ts">
+import { AlertCircle, RefreshCw } from 'lucide-vue-next';
 defineEmits<{ retry: []; restart: [] }>();
 </script>
 
@@ -48,11 +49,6 @@ defineEmits<{ retry: []; restart: [] }>();
   gap: 8px;
 }
 
-.ob-retry-banner__msg .material-symbols-outlined {
-  font-size: 18px;
-  color: #c26a2a;
-}
-
 .ob-retry-banner__btn {
   display: flex;
   align-items: center;
@@ -67,8 +63,6 @@ defineEmits<{ retry: []; restart: [] }>();
   color: #7a3910;
   cursor: pointer;
 }
-
-.ob-retry-banner__btn .material-symbols-outlined { font-size: 14px; }
 
 .ob-tertiary-link {
   background: none;

@@ -76,7 +76,7 @@
               @click.stop="togglePopover"
             >
               Schedule
-              <span class="material-symbols-outlined" style="font-size: 14px">expand_more</span>
+              <ChevronDown :size="14" />
             </button>
 
             <Teleport to="body">
@@ -116,7 +116,7 @@
         @click.stop="emit('select', ideaId)"
       >
         View Content
-        <span class="material-symbols-outlined" style="font-size: 14px">arrow_forward</span>
+        <ArrowRight :size="14" />
       </button>
     </div>
 
@@ -126,6 +126,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ChevronDown, ArrowRight } from 'lucide-vue-next';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 import { useStatusColors, resolveStatusKey } from '~/composables/useStatusColors';
 

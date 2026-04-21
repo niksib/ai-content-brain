@@ -20,27 +20,27 @@
     >
       <template v-if="latestSnapshot">
         <span v-if="latestSnapshot.views !== null" class="content-card__metric">
-          <span class="material-symbols-outlined" style="font-size:12px;">visibility</span>
+          <Eye :size="12" />
           {{ latestSnapshot.views }}
         </span>
         <span v-if="latestSnapshot.likes !== null" class="content-card__metric">
-          <span class="material-symbols-outlined" style="font-size:12px;">favorite</span>
+          <Heart :size="12" />
           {{ latestSnapshot.likes }}
         </span>
         <span v-if="latestSnapshot.replies !== null" class="content-card__metric">
-          <span class="material-symbols-outlined" style="font-size:12px;">chat_bubble</span>
+          <MessageCircle :size="12" />
           {{ latestSnapshot.replies }}
         </span>
         <span v-if="latestSnapshot.reposts !== null" class="content-card__metric">
-          <span class="material-symbols-outlined" style="font-size:12px;">repeat</span>
+          <Repeat2 :size="12" />
           {{ latestSnapshot.reposts }}
         </span>
         <span v-if="latestSnapshot.quotes !== null" class="content-card__metric">
-          <span class="material-symbols-outlined" style="font-size:12px;">format_quote</span>
+          <Quote :size="12" />
           {{ latestSnapshot.quotes }}
         </span>
         <span v-if="latestSnapshot.shares !== null" class="content-card__metric">
-          <span class="material-symbols-outlined" style="font-size:12px;">share</span>
+          <Share2 :size="12" />
           {{ latestSnapshot.shares }}
         </span>
         <span class="content-card__insights-fetched-at">{{ formattedFetchedAt }}</span>
@@ -54,7 +54,7 @@
         :disabled="refreshing"
         @click.stop="refreshInsights"
       >
-        <span class="material-symbols-outlined" :class="{ 'content-card__refresh-icon--spinning': refreshing }" style="font-size:13px;">refresh</span>
+        <RefreshCw :size="13" :class="{ 'content-card__refresh-icon--spinning': refreshing }" />
         {{ refreshing ? 'Updating...' : 'Update Insights' }}
       </button>
       <span v-if="refreshError" class="content-card__refresh-error">Failed to update</span>
@@ -64,6 +64,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { Eye, Heart, MessageCircle, Repeat2, Quote, Share2, RefreshCw } from 'lucide-vue-next';
 import type { LibraryItem, ThreadsInsightsSnapshot } from '~/stores/library';
 
 const props = defineProps<{

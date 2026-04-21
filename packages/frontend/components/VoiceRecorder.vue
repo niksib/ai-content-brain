@@ -21,7 +21,7 @@
         @click="submitText"
         title="Send (⌘↵)"
       >
-        <span class="material-symbols-outlined" style="font-size:20px;font-variation-settings:'FILL' 1,'wght' 500,'GRAD' 0,'opsz' 24;">send</span>
+        <Send :size="20" />
       </button>
     </div>
     <p class="text-composer__hint">Press ⌘↵ or Ctrl↵ to send</p>
@@ -30,6 +30,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick } from 'vue';
+import { Send } from 'lucide-vue-next';
 
 withDefaults(defineProps<{
   disabled?: boolean;

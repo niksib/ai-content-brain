@@ -18,7 +18,7 @@
     </p>
 
     <div class="ob-summary__actions">
-      <PrimaryCta icon="check" :disabled="loading" @click="onPrimary">
+      <PrimaryCta :icon="Check" :disabled="loading" @click="onPrimary">
         {{ ctaLabel }}
       </PrimaryCta>
     </div>
@@ -28,6 +28,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import OnboardingComposer from '../OnboardingComposer.vue';
+import { Check } from 'lucide-vue-next';
 import PrimaryCta from '../PrimaryCta.vue';
 
 const props = defineProps<{

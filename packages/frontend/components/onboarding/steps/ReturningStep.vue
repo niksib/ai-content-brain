@@ -13,7 +13,7 @@
       <div class="ob-progress-card__summary">{{ summary }}</div>
     </div>
 
-    <PrimaryCta icon="play_arrow" @click="$emit('continue')">
+    <PrimaryCta :icon="Play" @click="$emit('continue')">
       Continue from here
     </PrimaryCta>
 
@@ -24,6 +24,7 @@
 </template>
 
 <script setup lang="ts">
+import { Play } from 'lucide-vue-next';
 import PrimaryCta from '../PrimaryCta.vue';
 
 withDefaults(defineProps<{

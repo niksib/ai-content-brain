@@ -6,7 +6,7 @@
       </div>
     </div>
 
-    <PrimaryCta icon="play_arrow" @click="$emit('start')">Let's go</PrimaryCta>
+    <PrimaryCta :icon="Play" @click="$emit('start')">Let's go</PrimaryCta>
 
     <button type="button" class="ob-tertiary-link" @click="$emit('retry')">
       ← Try connecting Threads again
@@ -15,6 +15,7 @@
 </template>
 
 <script setup lang="ts">
+import { Play } from 'lucide-vue-next';
 import PrimaryCta from '../PrimaryCta.vue';
 
 defineEmits<{ start: []; retry: [] }>();

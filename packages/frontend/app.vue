@@ -5,24 +5,6 @@
 </template>
 
 <script setup lang="ts">
-onMounted(() => {
-  const markReady = () => document.documentElement.classList.add('material-symbols-ready');
-
-  if (document.fonts.check('24px "Material Symbols Outlined"')) {
-    markReady();
-    return;
-  }
-
-  const onLoadingDone = () => {
-    if (document.fonts.check('24px "Material Symbols Outlined"')) {
-      markReady();
-      document.fonts.removeEventListener('loadingdone', onLoadingDone);
-    }
-  };
-
-  document.fonts.addEventListener('loadingdone', onLoadingDone);
-  setTimeout(markReady, 4000); // fallback if font never loads
-});
 </script>
 
 <style>
@@ -70,15 +52,6 @@ onMounted(() => {
   /* Typography */
   --font-heading: 'Manrope', sans-serif;
   --font-body: 'Inter', sans-serif;
-}
-
-/* ─── Material Symbols ─── */
-.material-symbols-outlined {
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  vertical-align: middle;
-  line-height: 1;
-  font-size: 24px;
-  display: inline-block;
 }
 
 /* ─── Global Reset & Base ─── */

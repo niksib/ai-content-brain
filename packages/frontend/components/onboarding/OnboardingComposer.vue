@@ -23,9 +23,9 @@
         :disabled="disabled"
         @click="toggleRecording"
       >
-        <span class="material-symbols-outlined">
-          {{ isTranscribing ? 'hourglass_top' : isRecording ? 'stop' : 'mic' }}
-        </span>
+        <Hourglass v-if="isTranscribing" :size="20" />
+        <Square v-else-if="isRecording" :size="20" />
+        <Mic v-else :size="20" />
       </button>
 
       <button
@@ -35,7 +35,7 @@
         :disabled="disabled || !modelValue.trim()"
         @click="handleSubmit"
       >
-        <span class="material-symbols-outlined">arrow_upward</span>
+        <ArrowUp :size="18" />
       </button>
     </div>
   </div>
@@ -43,6 +43,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue';
+import { Hourglass, Square, Mic, ArrowUp } from 'lucide-vue-next';
 import { useVoiceRecorder } from '~/composables/useVoiceRecorder';
 import { useVoiceService } from '~/services/voice';
 
@@ -194,7 +195,6 @@ function autoResize() {
   animation: ob-mic-pulse 1.2s ease-in-out infinite;
 }
 .ob-composer__mic--busy { opacity: 0.7; cursor: wait; }
-.ob-composer__mic .material-symbols-outlined { font-size: 20px; }
 
 @keyframes ob-mic-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6); }
@@ -213,5 +213,4 @@ function autoResize() {
   box-shadow: none;
   background: #cfced9;
 }
-.ob-composer__send .material-symbols-outlined { font-size: 18px; }
 </style>
