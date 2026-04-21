@@ -26,7 +26,18 @@ interface AgentOptions {
 }
 
 export abstract class BaseAgent {
-  systemPrompt: string;
+  /** Static part: contextLines + CLAUDE.md + skills — never changes, safe to cache. */
+  readonly staticSystemPrompt: string;
+  /** Dynamic part: session context loaded async (e.g. memory map, current ideas). */
+  dynamicSystemPrompt: string = "";
+
+  /** Full combined prompt — kept for backward-compat (e.g. onboarding service). */
+  get systemPrompt(): string {
+    return this.dynamicSystemPrompt
+      ? `${this.staticSystemPrompt}\n\n${this.dynamicSystemPrompt}`
+      : this.staticSystemPrompt;
+  }
+
   protected readonly userId: string;
 
   protected constructor(agentName: string, userId: string, options: AgentOptions = {}) {
@@ -46,7 +57,7 @@ export abstract class BaseAgent {
     const claudeMd = readFile(path.join(agentDir, ".claude", "CLAUDE.md"));
     const skillsBlock = readSkills(agentDir, skills);
 
-    this.systemPrompt = [contextLines, claudeMd, skillsBlock].filter(Boolean).join("\n\n");
+    this.staticSystemPrompt = [contextLines, claudeMd, skillsBlock].filter(Boolean).join("\n\n");
   }
 
   // Override in subclasses that need async data before first run (e.g. session context, user state)
@@ -54,12 +65,9 @@ export abstract class BaseAgent {
     return "";
   }
 
-  // Call after construction — applies async context to systemPrompt
+  // Call after construction — loads async context into dynamicSystemPrompt
   protected static async initialize<T extends BaseAgent>(agent: T): Promise<T> {
-    const extraContext = await agent.loadContext();
-    if (extraContext) {
-      agent.systemPrompt += `\n\n${extraContext}`;
-    }
+    agent.dynamicSystemPrompt = await agent.loadContext();
     return agent;
   }
 

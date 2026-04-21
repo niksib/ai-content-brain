@@ -3,7 +3,6 @@ import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireCredits } from "../middleware/credits.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { agentRunner } from "../services/agent-runner.service.js";
-import { billingService } from "../services/billing.service.js";
 import { createSSEStream } from "../lib/sse.js";
 import { ThreadsAgent } from "../agents/threads/threads.agent.js";
 import { LinkedInAgent } from "../agents/linkedin/linkedin.agent.js";
@@ -86,13 +85,18 @@ ideaRoutes.patch(
     const { send, close, response } = createSSEStream(context);
 
     agentRunner
-      .stream(agent, [{ role: "user", content: agent.buildProductionPrompt() }], { send, close })
+      .stream(
+        agent,
+        [{ role: "user", content: agent.buildProductionPrompt() }],
+        { send, close },
+        undefined,
+        { userId: user.id, actionType: "content_production", reference: ideaId }
+      )
       .then(async () => {
         await prisma.contentIdea.update({
           where: { id: ideaId },
           data: { status: "completed" },
         });
-        await billingService.deductCredits(user.id, 20, "content_production", ideaId);
       })
       .catch(async () => {
         await prisma.contentIdea.update({
@@ -218,7 +222,13 @@ ideaRoutes.post(
     };
 
     agentRunner
-      .stream(agent, messageHistory, wrappedSse, { onContentSaved })
+      .stream(
+        agent,
+        messageHistory,
+        wrappedSse,
+        { onContentSaved },
+        { userId: user.id, actionType: "agent_call", reference: ideaId }
+      )
       .then(async ({ costUsd }) => {
         const assistantContent = tokenChunks.join("");
         if (assistantContent.length > 0) {
@@ -232,7 +242,6 @@ ideaRoutes.post(
             },
           });
         }
-        await billingService.deductCredits(user.id, 10, "content_plan", ideaId);
       });
 
     return response;

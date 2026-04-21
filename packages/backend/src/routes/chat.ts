@@ -3,7 +3,6 @@ import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireCredits } from "../middleware/credits.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { agentRunner } from "../services/agent-runner.service.js";
-import { billingService } from "../services/billing.service.js";
 import { createSSEStream } from "../lib/sse.js";
 import { StrategistAgent } from "../agents/strategist/strategist.agent.js";
 import type { AppEnv } from "../types/hono.js";
@@ -68,9 +67,15 @@ chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "conten
   const agent = await StrategistAgent.create(user.id, chatSession.id);
 
   agentRunner
-    .stream(agent, messageHistory, wrappedSse)
+    .stream(
+      agent,
+      messageHistory,
+      wrappedSse,
+      undefined,
+      { userId: user.id, actionType: "content_plan", reference: chatSession.id }
+    )
     .then(async ({ costUsd }) => {
-      // Save assistant message with accumulated text and cost
+      // Save assistant message with accumulated text and real cost
       const assistantContent = tokenChunks.join("");
       if (assistantContent.length > 0) {
         await prisma.chatMessage.create({
@@ -82,9 +87,6 @@ chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "conten
           },
         });
       }
-
-      // Deduct credits after successful processing
-      await billingService.deductCredits(user.id, 10, "content_plan", chatSession.id);
     });
 
   return response;

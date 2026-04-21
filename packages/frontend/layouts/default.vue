@@ -1,10 +1,18 @@
 <template>
-  <div class="bg-background font-body text-on-surface flex min-h-screen">
+  <div class="bg-background font-body text-on-surface flex h-screen overflow-hidden">
     <!-- Sidebar -->
-    <aside class="h-screen w-64 border-r border-slate-200 bg-slate-100 flex flex-col py-6 shrink-0 sticky top-0">
-      <NuxtLink to="/dashboard" class="px-6 mb-8 flex items-center gap-2 no-underline">
-        <img src="~/assets/waving-hand.svg" class="w-9 h-9 block shrink-0" alt="" />
-        <span class="brand-wordmark">Postrr</span>
+    <aside class="w-64 border-r border-slate-200 bg-slate-100 flex flex-col py-6 shrink-0 overflow-y-auto">
+      <NuxtLink to="/dashboard" class="px-6 mb-8 flex items-center gap-2.5 no-underline">
+        <div
+          class="shrink-0 rounded-full relative overflow-hidden"
+          style="width:28px;height:28px;background:linear-gradient(135deg,#4f46e5,#8b5cf6,#c084fc);box-shadow:0 4px 12px rgba(79,70,229,0.3);"
+        >
+          <div
+            class="absolute inset-0 rounded-full"
+            style="inset:4px;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,0.7),transparent 50%);"
+          />
+        </div>
+        <span style="font-family:'Manrope',sans-serif;font-weight:800;font-size:22px;letter-spacing:-0.02em;color:#111827;">HeyPostrr</span>
       </NuxtLink>
 
       <nav class="flex-1 space-y-1">

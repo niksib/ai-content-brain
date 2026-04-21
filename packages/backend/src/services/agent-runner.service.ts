@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { BaseAgent, AgentToolOptions } from "../agents/base.agent.js";
+import { deductCreditsForLlmCall, type LlmActionType } from "./llm-cost.js";
 export type { AgentToolOptions };
 
 interface SSEWriter {
@@ -12,6 +13,12 @@ interface HistoryMessage {
   content: string;
 }
 
+interface BillingOptions {
+  userId: string;
+  actionType: LlmActionType;
+  reference?: string;
+}
+
 export class AgentRunnerService {
   private anthropic: Anthropic;
 
@@ -19,15 +26,12 @@ export class AgentRunnerService {
     this.anthropic = new Anthropic();
   }
 
-  // Claude Sonnet 4.6 pricing
-  private static readonly INPUT_COST_PER_TOKEN = 3 / 1_000_000;
-  private static readonly OUTPUT_COST_PER_TOKEN = 15 / 1_000_000;
-
   async stream(
     agent: BaseAgent,
     messageHistory: HistoryMessage[],
     sse: SSEWriter,
-    extraToolOptions?: AgentToolOptions
+    extraToolOptions?: AgentToolOptions,
+    billing?: BillingOptions
   ): Promise<{ costUsd: number }> {
     // extraToolOptions first so SSE-wired defaults always win on conflict
     const toolOptions: AgentToolOptions = {
@@ -39,14 +43,38 @@ export class AgentRunnerService {
 
     const { definitions, executors } = agent.getTools(toolOptions);
 
+    // Build system as array of blocks:
+    // - static part (CLAUDE.md + skills) gets cache_control → cached across turns
+    // - dynamic part (session context: memory, ideas, history) is uncached → changes between requests
+    const systemBlocks: Anthropic.Messages.TextBlockParam[] = [
+      {
+        type: "text",
+        text: agent.staticSystemPrompt,
+        cache_control: { type: "ephemeral" },
+      },
+    ];
+    if (agent.dynamicSystemPrompt) {
+      systemBlocks.push({ type: "text", text: agent.dynamicSystemPrompt });
+    }
+
+    // Cache the last tool definition — tools never change, free win
+    const toolsWithCache: Anthropic.Tool[] = definitions.map((tool, index) =>
+      index === definitions.length - 1
+        ? { ...tool, cache_control: { type: "ephemeral" } }
+        : tool
+    );
+
     const messages: Anthropic.MessageParam[] = messageHistory.map((msg) => ({
       role: msg.role,
       content: msg.content,
     }));
 
-    let totalInputTokens = 0;
+    // Accumulate all token types across multi-turn loop
+    let totalInputUncachedTokens = 0;
+    let totalInputCachedTokens = 0;
+    let totalCacheWriteTokens = 0;
     let totalOutputTokens = 0;
-    let finalCostUsd = 0;
+    let costUsd = 0;
 
     try {
       let continueLoop = true;
@@ -54,9 +82,9 @@ export class AgentRunnerService {
       while (continueLoop) {
         const stream = this.anthropic.messages.stream({
           model: "claude-sonnet-4-6",
-          system: agent.systemPrompt,
+          system: systemBlocks,
           messages,
-          tools: definitions,
+          tools: toolsWithCache,
           max_tokens: 8096,
         });
 
@@ -78,8 +106,17 @@ export class AgentRunnerService {
 
         const response = await stream.finalMessage();
 
-        totalInputTokens += response.usage.input_tokens;
-        totalOutputTokens += response.usage.output_tokens;
+        // Accumulate all token types for accurate billing
+        const usage = response.usage as {
+          input_tokens: number;
+          output_tokens: number;
+          cache_creation_input_tokens?: number;
+          cache_read_input_tokens?: number;
+        };
+        totalInputUncachedTokens += usage.input_tokens;
+        totalOutputTokens += usage.output_tokens;
+        totalCacheWriteTokens += usage.cache_creation_input_tokens ?? 0;
+        totalInputCachedTokens += usage.cache_read_input_tokens ?? 0;
 
         messages.push({ role: "assistant", content: response.content });
 
@@ -145,14 +182,32 @@ export class AgentRunnerService {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     } finally {
-      finalCostUsd =
-        totalInputTokens * AgentRunnerService.INPUT_COST_PER_TOKEN +
-        totalOutputTokens * AgentRunnerService.OUTPUT_COST_PER_TOKEN;
-      sse.send("done", { costUsd: finalCostUsd });
+      // Deduct real token-based credits if billing params provided
+      if (billing) {
+        try {
+          const result = await deductCreditsForLlmCall({
+            userId: billing.userId,
+            model: "claude-sonnet-4-6",
+            usage: {
+              input_tokens: totalInputUncachedTokens,
+              output_tokens: totalOutputTokens,
+              cache_creation_input_tokens: totalCacheWriteTokens,
+              cache_read_input_tokens: totalInputCachedTokens,
+            },
+            actionType: billing.actionType,
+            reference: billing.reference,
+          });
+          costUsd = result.costCents / 100;
+        } catch (billingError) {
+          console.error("[AgentRunner] Failed to deduct credits:", billingError);
+        }
+      }
+
+      sse.send("done", { costUsd });
       sse.close();
     }
 
-    return { costUsd: finalCostUsd };
+    return { costUsd };
   }
 }
 
