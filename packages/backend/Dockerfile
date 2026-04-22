@@ -12,6 +12,7 @@ RUN pnpm install --frozen-lockfile --filter @daily-content-brain/backend
 # Stage 3: Build
 FROM deps AS build
 COPY packages/backend ./packages/backend
+RUN pnpm --filter @daily-content-brain/backend exec prisma generate
 RUN pnpm --filter @daily-content-brain/backend build
 
 # Stage 4: Production

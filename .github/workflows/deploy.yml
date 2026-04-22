@@ -73,7 +73,7 @@ jobs:
           command: |
             set -e
 
-            cd /opt/ai-content-brain
+            cd /var/www/ai-content-brain
 
             # 1. Обновить конфиги (nginx, docker-compose) из репо
             sudo git fetch origin main
