@@ -46,7 +46,7 @@ services:
       dockerfile: packages/backend/Dockerfile
     image: ${REGISTRY}/backend:${IMAGE_TAG}
     ports:
-      - "127.0.0.1:3001:3001"
+      - "3001:3001"
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://app:${DB_PASSWORD}@postgres:5432/daily_content_brain
@@ -90,7 +90,7 @@ services:
       dockerfile: packages/frontend/Dockerfile
     image: ${REGISTRY}/frontend:${IMAGE_TAG}
     ports:
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
     environment:
       NODE_ENV: production
       NUXT_PUBLIC_API_BASE_URL: ${BACKEND_URL}
