@@ -23,6 +23,7 @@ COPY --from=deps /app/packages/backend/node_modules ./packages/backend/node_modu
 COPY --from=build /app/packages/backend/src ./packages/backend/src
 COPY --from=build /app/packages/backend/package.json ./packages/backend/package.json
 COPY --from=build /app/packages/backend/prisma ./packages/backend/prisma
+COPY --from=build /app/packages/backend/prisma.config.ts ./packages/backend/prisma.config.ts
 
 WORKDIR /app/packages/backend
 
