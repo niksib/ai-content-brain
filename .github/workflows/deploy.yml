@@ -94,11 +94,11 @@ jobs:
             sudo docker tag ghcr.io/${{ github.repository }}/frontend:${{ github.sha }} ghcr.io/${{ github.repository }}/frontend:latest
 
             # 6. Миграции до перезапуска
-            sudo docker compose -f docker/prod/docker-compose.yml \
+            sudo docker compose -p ai-content-brain -f docker/prod/docker-compose.yml \
               run --rm --no-deps backend npx prisma migrate deploy
 
             # 7. Перезапуск контейнеров
-            sudo docker compose -f docker/prod/docker-compose.yml \
+            sudo docker compose -p ai-content-brain -f docker/prod/docker-compose.yml \
               up -d --remove-orphans --force-recreate backend frontend
 
             # 8. Чистим старые образы

@@ -9,11 +9,10 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/backend/package.json ./packages/backend/package.json
 RUN pnpm install --frozen-lockfile --filter @daily-content-brain/backend
 
-# Stage 3: Build
+# Stage 3: Generate Prisma client
 FROM deps AS build
 COPY packages/backend ./packages/backend
 RUN pnpm --filter @daily-content-brain/backend exec prisma generate
-RUN pnpm --filter @daily-content-brain/backend build
 
 # Stage 4: Production
 FROM base AS production
@@ -21,7 +20,7 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/backend/node_modules ./packages/backend/node_modules
-COPY --from=build /app/packages/backend/dist ./packages/backend/dist
+COPY --from=build /app/packages/backend/src ./packages/backend/src
 COPY --from=build /app/packages/backend/package.json ./packages/backend/package.json
 COPY --from=build /app/packages/backend/prisma ./packages/backend/prisma
 
@@ -29,4 +28,4 @@ WORKDIR /app/packages/backend
 
 EXPOSE 3001
 
-CMD ["node", "dist/index.js"]
+CMD ["node_modules/.bin/tsx", "src/index.ts"]
