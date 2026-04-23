@@ -9,6 +9,7 @@
         v-if="viewStep === 'connect'"
         key="connect"
         :loading="connecting"
+        :already-connected="Boolean(threadsAccount)"
         @connect="onConnectThreads"
         @skip="onSkipThreads"
       />
@@ -94,12 +95,18 @@ const FINALIZING_STEPS = [
 const onboarding = useOnboardingStore();
 const route = useRoute();
 
+interface ThreadsAccountView {
+  username: string;
+  name: string | null;
+}
+
 const isRecording = ref(false);
 const questionIndex = ref(0);
 const localStep = ref<ViewStep | null>(null);
 const connecting = ref(false);
 const analysisReady = ref(false);
 const finalizingReady = ref(false);
+const threadsAccount = ref<ThreadsAccountView | null>(null);
 
 const ANALYSIS_POLL_INTERVAL_MS = 2500;
 let analysisPollHandle: ReturnType<typeof setInterval> | null = null;
@@ -153,8 +160,14 @@ const orbState = computed<'idle' | 'thinking' | 'speaking' | 'listening'>(() => 
 
 const bubbleText = computed(() => {
   switch (viewStep.value) {
-    case 'connect':
+    case 'connect': {
+      if (threadsAccount.value) {
+        const displayName = threadsAccount.value.name?.trim()
+          || `@${threadsAccount.value.username}`;
+        return `Hi, I'm Ori, your Postrr copilot. I can see your Threads account, ${displayName}. When you're ready, I'll spend a moment with your posts to learn your voice, topics, and audience, so I can skip the questions I can answer just by looking.`;
+      }
       return "Hi, I'm Ori, your Postrr copilot. Before we start making posts together, I want to actually understand you as a creator. Connect Threads so I can spend a moment with your account, your voice, your topics, your audience, and skip the questions I can answer just by looking.";
+    }
     case 'analyzing':
       return 'One moment while I get to know you as a creator.';
     case 'finalizing':
@@ -169,10 +182,13 @@ const bubbleText = computed(() => {
     case 'error':
       return onboarding.error
         ?? 'I lost connection for a moment. Want me to pick up where we left off?';
-    case 'question':
-      return currentQuestion.value?.bubbleContext
-        || currentQuestion.value?.prompt
-        || '';
+    case 'question': {
+      const question = currentQuestion.value;
+      if (!question) return '';
+      const context = question.bubbleContext?.trim();
+      const prompt = question.prompt?.trim() ?? '';
+      return context ? `${context}\n\n${prompt}` : prompt;
+    }
     default:
       return '';
   }
@@ -192,8 +208,21 @@ const bubbleMeta = computed(() => {
   }
 });
 
+async function loadThreadsAccount(): Promise<void> {
+  try {
+    const config = useRuntimeConfig();
+    const response = await $fetch<{ account: ThreadsAccountView | null }>(
+      `${config.public.apiBaseUrl}/api/threads/account`,
+      { credentials: 'include' },
+    );
+    threadsAccount.value = response.account;
+  } catch {
+    threadsAccount.value = null;
+  }
+}
+
 onMounted(async () => {
-  await onboarding.ensureSession();
+  await Promise.all([onboarding.ensureSession(), loadThreadsAccount()]);
 
   const justConnected = route.query.threads_connected === 'true';
   if (
@@ -255,6 +284,18 @@ async function onConnectThreads() {
     connecting.value = false;
     return;
   }
+
+  if (threadsAccount.value) {
+    // Threads already linked (e.g. via Threads login) — skip OAuth and start analysis.
+    try {
+      localStep.value = 'analyzing';
+      await onboarding.runAnalysis();
+    } finally {
+      connecting.value = false;
+    }
+    return;
+  }
+
   const config = useRuntimeConfig();
   await navigateTo(`${config.public.apiBaseUrl}/api/threads/auth`, { external: true });
 }

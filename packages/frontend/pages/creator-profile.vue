@@ -77,6 +77,59 @@
             </button>
           </div>
         </article>
+
+        <article v-if="isCreating" class="block-card block-card--new">
+          <header class="block-card__header">
+            <div class="block-card__new-fields">
+              <input
+                v-model="newBlock.title"
+                type="text"
+                class="form-input"
+                placeholder="Block title (e.g. “Brand voice rules”)"
+                maxlength="80"
+              />
+              <input
+                v-model="newBlock.description"
+                type="text"
+                class="form-input form-input--small"
+                placeholder="Short description (optional)"
+                maxlength="140"
+              />
+            </div>
+            <button type="button" class="block-card__delete" @click="cancelCreate">
+              Cancel
+            </button>
+          </header>
+
+          <textarea
+            v-model="newBlock.content"
+            class="form-textarea"
+            rows="4"
+            placeholder="What should Postrr remember? Write it in your own words."
+          />
+
+          <div class="block-card__footer">
+            <span v-if="newBlockKeyError" class="block-card__error">{{ newBlockKeyError }}</span>
+            <span v-else class="block-card__key">{{ newBlockKeyPreview || '(key will be generated from title)' }}</span>
+            <button
+              type="button"
+              class="btn btn--primary block-card__save"
+              :disabled="!canSaveNewBlock || profileStore.isSaving"
+              @click="saveNewBlock"
+            >
+              Add block
+            </button>
+          </div>
+        </article>
+
+        <button
+          v-else
+          type="button"
+          class="block-card__add"
+          @click="startCreate"
+        >
+          + Add custom memory
+        </button>
       </div>
     </section>
   </div>
@@ -200,6 +253,63 @@ async function onSave(key: string): Promise<void> {
 async function onDelete(key: string): Promise<void> {
   if (isCanonical(key)) return;
   await profileStore.deleteBlock(key);
+}
+
+const isCreating = ref(false);
+const newBlock = reactive({
+  title: '',
+  description: '',
+  content: '',
+});
+
+function slugifyKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+}
+
+const newBlockKeyPreview = computed(() => slugifyKey(newBlock.title));
+
+const newBlockKeyError = computed<string>(() => {
+  const key = newBlockKeyPreview.value;
+  if (!key) return '';
+  if (canonicalMap.value[key]) return `"${key}" is reserved for a canonical block.`;
+  if (blockMap.value[key]) return `A block with key "${key}" already exists.`;
+  return '';
+});
+
+const canSaveNewBlock = computed(() =>
+  newBlock.title.trim().length > 0 &&
+  newBlock.content.trim().length > 0 &&
+  newBlockKeyPreview.value.length > 0 &&
+  !newBlockKeyError.value
+);
+
+function startCreate(): void {
+  isCreating.value = true;
+  newBlock.title = '';
+  newBlock.description = '';
+  newBlock.content = '';
+}
+
+function cancelCreate(): void {
+  isCreating.value = false;
+  newBlock.title = '';
+  newBlock.description = '';
+  newBlock.content = '';
+}
+
+async function saveNewBlock(): Promise<void> {
+  if (!canSaveNewBlock.value) return;
+  await profileStore.upsertBlock({
+    key: newBlockKeyPreview.value,
+    title: newBlock.title.trim(),
+    description: newBlock.description.trim(),
+    content: newBlock.content.trim(),
+  });
+  cancelCreate();
 }
 
 onMounted(async () => {
@@ -384,6 +494,63 @@ onMounted(async () => {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.6875rem;
   color: #9ca3af;
+}
+
+.block-card__error {
+  font-size: 0.75rem;
+  color: #dc2626;
+}
+
+.block-card--new {
+  border-style: dashed;
+  border-color: #c7d2fe;
+  background: #fff;
+}
+
+.block-card__new-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.block-card__add {
+  border: 1px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 0.875rem 1.25rem;
+  background: transparent;
+  color: #6366f1;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.block-card__add:hover {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.05);
+  color: #4f46e5;
+}
+
+.form-input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #111827;
+  background: #fff;
+  width: 100%;
+}
+
+.form-input--small {
+  font-size: 0.8125rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 .form-textarea {

@@ -7,6 +7,14 @@
         <span class="calendar-section__badge">{{ currentMonthLabel }}</span>
       </div>
       <div class="calendar-section__nav">
+        <button
+          type="button"
+          class="calendar-schedule-btn"
+          @click="emit('schedule')"
+        >
+          <CalendarPlus :size="16" />
+          Schedule post
+        </button>
         <button class="calendar-nav-btn" @click="prevMonth">
           <ChevronLeft :size="20" />
         </button>
@@ -39,8 +47,8 @@
           :class="{
             'calendar-cell--today': day.isToday,
             'calendar-cell--weekend': day.isWeekend,
-            'calendar-cell--empty': day.items.length === 0 && !day.isToday,
-            'calendar-cell--has-items': day.items.length > 0,
+            'calendar-cell--empty': day.entries.length === 0 && !day.isToday,
+            'calendar-cell--has-items': day.entries.length > 0,
           }"
         >
           <!-- Day number -->
@@ -50,28 +58,42 @@
           </div>
 
           <!-- Content bubbles -->
-          <div v-if="day.items.length > 0" class="calendar-cell__bubbles">
-            <div
-              v-for="item in day.items.slice(0, 3)"
-              :key="item.id"
-              class="calendar-bubble"
-              :class="bubbleClass(item)"
-              @click.stop="emit('navigate', item)"
-            >
-              <div class="calendar-bubble__meta">
-                <PlatformIcon :platform="(item.platform as any)" :size="11" />
-                <span class="calendar-bubble__format">{{ formatLabel(item.format) }}</span>
-                <span class="calendar-bubble__status">{{ chipStatusLabel(item) }}</span>
+          <div v-if="day.entries.length > 0" class="calendar-cell__bubbles">
+            <template v-for="entry in day.entries.slice(0, 3)" :key="entry.key">
+              <div
+                v-if="entry.kind === 'library'"
+                class="calendar-bubble"
+                :class="bubbleClass(entry.item)"
+                @click.stop="emit('navigate', entry.item)"
+              >
+                <div class="calendar-bubble__meta">
+                  <PlatformIcon :platform="(entry.item.platform as any)" :size="11" />
+                  <span class="calendar-bubble__format">{{ formatLabel(entry.item.format) }}</span>
+                  <span class="calendar-bubble__status">{{ chipStatusLabel(entry.item) }}</span>
+                </div>
+                <p class="calendar-bubble__title">{{ entry.item.contentIdea.angle }}</p>
               </div>
-              <p class="calendar-bubble__title">{{ item.contentIdea.angle }}</p>
-            </div>
+              <div
+                v-else
+                class="calendar-bubble calendar-bubble--standalone"
+                :class="[standaloneBubbleClass(entry.post), entry.post.status !== 'pending' ? 'calendar-bubble--readonly' : '']"
+                @click.stop="onStandaloneClick(entry.post)"
+              >
+                <div class="calendar-bubble__meta">
+                  <PlatformIcon :platform="(entry.post.platform as any)" :size="11" />
+                  <span class="calendar-bubble__format">{{ standaloneFormatLabel(entry.post) }}</span>
+                  <span class="calendar-bubble__status">{{ standaloneStatusLabel(entry.post) }}</span>
+                </div>
+                <p class="calendar-bubble__title">{{ entry.post.text || '(empty)' }}</p>
+              </div>
+            </template>
             <button
-              v-if="day.items.length > 3 && sessionIdForDay(day)"
+              v-if="day.entries.length > 3 && sessionIdForDay(day)"
               type="button"
               class="calendar-bubble__overflow"
               @click.stop="emit('navigate-session', sessionIdForDay(day)!)"
             >
-              +{{ day.items.length - 3 }} more
+              +{{ day.entries.length - 3 }} more
             </button>
           </div>
         </div>
@@ -82,12 +104,36 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, CalendarPlus } from 'lucide-vue-next';
 import type { LibraryItem } from '~/stores/library';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 
+export interface StandalonePostThreadEntry {
+  text: string;
+  mediaType?: 'IMAGE' | 'VIDEO';
+  mediaUrl?: string;
+}
+
+export interface StandalonePost {
+  id: string;
+  platform: string;
+  status: 'pending' | 'publishing' | 'published' | 'failed';
+  text: string;
+  isThread: boolean;
+  mediaType: 'TEXT' | 'IMAGE' | 'VIDEO';
+  mediaUrl: string | null;
+  posts: StandalonePostThreadEntry[] | null;
+  scheduledAt: string;
+  publishedAt: string | null;
+}
+
+type DayEntry =
+  | { kind: 'library'; key: string; item: LibraryItem }
+  | { kind: 'standalone'; key: string; post: StandalonePost };
+
 const props = defineProps<{
   items: LibraryItem[];
+  standalonePosts?: StandalonePost[];
   currentMonth: number;
   currentYear: number;
 }>();
@@ -95,8 +141,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   navigate: [item: LibraryItem];
   'navigate-session': [sessionId: string];
+  'navigate-standalone': [post: StandalonePost];
   'update:month': [year: number, month: number];
+  schedule: [];
 }>();
+
+function onStandaloneClick(post: StandalonePost): void {
+  if (post.status !== 'pending') return;
+  emit('navigate-standalone', post);
+}
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -122,18 +175,37 @@ const daysInMonth = computed(() => {
     const dayOfWeek = (leadingDays.value + i) % 7;
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-    const items = props.items.filter((item) => {
-      // scheduled → use scheduledAt, posted/ready → use createdAt
-      const iso = item.contentIdea.publishStatus === 'scheduled' && item.contentIdea.scheduledAt
-        ? item.contentIdea.scheduledAt
-        : item.createdAt;
-      const d = new Date(iso);
-      return d.getFullYear() === props.currentYear &&
-        d.getMonth() === props.currentMonth &&
-        d.getDate() === number;
-    });
+    const libraryEntries: DayEntry[] = props.items
+      .filter((item) => {
+        const { publishStatus, scheduledAt, publishedAt } = item.contentIdea;
+        let iso = item.createdAt;
+        if (publishStatus === 'posted' && publishedAt) {
+          iso = publishedAt;
+        } else if (publishStatus === 'scheduled' && scheduledAt) {
+          iso = scheduledAt;
+        }
+        const d = new Date(iso);
+        return d.getFullYear() === props.currentYear &&
+          d.getMonth() === props.currentMonth &&
+          d.getDate() === number;
+      })
+      .map((item) => ({ kind: 'library', key: `library-${item.id}`, item }));
 
-    return { number, isToday, isWeekend, items };
+    const standaloneEntries: DayEntry[] = (props.standalonePosts ?? [])
+      .filter((post) => {
+        const iso = post.status === 'published' && post.publishedAt
+          ? post.publishedAt
+          : post.scheduledAt;
+        const d = new Date(iso);
+        return d.getFullYear() === props.currentYear &&
+          d.getMonth() === props.currentMonth &&
+          d.getDate() === number;
+      })
+      .map((post) => ({ kind: 'standalone', key: `standalone-${post.id}`, post }));
+
+    const entries = [...libraryEntries, ...standaloneEntries];
+
+    return { number, isToday, isWeekend, entries };
   });
 });
 
@@ -156,21 +228,36 @@ function chipStatusLabel(item: LibraryItem): string {
   return 'Ready';
 }
 
-function chipClass(item: LibraryItem): string {
-  if (item.contentIdea.publishStatus === 'posted') return 'calendar-chip--posted';
-  if (item.contentIdea.publishStatus === 'scheduled') return 'calendar-chip--scheduled';
-  return 'calendar-chip--ready';
-}
-
 function bubbleClass(item: LibraryItem): string {
   if (item.contentIdea.publishStatus === 'posted') return 'calendar-bubble--posted';
   if (item.contentIdea.publishStatus === 'scheduled') return 'calendar-bubble--scheduled';
   return 'calendar-bubble--ready';
 }
 
-function sessionIdForDay(day: { items: LibraryItem[] }): string | null {
-  for (const item of day.items) {
-    const sessionId = item.contentIdea.contentPlan?.chatSessionId;
+function standaloneBubbleClass(post: StandalonePost): string {
+  if (post.status === 'published') return 'calendar-bubble--posted';
+  if (post.status === 'failed') return 'calendar-bubble--ready';
+  return 'calendar-bubble--scheduled';
+}
+
+function standaloneStatusLabel(post: StandalonePost): string {
+  if (post.status === 'published') return 'Posted';
+  if (post.status === 'failed') return 'Failed';
+  if (post.status === 'publishing') return 'Sending';
+  return 'Sched';
+}
+
+function standaloneFormatLabel(post: StandalonePost): string {
+  if (post.isThread) return 'Thread';
+  if (post.mediaType === 'VIDEO') return 'Video';
+  if (post.mediaType === 'IMAGE') return 'Post+img';
+  return 'Post';
+}
+
+function sessionIdForDay(day: { entries: DayEntry[] }): string | null {
+  for (const entry of day.entries) {
+    if (entry.kind !== 'library') continue;
+    const sessionId = entry.item.contentIdea.contentPlan?.chatSessionId;
     if (sessionId) return sessionId;
   }
   return null;
@@ -238,7 +325,34 @@ function nextMonth(): void {
 
 .calendar-section__nav {
   display: flex;
-  gap: 0.375rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.calendar-schedule-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: none;
+  background: #3525cd;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  box-shadow: 0 4px 12px rgba(53, 37, 205, 0.22);
+  margin-right: 0.25rem;
+}
+
+.calendar-schedule-btn:hover {
+  background: #4f46e5;
+}
+
+.calendar-schedule-btn:active {
+  transform: scale(0.97);
 }
 
 .calendar-nav-btn {
@@ -406,6 +520,9 @@ function nextMonth(): void {
   background: #fff4ef;
   border: 1px solid #ffd1bd;
 }
+
+.calendar-bubble--readonly { cursor: default; }
+.calendar-bubble--readonly:hover { filter: none; transform: none; }
 
 /* Bubble meta: platform icon + format + status badge */
 .calendar-bubble__meta {

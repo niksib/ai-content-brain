@@ -3,100 +3,68 @@
     <div class="pricing-hero">
       <p class="pricing-hero__label">Pricing</p>
       <h1 class="pricing-hero__title">Choose your plan</h1>
-      <p class="pricing-hero__subtitle">Unlock the full power of AI-driven content creation.</p>
+      <p class="pricing-hero__subtitle">Monthly credits refill on every billing cycle. Unused credits don't roll over.</p>
     </div>
 
+    <p v-if="errorMessage" class="pricing-error">{{ errorMessage }}</p>
+
     <div class="pricing-grid">
-      <!-- Free plan -->
-      <div class="plan-card">
+      <div
+        v-for="plan in plans"
+        :key="plan.id"
+        class="plan-card"
+        :class="{ 'plan-card--featured': plan.id === 'creator' }"
+      >
+        <div v-if="plan.id === 'creator'" class="plan-card__badge">Most Popular</div>
         <div class="plan-card__header">
-          <h3 class="plan-card__name">Free</h3>
+          <h3 class="plan-card__name">{{ plan.name }}</h3>
           <div class="plan-card__price">
-            <span class="plan-card__amount">$0</span>
+            <span class="plan-card__amount">${{ plan.priceUsd }}</span>
             <span class="plan-card__period">/ month</span>
           </div>
         </div>
-        <ul class="plan-card__features">
-          <li class="plan-card__feature">
-            <CheckCircle :size="18" class="plan-card__check" />
-            500 credits / month
-          </li>
-          <li class="plan-card__feature">
-            <CheckCircle :size="18" class="plan-card__check" />
-            Up to 10 sessions
-          </li>
-          <li class="plan-card__feature plan-card__feature--muted">
-            <XCircle :size="18" class="plan-card__cross" />
-            Advanced AI features
-          </li>
-          <li class="plan-card__feature plan-card__feature--muted">
-            <XCircle :size="18" class="plan-card__cross" />
-            Priority support
-          </li>
-        </ul>
-        <button class="plan-card__btn plan-card__btn--secondary" disabled>Current Plan</button>
-      </div>
 
-      <!-- Pro plan -->
-      <div class="plan-card plan-card--featured">
-        <div class="plan-card__badge">Most Popular</div>
-        <div class="plan-card__header">
-          <h3 class="plan-card__name">Pro</h3>
-          <div class="plan-card__price">
-            <span class="plan-card__amount">$29</span>
-            <span class="plan-card__period">/ month</span>
-          </div>
-        </div>
         <ul class="plan-card__features">
           <li class="plan-card__feature">
             <CheckCircle :size="18" class="plan-card__check" />
-            5 000 credits / month
+            {{ plan.monthlyCredits.toLocaleString() }} credits / month
           </li>
           <li class="plan-card__feature">
             <CheckCircle :size="18" class="plan-card__check" />
-            Unlimited sessions
+            Threads publishing
           </li>
           <li class="plan-card__feature">
             <CheckCircle :size="18" class="plan-card__check" />
-            Advanced AI features
+            Full voice matching
           </li>
-          <li class="plan-card__feature">
+          <li v-if="plan.id !== 'free'" class="plan-card__feature">
+            <CheckCircle :size="18" class="plan-card__check" />
+            Schedule posts
+          </li>
+          <li v-if="plan.id === 'pro'" class="plan-card__feature">
             <CheckCircle :size="18" class="plan-card__check" />
             Priority support
           </li>
         </ul>
-        <button class="plan-card__btn plan-card__btn--primary" disabled>Coming Soon</button>
-      </div>
 
-      <!-- Scale plan -->
-      <div class="plan-card">
-        <div class="plan-card__header">
-          <h3 class="plan-card__name">Scale</h3>
-          <div class="plan-card__price">
-            <span class="plan-card__amount">$79</span>
-            <span class="plan-card__period">/ month</span>
-          </div>
-        </div>
-        <ul class="plan-card__features">
-          <li class="plan-card__feature">
-            <CheckCircle :size="18" class="plan-card__check" />
-            20 000 credits / month
-          </li>
-          <li class="plan-card__feature">
-            <CheckCircle :size="18" class="plan-card__check" />
-            Unlimited sessions
-          </li>
-          <li class="plan-card__feature">
-            <CheckCircle :size="18" class="plan-card__check" />
-            Advanced AI features
-          </li>
-          <li class="plan-card__feature">
-            <CheckCircle :size="18" class="plan-card__check" />
-            Dedicated support
-          </li>
-        </ul>
-        <button class="plan-card__btn plan-card__btn--secondary" disabled>Coming Soon</button>
+        <button
+          class="plan-card__btn"
+          :class="plan.id === 'creator' ? 'plan-card__btn--primary' : 'plan-card__btn--secondary'"
+          :disabled="isCurrentPlan(plan.id) || isSubmitting"
+          @click="onSelect(plan.id)"
+        >
+          {{ ctaLabel(plan.id) }}
+        </button>
       </div>
+    </div>
+
+    <div v-if="subscription && subscription.plan !== 'free'" class="pricing-portal">
+      <button type="button" class="pricing-portal__btn" :disabled="isSubmitting" @click="onManage">
+        Manage subscription
+      </button>
+      <span v-if="subscription.cancelAtPeriodEnd" class="pricing-portal__note">
+        Cancels on {{ periodEndLabel }}
+      </span>
     </div>
 
     <div class="pricing-back">
@@ -109,13 +77,70 @@
 </template>
 
 <script setup lang="ts">
-import { CheckCircle, XCircle, ArrowLeft } from 'lucide-vue-next';
+import { ref, computed, onMounted } from 'vue';
+import { CheckCircle, ArrowLeft } from 'lucide-vue-next';
+import { useBillingStore, type PlanId } from '~/stores/billing';
 
-definePageMeta({
-  layout: 'default',
+definePageMeta({ layout: 'default' });
+useSeoMeta({ title: 'Pricing — HeyPostrr' });
+
+const billing = useBillingStore();
+const isSubmitting = ref(false);
+const errorMessage = ref('');
+
+const plans = computed(() => billing.plans);
+const subscription = computed(() => billing.subscription);
+
+const periodEndLabel = computed(() => {
+  const iso = subscription.value?.currentPeriodEnd;
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return '';
+  }
 });
 
-useSeoMeta({ title: 'Pricing — Creator Hub' });
+function isCurrentPlan(planId: PlanId): boolean {
+  return subscription.value?.plan === planId;
+}
+
+function ctaLabel(planId: PlanId): string {
+  if (isCurrentPlan(planId)) return 'Current plan';
+  if (planId === 'free') return 'Free tier';
+  return 'Choose plan';
+}
+
+async function onSelect(planId: PlanId): Promise<void> {
+  if (isCurrentPlan(planId) || planId === 'free') return;
+  errorMessage.value = '';
+  isSubmitting.value = true;
+  try {
+    await billing.startCheckout(planId);
+  } catch (error: unknown) {
+    const apiError = (error as { data?: { error?: string } })?.data?.error;
+    errorMessage.value = apiError ?? 'Failed to start checkout. Please try again.';
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+async function onManage(): Promise<void> {
+  errorMessage.value = '';
+  isSubmitting.value = true;
+  try {
+    await billing.openPortal();
+  } catch (error: unknown) {
+    const apiError = (error as { data?: { error?: string } })?.data?.error;
+    errorMessage.value = apiError ?? 'Failed to open portal.';
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([billing.loadPlans(), billing.loadSubscription()]);
+});
 </script>
 
 <style scoped>
@@ -160,7 +185,13 @@ useSeoMeta({ title: 'Pricing — Creator Hub' });
   margin: 0;
 }
 
-/* Grid */
+.pricing-error {
+  text-align: center;
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
 .pricing-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -177,7 +208,6 @@ useSeoMeta({ title: 'Pricing — Creator Hub' });
   }
 }
 
-/* Plan card */
 .plan-card {
   position: relative;
   background: #fff;
@@ -228,9 +258,7 @@ useSeoMeta({ title: 'Pricing — Creator Hub' });
   color: inherit;
 }
 
-.plan-card--featured .plan-card__name {
-  color: rgba(255, 255, 255, 0.85);
-}
+.plan-card--featured .plan-card__name { color: rgba(255, 255, 255, 0.85); }
 
 .plan-card__price {
   display: flex;
@@ -252,11 +280,8 @@ useSeoMeta({ title: 'Pricing — Creator Hub' });
   opacity: 0.7;
 }
 
-.plan-card--featured .plan-card__period {
-  color: rgba(255, 255, 255, 0.6);
-}
+.plan-card--featured .plan-card__period { color: rgba(255, 255, 255, 0.6); }
 
-/* Features */
 .plan-card__features {
   list-style: none;
   margin: 0;
@@ -274,29 +299,11 @@ useSeoMeta({ title: 'Pricing — Creator Hub' });
   color: #191c1e;
 }
 
-.plan-card--featured .plan-card__feature {
-  color: rgba(255, 255, 255, 0.9);
-}
+.plan-card--featured .plan-card__feature { color: rgba(255, 255, 255, 0.9); }
 
-.plan-card__feature--muted {
-  color: #9ca3af;
-}
+.plan-card__check { color: #3525cd; flex-shrink: 0; }
+.plan-card--featured .plan-card__check { color: rgba(255, 255, 255, 0.9); }
 
-.plan-card__check {
-  color: #3525cd;
-  flex-shrink: 0;
-}
-
-.plan-card--featured .plan-card__check {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.plan-card__cross {
-  color: #d1d5db;
-  flex-shrink: 0;
-}
-
-/* Buttons */
 .plan-card__btn {
   padding: 0.75rem 1.5rem;
   border-radius: 9999px;
@@ -316,21 +323,40 @@ useSeoMeta({ title: 'Pricing — Creator Hub' });
   background: #fff;
   color: #3525cd;
 }
+.plan-card__btn--primary:hover:not(:disabled) { background: #f3f4ff; }
 
 .plan-card__btn--secondary {
   background: rgba(53, 37, 205, 0.07);
   color: #3525cd;
 }
+.plan-card__btn--secondary:hover:not(:disabled) { background: rgba(53, 37, 205, 0.14); }
 
-.plan-card--featured .plan-card__btn--secondary {
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
+.pricing-portal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-/* Back link */
-.pricing-back {
-  text-align: center;
+.pricing-portal__btn {
+  padding: 0.625rem 1.5rem;
+  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  cursor: pointer;
 }
+
+.pricing-portal__btn:hover:not(:disabled) { background: #f9fafb; }
+
+.pricing-portal__note {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.pricing-back { text-align: center; }
 
 .pricing-back__link {
   display: inline-flex;
@@ -343,7 +369,5 @@ useSeoMeta({ title: 'Pricing — Creator Hub' });
   transition: color 0.15s;
 }
 
-.pricing-back__link:hover {
-  color: #3525cd;
-}
+.pricing-back__link:hover { color: #3525cd; }
 </style>

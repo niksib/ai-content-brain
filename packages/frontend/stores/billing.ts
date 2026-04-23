@@ -2,6 +2,25 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useApiClient } from '~/services/api';
 
+export type PlanId = 'free' | 'creator' | 'pro';
+
+export interface Plan {
+  id: PlanId;
+  name: string;
+  priceUsd: number;
+  monthlyCredits: number;
+  purchasable: boolean;
+}
+
+export interface SubscriptionState {
+  plan: PlanId;
+  status: 'active' | 'past_due' | 'canceled' | 'incomplete';
+  monthlyCredits: number;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  balance: number;
+}
+
 export interface CreditTransaction {
   id: string;
   userId: string;
@@ -22,6 +41,8 @@ export const useBillingStore = defineStore('billing', () => {
   const apiClient = useApiClient();
 
   const balance = ref(0);
+  const plans = ref<Plan[]>([]);
+  const subscription = ref<SubscriptionState | null>(null);
   const transactions = ref<CreditTransaction[]>([]);
   const transactionsTotal = ref(0);
   const isLoading = ref(false);
@@ -32,6 +53,25 @@ export const useBillingStore = defineStore('billing', () => {
       balance.value = response.balance;
     } catch {
       balance.value = 0;
+    }
+  }
+
+  async function loadPlans(): Promise<void> {
+    try {
+      const response = await apiClient.get<{ plans: Plan[] }>('/api/billing/plans');
+      plans.value = response.plans;
+    } catch {
+      plans.value = [];
+    }
+  }
+
+  async function loadSubscription(): Promise<void> {
+    try {
+      const response = await apiClient.get<SubscriptionState>('/api/billing/subscription');
+      subscription.value = response;
+      balance.value = response.balance;
+    } catch {
+      subscription.value = null;
     }
   }
 
@@ -51,23 +91,32 @@ export const useBillingStore = defineStore('billing', () => {
     }
   }
 
-  async function createCheckout(priceId: string, mode: 'subscription' | 'payment'): Promise<void> {
-    const response = await apiClient.post<{ url: string }>('/api/billing/checkout', {
-      priceId,
-      mode,
-    });
+  async function startCheckout(planId: PlanId): Promise<void> {
+    const response = await apiClient.post<{ url: string }>('/api/billing/checkout', { planId });
     if (response.url) {
-      await navigateTo(response.url, { external: true });
+      window.location.assign(response.url);
+    }
+  }
+
+  async function openPortal(): Promise<void> {
+    const response = await apiClient.post<{ url: string }>('/api/billing/portal', {});
+    if (response.url) {
+      window.location.assign(response.url);
     }
   }
 
   return {
     balance,
+    plans,
+    subscription,
     transactions,
     transactionsTotal,
     isLoading,
     loadBalance,
+    loadPlans,
+    loadSubscription,
     loadTransactions,
-    createCheckout,
+    startCheckout,
+    openPortal,
   };
 });

@@ -90,6 +90,7 @@
         </Teleport>
 
         <p v-if="errorMessage" class="threads-publish__error">{{ errorMessage }}</p>
+        <p v-else-if="publishNoticeMessage" class="threads-publish__notice">{{ publishNoticeMessage }}</p>
       </div>
     </div>
   </div>
@@ -126,6 +127,8 @@ const showSchedulePopover = ref(false);
 const scheduleDateInput = ref('');
 const scheduleTimeInput = ref('');
 const errorMessage = ref('');
+const publishNoticeMessage = ref('');
+const PUBLISH_DELAY_MS = 60_000;
 const scheduleWrapEl = ref<HTMLElement | null>(null);
 const scheduleButtonEl = ref<HTMLElement | null>(null);
 const popoverEl = ref<HTMLElement | null>(null);
@@ -211,36 +214,34 @@ function buildThreadPayload() {
 async function publishNow(): Promise<void> {
   isPublishing.value = true;
   errorMessage.value = '';
+  publishNoticeMessage.value = '';
 
   try {
+    const scheduledAt = new Date(Date.now() + PUBLISH_DELAY_MS).toISOString();
+    const scheduleBody: Record<string, unknown> = {
+      scheduledAt,
+      contentIdeaId: props.contentIdeaId,
+    };
+
     if (isMultiThread.value) {
-      const result = await $fetch<{ postIds: string[] }>(`${apiBaseUrl}/api/threads/publish-thread`, {
-        method: 'POST',
-        credentials: 'include',
-        body: { posts: buildThreadPayload(), contentIdeaId: props.contentIdeaId },
-      });
-      emit('published', result.postIds[0]);
+      scheduleBody.posts = buildThreadPayload();
     } else {
-      const publishBody: Record<string, unknown> = {
-        text: props.text,
-        contentIdeaId: props.contentIdeaId,
-      };
+      scheduleBody.text = props.text;
       const singleMedia = props.postsMedia?.[0];
-      if (singleMedia) {
-        if ('carouselItems' in singleMedia) {
-          publishBody.carouselItems = singleMedia.carouselItems;
-        } else {
-          publishBody.mediaUrl = singleMedia.mediaUrl;
-          publishBody.mediaType = singleMedia.mediaType;
-        }
+      if (singleMedia && 'mediaType' in singleMedia) {
+        scheduleBody.mediaUrl = singleMedia.mediaUrl;
+        scheduleBody.mediaType = singleMedia.mediaType;
       }
-      const result = await $fetch<{ postId: string }>(`${apiBaseUrl}/api/threads/publish`, {
-        method: 'POST',
-        credentials: 'include',
-        body: publishBody,
-      });
-      emit('published', result.postId);
     }
+
+    await $fetch(`${apiBaseUrl}/api/threads/schedule`, {
+      method: 'POST',
+      credentials: 'include',
+      body: scheduleBody,
+    });
+
+    publishNoticeMessage.value = "Your post is queued, it'll publish in about a minute.";
+    emit('scheduled', scheduledAt);
   } catch (error: unknown) {
     const apiError = (error as { data?: { error?: string } })?.data?.error;
     errorMessage.value = apiError ?? 'Failed to publish. Please try again.';
@@ -458,6 +459,13 @@ async function schedulePost(): Promise<void> {
 .threads-publish__error {
   font-size: 0.8125rem;
   color: #ef4444;
+  margin: 0;
+  width: 100%;
+}
+
+.threads-publish__notice {
+  font-size: 0.8125rem;
+  color: #4338ca;
   margin: 0;
   width: 100%;
 }

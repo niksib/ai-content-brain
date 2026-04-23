@@ -179,6 +179,7 @@ model ContentIdea {
 
   publishStatus String?   // "posted" | "scheduled"
   scheduledAt   DateTime? // set when post is scheduled for publishing
+  publishedAt   DateTime? // set when post is actually published
   threadsPostId String?   // Threads media ID after publishing
 
   producedContent   ProducedContent?
@@ -237,6 +238,33 @@ model CreditBalance {
   userId    String   @unique
   balance   Int      @default(0)
   updatedAt DateTime @updatedAt
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  stripeCustomerId     String?
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  plan                 SubscriptionPlan   @default(free)
+  status               SubscriptionStatus @default(active)
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+enum SubscriptionPlan {
+  free
+  creator
+  pro
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  canceled
+  incomplete
 }
 
 model CreditTransaction {

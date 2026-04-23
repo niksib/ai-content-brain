@@ -40,10 +40,12 @@ export class ThreadsSchedulerService {
       contentIdeaId: string | null;
       text: string;
       posts: unknown;
+      mediaType: "TEXT" | "IMAGE" | "VIDEO";
+      mediaUrl: string | null;
       threadsAccount: { threadsUserId: string; accessToken: string };
     }
   ): Promise<void> {
-    const { id: postId, threadsAccountId, contentIdeaId, text, posts, threadsAccount } = scheduledPost;
+    const { id: postId, threadsAccountId, contentIdeaId, text, posts, mediaType, mediaUrl, threadsAccount } = scheduledPost;
     const { threadsUserId, accessToken } = threadsAccount;
 
     await prisma.scheduledPost.update({
@@ -64,6 +66,10 @@ export class ThreadsSchedulerService {
         const result = await threadsApiService.publishThreadChain(threadsUserId, accessToken, normalized);
         firstPostId = result.postIds[0];
         console.log(`[ThreadsScheduler] Published thread ${postId} → post IDs: ${result.postIds.join(", ")}`);
+      } else if (mediaUrl && (mediaType === "IMAGE" || mediaType === "VIDEO")) {
+        const result = await threadsApiService.publishSingleMediaPost(threadsUserId, accessToken, text, mediaType, mediaUrl);
+        firstPostId = result.postId;
+        console.log(`[ThreadsScheduler] Published media post ${postId} → Threads ID ${firstPostId}`);
       } else {
         const result = await threadsApiService.publishTextPost(threadsUserId, accessToken, text);
         firstPostId = result.postId;
@@ -83,7 +89,7 @@ export class ThreadsSchedulerService {
       if (contentIdeaId) {
         await prisma.contentIdea.update({
           where: { id: contentIdeaId },
-          data: { publishStatus: "posted", threadsPostId: firstPostId },
+          data: { publishStatus: "posted", threadsPostId: firstPostId, publishedAt: new Date() },
         });
       }
     } catch (error) {

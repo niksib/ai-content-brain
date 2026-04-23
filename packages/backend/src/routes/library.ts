@@ -36,6 +36,7 @@ libraryRoutes.get("/library", requireAuth, async (context) => {
             status: true,
             publishStatus: true,
             scheduledAt: true,
+            publishedAt: true,
             threadsPostId: true,
             contentPlan: {
               select: { chatSessionId: true },

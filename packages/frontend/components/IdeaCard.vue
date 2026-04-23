@@ -128,7 +128,8 @@ const statusLabel = computed(() => {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);
 }
 
-.idea-card--updating {
+.idea-card.idea-card--updating,
+.idea-card.idea-card--updating:hover {
   border-color: #a5b4fc;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
   animation: card-updating-pulse 2s ease-in-out infinite;
@@ -139,7 +140,8 @@ const statusLabel = computed(() => {
   50% { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25); }
 }
 
-.idea-card--updated {
+.idea-card.idea-card--updated,
+.idea-card.idea-card--updated:hover {
   border-color: #a5b4fc;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }

@@ -6,11 +6,15 @@
       <h2 class="section-title">Subscription</h2>
       <div class="info-row">
         <span class="info-label">Plan</span>
-        <span class="info-value">Free (Beta)</span>
+        <span class="info-value">{{ planLabel }}</span>
+      </div>
+      <div v-if="renewalLabel" class="info-row">
+        <span class="info-label">{{ billingStore.subscription?.cancelAtPeriodEnd ? 'Cancels on' : 'Renews on' }}</span>
+        <span class="info-value">{{ renewalLabel }}</span>
       </div>
       <div class="credits-progress-wrap">
         <div class="credits-progress__header">
-          <span class="info-label">Credits Used</span>
+          <span class="info-label">Monthly Limit</span>
           <span class="credits-progress__stat">{{ creditsUsedPercent }}%</span>
         </div>
         <div class="credits-progress__bar">
@@ -19,14 +23,22 @@
             :style="{ width: creditsUsedPercent + '%' }"
           ></div>
         </div>
+        <p class="credits-progress__hint">{{ billingStore.balance }} of {{ planMonthlyCredits }} credits remaining</p>
       </div>
-      <div class="placeholder-actions">
-        <button type="button" class="btn btn--primary" @click="handleBuyCredits">
-          Buy Credits
+      <div class="subscription-actions">
+        <NuxtLink to="/pricing" class="btn btn--primary">{{ isPaidPlan ? 'Change plan' : 'Upgrade' }}</NuxtLink>
+        <button
+          v-if="isPaidPlan"
+          type="button"
+          class="btn btn--secondary"
+          :disabled="isOpeningPortal"
+          @click="openPortal"
+        >
+          {{ isOpeningPortal ? 'Opening…' : 'Manage billing' }}
         </button>
       </div>
-      <p v-if="billingStatus === 'success'" class="save-message">Payment successful! Credits have been added.</p>
-      <p v-if="billingStatus === 'cancel'" class="save-message save-message--error">Payment was cancelled.</p>
+      <p v-if="billingStatus === 'success'" class="save-message">Payment successful! Your plan is active.</p>
+      <p v-if="billingStatus === 'cancel'" class="save-message save-message--error">Checkout was cancelled.</p>
     </section>
 
     <!-- Account -->
@@ -144,11 +156,50 @@ const route = useRoute();
 const profileStore = useProfileStore();
 const billingStore = useBillingStore();
 
-const PLAN_MAX_CREDITS = 500;
-const creditsUsedPercent = computed(() => {
-  const used = PLAN_MAX_CREDITS - billingStore.balance;
-  return Math.max(0, Math.min(100, Math.round((used / PLAN_MAX_CREDITS) * 100)));
+const PLAN_LABELS: Record<string, string> = {
+  free: 'Free',
+  creator: 'Creator',
+  pro: 'Pro',
+};
+
+const planLabel = computed(() => {
+  const planId = billingStore.subscription?.plan ?? 'free';
+  return PLAN_LABELS[planId] ?? 'Free';
 });
+
+const planMonthlyCredits = computed(() => billingStore.subscription?.monthlyCredits ?? 100);
+
+const isPaidPlan = computed(() => {
+  const planId = billingStore.subscription?.plan;
+  return planId === 'creator' || planId === 'pro';
+});
+
+const creditsUsedPercent = computed(() => {
+  const max = planMonthlyCredits.value || 1;
+  const used = max - billingStore.balance;
+  return Math.max(0, Math.min(100, Math.round((used / max) * 100)));
+});
+
+const renewalLabel = computed(() => {
+  const iso = billingStore.subscription?.currentPeriodEnd;
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return '';
+  }
+});
+
+const isOpeningPortal = ref(false);
+
+async function openPortal() {
+  isOpeningPortal.value = true;
+  try {
+    await billingStore.openPortal();
+  } finally {
+    isOpeningPortal.value = false;
+  }
+}
 
 const billingStatus = computed(() => route.query.billing as string | undefined);
 
@@ -162,10 +213,6 @@ const passwordForm = reactive({ current: '', next: '', confirm: '' });
 // ── Delete Account ──
 const isDeletingAccount = ref(false);
 const deleteError = ref('');
-
-function handleBuyCredits() {
-  billingStore.createCheckout('price_credits_500', 'payment');
-}
 
 async function handleChangePassword() {
   passwordError.value = '';
@@ -233,7 +280,7 @@ async function handleDeleteAccount() {
 onMounted(async () => {
   await Promise.all([
     profileStore.loadProfile(),
-    billingStore.loadBalance(),
+    billingStore.loadSubscription(),
   ]);
 });
 </script>
@@ -319,9 +366,16 @@ onMounted(async () => {
   transition: width 0.4s ease;
 }
 
-.placeholder-actions {
+.credits-progress__hint {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 0.375rem 0 0;
+}
+
+.subscription-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .form-group {
@@ -360,6 +414,10 @@ onMounted(async () => {
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.15s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn:disabled {

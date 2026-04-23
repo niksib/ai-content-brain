@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import Stripe from "stripe";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { billingService } from "../services/billing.service.js";
+import { PLANS, getPlanById, type PlanId } from "../billing/plans.js";
 import type { AppEnv } from "../types/hono.js";
 
 export const billingRoutes = new Hono<AppEnv>();
@@ -22,26 +23,65 @@ billingRoutes.get("/billing/transactions", requireAuth, async (context) => {
   return context.json(transactions);
 });
 
-// Create Stripe Checkout session
+// List available plans
+billingRoutes.get("/billing/plans", async (context) => {
+  return context.json({
+    plans: Object.values(PLANS).map((plan) => ({
+      id: plan.id,
+      name: plan.name,
+      priceUsd: plan.priceUsd,
+      monthlyCredits: plan.monthlyCredits,
+      purchasable: Boolean(plan.stripePriceId),
+    })),
+  });
+});
+
+// Get current subscription status
+billingRoutes.get("/billing/subscription", requireAuth, async (context) => {
+  const user = context.get("user");
+  const [subscription, balance] = await Promise.all([
+    billingService.getSubscription(user.id),
+    billingService.getBalance(user.id),
+  ]);
+  return context.json({ ...subscription, balance });
+});
+
+// Create Stripe Checkout session for a plan
 billingRoutes.post("/billing/checkout", requireAuth, async (context) => {
   const user = context.get("user");
-  const body = await context.req.json();
-  const { priceId, mode } = body;
+  const body = await context.req.json() as { planId?: string };
 
-  if (!priceId || !mode) {
-    return context.json({ error: "priceId and mode are required" }, 400);
+  if (!body.planId) {
+    return context.json({ error: "planId is required" }, 400);
   }
 
-  if (mode !== "subscription" && mode !== "payment") {
-    return context.json({ error: "mode must be 'subscription' or 'payment'" }, 400);
+  const plan = getPlanById(body.planId);
+  if (!plan) {
+    return context.json({ error: "Unknown plan" }, 400);
+  }
+  if (!plan.stripePriceId) {
+    return context.json({ error: "This plan is not purchasable" }, 400);
   }
 
-  const checkoutUrl = await billingService.createCheckoutSession(
-    user.id,
-    priceId,
-    mode
-  );
-  return context.json({ url: checkoutUrl });
+  try {
+    const url = await billingService.createCheckoutSession(user.id, plan.id as PlanId);
+    return context.json({ url });
+  } catch (error) {
+    console.error("[billing/checkout] Failed to create checkout:", error);
+    return context.json({ error: "Failed to start checkout" }, 500);
+  }
+});
+
+// Stripe Customer Portal (manage subscription)
+billingRoutes.post("/billing/portal", requireAuth, async (context) => {
+  const user = context.get("user");
+  try {
+    const url = await billingService.createPortalSession(user.id);
+    return context.json({ url });
+  } catch (error) {
+    console.error("[billing/portal] Failed to open portal:", error);
+    return context.json({ error: "No active subscription" }, 400);
+  }
 });
 
 // Stripe webhook (no auth — uses Stripe signature verification)
@@ -68,13 +108,12 @@ billingRoutes.post("/billing/webhook", async (context) => {
     return context.json({ error: "Invalid signature" }, 400);
   }
 
-  await billingService.handleWebhook(event);
-  return context.json({ received: true });
-});
+  try {
+    await billingService.handleWebhook(event);
+  } catch (error) {
+    console.error("[billing/webhook] Failed to handle event:", event.type, error);
+    return context.json({ error: "Webhook handler failed" }, 500);
+  }
 
-// Subscription status placeholder
-billingRoutes.get("/billing/subscription", requireAuth, async (context) => {
-  const user = context.get("user");
-  const balance = await billingService.getBalance(user.id);
-  return context.json({ plan: "free_beta", credits: balance });
+  return context.json({ received: true });
 });

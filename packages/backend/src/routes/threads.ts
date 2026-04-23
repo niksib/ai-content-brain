@@ -1,9 +1,12 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { threadsApiService, THREADS_BASE_URL } from "../services/threads-api.service.js";
+import { auth } from "../lib/auth.js";
 import type { AppEnv } from "../types/hono.js";
+
+const LOGIN_STATE_PREFIX = "login";
 
 function signOAuthState(userId: string): string {
   const secret = process.env.THREADS_APP_SECRET!;
@@ -18,6 +21,30 @@ function verifyOAuthState(state: string): string | null {
   const expected = createHmac("sha256", process.env.THREADS_APP_SECRET!).update(userId).digest("hex").slice(0, 16);
   if (sig !== expected) return null;
   return userId;
+}
+
+function signLoginState(): string {
+  const nonce = randomBytes(12).toString("hex");
+  const secret = process.env.THREADS_APP_SECRET!;
+  const sig = createHmac("sha256", secret).update(`${LOGIN_STATE_PREFIX}:${nonce}`).digest("hex").slice(0, 16);
+  return `${LOGIN_STATE_PREFIX}:${nonce}:${sig}`;
+}
+
+function verifyLoginState(state: string): boolean {
+  const parts = state.split(":");
+  if (parts.length !== 3 || parts[0] !== LOGIN_STATE_PREFIX) return false;
+  const [, nonce, sig] = parts;
+  const expected = createHmac("sha256", process.env.THREADS_APP_SECRET!).update(`${LOGIN_STATE_PREFIX}:${nonce}`).digest("hex").slice(0, 16);
+  return sig === expected;
+}
+
+function derivePasswordForThreadsUser(threadsUserId: string): string {
+  const secret = process.env.BETTER_AUTH_SECRET || process.env.THREADS_APP_SECRET!;
+  return createHmac("sha256", secret).update(`threads-login:${threadsUserId}`).digest("hex");
+}
+
+function buildThreadsLoginEmail(threadsUserId: string): string {
+  return `threads-${threadsUserId}@postrr.local`;
 }
 
 export const threadsRoutes = new Hono<AppEnv>();
@@ -51,18 +78,39 @@ threadsRoutes.get("/threads/auth", requireAuth, async (context) => {
   return context.redirect(authUrl);
 });
 
-// GET /threads/callback — handle OAuth callback
+// GET /threads/login — start Threads OAuth login flow (no existing session required)
+threadsRoutes.get("/threads/login", async (context) => {
+  const authUrl = threadsApiService.buildAuthorizationUrl(signLoginState());
+  return context.redirect(authUrl);
+});
+
+// GET /threads/callback — handle OAuth callback (connect-mode or login-mode)
 threadsRoutes.get("/threads/callback", async (context) => {
   const code = context.req.query("code");
   const state = context.req.query("state");
   const error = context.req.query("error");
 
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const isLoginMode = typeof state === "string" && state.startsWith(`${LOGIN_STATE_PREFIX}:`);
 
   if (error || !code || !state) {
-    return context.redirect(`${frontendUrl}/profile?threads_error=access_denied`);
+    const errorPath = isLoginMode ? "/?threads_login_error=access_denied" : "/profile?threads_error=access_denied";
+    return context.redirect(`${frontendUrl}${errorPath}`);
   }
 
+  if (isLoginMode) {
+    return handleLoginCallback(context, code, state, frontendUrl);
+  }
+
+  return handleConnectCallback(context, code, state, frontendUrl);
+});
+
+async function handleConnectCallback(
+  context: Parameters<Parameters<typeof threadsRoutes.get>[1]>[0],
+  code: string,
+  state: string,
+  frontendUrl: string,
+) {
   const verifiedUserId = verifyOAuthState(state);
   if (!verifiedUserId) {
     return context.redirect(`${frontendUrl}/profile?threads_error=invalid_state`);
@@ -109,7 +157,100 @@ threadsRoutes.get("/threads/callback", async (context) => {
     console.error("[threads/callback] Failed to connect Threads account:", connectError);
     return context.redirect(`${frontendUrl}/profile?threads_error=connection_failed`);
   }
-});
+}
+
+async function handleLoginCallback(
+  context: Parameters<Parameters<typeof threadsRoutes.get>[1]>[0],
+  code: string,
+  state: string,
+  frontendUrl: string,
+) {
+  if (!verifyLoginState(state)) {
+    return context.redirect(`${frontendUrl}/?threads_login_error=invalid_state`);
+  }
+
+  try {
+    const shortLivedToken = await threadsApiService.exchangeCodeForShortLivedToken(code);
+    const tokenData = await threadsApiService.exchangeForLongLivedToken(shortLivedToken);
+    const userInfo = await threadsApiService.getUserInfo(tokenData.accessToken);
+    const tokenExpiresAt = new Date(Date.now() + tokenData.expiresInSeconds * 1000);
+
+    const email = buildThreadsLoginEmail(userInfo.id);
+    const password = derivePasswordForThreadsUser(userInfo.id);
+    const displayName = userInfo.name?.trim() || userInfo.username || "Threads creator";
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+
+    const authHeaders = new Headers({
+      "content-type": "application/json",
+      origin: frontendUrl,
+    });
+
+    let authResult;
+    if (existingUser) {
+      authResult = await auth.api.signInEmail({
+        body: { email, password },
+        headers: authHeaders,
+        returnHeaders: true,
+        asResponse: false,
+      });
+    } else {
+      authResult = await auth.api.signUpEmail({
+        body: { email, password, name: displayName },
+        headers: authHeaders,
+        returnHeaders: true,
+        asResponse: false,
+      });
+    }
+
+    const userId = authResult.response.user.id;
+
+    await prisma.threadsAccount.upsert({
+      where: { userId },
+      create: {
+        userId,
+        threadsUserId: userInfo.id,
+        username: userInfo.username,
+        name: userInfo.name ?? null,
+        biography: userInfo.biography ?? null,
+        profilePictureUrl: userInfo.profilePictureUrl ?? null,
+        accessToken: tokenData.accessToken,
+        tokenExpiresAt,
+        scopes: "threads_basic,threads_content_publish,threads_keyword_search,threads_manage_insights,threads_manage_replies,threads_profile_discovery,threads_read_replies",
+      },
+      update: {
+        threadsUserId: userInfo.id,
+        username: userInfo.username,
+        name: userInfo.name ?? null,
+        biography: userInfo.biography ?? null,
+        profilePictureUrl: userInfo.profilePictureUrl ?? null,
+        accessToken: tokenData.accessToken,
+        tokenExpiresAt,
+      },
+    });
+
+    const onboardingSession = await prisma.onboardingSession.findUnique({
+      where: { userId },
+      select: { completedAt: true },
+    });
+    const returnPath = onboardingSession?.completedAt ? "/dashboard" : "/onboarding";
+
+    const responseHeaders = new Headers();
+    responseHeaders.set("Location", `${frontendUrl}${returnPath}?threads_connected=true`);
+
+    const getSetCookie = (authResult.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+    const cookies = typeof getSetCookie === "function" ? getSetCookie.call(authResult.headers) : [];
+
+    for (const cookie of cookies) {
+      responseHeaders.append("set-cookie", cookie);
+    }
+
+    return new Response(null, { status: 302, headers: responseHeaders });
+  } catch (loginError) {
+    console.error("[threads/callback] Threads login failed:", loginError);
+    return context.redirect(`${frontendUrl}/?threads_login_error=login_failed`);
+  }
+}
 
 // DELETE /threads/account — disconnect Threads account
 threadsRoutes.delete("/threads/account", requireAuth, async (context) => {
@@ -195,7 +336,7 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
     if (body.contentIdeaId) {
       await prisma.contentIdea.update({
         where: { id: body.contentIdeaId, userId: user.id },
-        data: { publishStatus: "posted", threadsPostId: result.postId },
+        data: { publishStatus: "posted", threadsPostId: result.postId, publishedAt: new Date() },
       });
     }
 
@@ -261,7 +402,7 @@ threadsRoutes.post("/threads/publish-thread", requireAuth, async (context) => {
     if (body.contentIdeaId) {
       await prisma.contentIdea.update({
         where: { id: body.contentIdeaId, userId: user.id },
-        data: { publishStatus: "posted", threadsPostId: result.postIds[0] },
+        data: { publishStatus: "posted", threadsPostId: result.postIds[0], publishedAt: new Date() },
       });
     }
 
@@ -277,20 +418,29 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
   const user = context.get("user");
   const body = await context.req.json() as {
     text?: string;
-    posts?: string[];
+    mediaType?: "IMAGE" | "VIDEO";
+    mediaUrl?: string;
+    posts?: Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>;
     scheduledAt: string;
     contentIdeaId?: string;
   };
 
   const isThread = Array.isArray(body.posts) && body.posts.length > 1;
 
-  if (isThread) {
-    for (const [postIndex, postText] of body.posts!.entries()) {
-      if (typeof postText !== "string" || !postText.trim()) {
+  const normalizedPosts = isThread
+    ? body.posts!.map((entry) => (typeof entry === "string" ? { text: entry } : entry))
+    : null;
+
+  if (isThread && normalizedPosts) {
+    for (const [postIndex, post] of normalizedPosts.entries()) {
+      if (typeof post.text !== "string" || !post.text.trim()) {
         return context.json({ error: `post[${postIndex}] is empty` }, 400);
       }
-      if (postText.length > 500) {
+      if (post.text.length > 500) {
         return context.json({ error: `post[${postIndex}] exceeds 500 characters` }, 400);
+      }
+      if (post.mediaUrl && post.mediaType !== "IMAGE" && post.mediaType !== "VIDEO") {
+        return context.json({ error: `post[${postIndex}] has mediaUrl without a valid mediaType` }, 400);
       }
     }
   } else {
@@ -299,6 +449,9 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
     }
     if (body.text.length > 500) {
       return context.json({ error: "text must be 500 characters or fewer" }, 400);
+    }
+    if (body.mediaUrl && body.mediaType !== "IMAGE" && body.mediaType !== "VIDEO") {
+      return context.json({ error: "mediaUrl requires a valid mediaType" }, 400);
     }
   }
 
@@ -324,8 +477,10 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
       userId: user.id,
       threadsAccountId: account.id,
       contentIdeaId: body.contentIdeaId ?? null,
-      text: isThread ? (body.posts![0] ?? "") : body.text!,
-      posts: isThread ? body.posts : undefined,
+      text: isThread ? (normalizedPosts?.[0]?.text ?? "") : body.text!,
+      posts: isThread ? normalizedPosts : undefined,
+      mediaType: isThread ? "TEXT" : (body.mediaType ?? "TEXT"),
+      mediaUrl: isThread ? null : (body.mediaUrl ?? null),
       scheduledAt,
     },
   });
@@ -340,16 +495,100 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
   return context.json({ scheduledPost });
 });
 
-// GET /threads/scheduled — list pending scheduled posts
+// GET /threads/scheduled — list scheduled posts (default: pending only; ?status=all includes published/failed)
 threadsRoutes.get("/threads/scheduled", requireAuth, async (context) => {
   const user = context.get("user");
+  const statusFilter = context.req.query("status") === "all" ? undefined : "pending";
 
   const scheduledPosts = await prisma.scheduledPost.findMany({
-    where: { userId: user.id, status: "pending" },
+    where: {
+      userId: user.id,
+      ...(statusFilter ? { status: statusFilter } : {}),
+    },
     orderBy: { scheduledAt: "asc" },
   });
 
   return context.json({ scheduledPosts });
+});
+
+// PATCH /threads/scheduled/:id — update a pending scheduled post
+threadsRoutes.patch("/threads/scheduled/:id", requireAuth, async (context) => {
+  const user = context.get("user");
+  const postId = context.req.param("id");
+  const body = await context.req.json() as {
+    text?: string;
+    mediaType?: "TEXT" | "IMAGE" | "VIDEO";
+    mediaUrl?: string | null;
+    posts?: Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>;
+    scheduledAt?: string;
+  };
+
+  const post = await prisma.scheduledPost.findUnique({
+    where: { id: postId, userId: user.id },
+  });
+
+  if (!post) {
+    return context.json({ error: "Scheduled post not found" }, 404);
+  }
+
+  if (post.status !== "pending") {
+    return context.json({ error: "Only pending posts can be edited" }, 400);
+  }
+
+  const isThread = Array.isArray(body.posts) && body.posts.length > 1;
+
+  const normalizedPosts = isThread
+    ? body.posts!.map((entry) => (typeof entry === "string" ? { text: entry } : entry))
+    : null;
+
+  if (isThread && normalizedPosts) {
+    for (const [postIndex, entry] of normalizedPosts.entries()) {
+      if (typeof entry.text !== "string" || !entry.text.trim()) {
+        return context.json({ error: `post[${postIndex}] is empty` }, 400);
+      }
+      if (entry.text.length > 500) {
+        return context.json({ error: `post[${postIndex}] exceeds 500 characters` }, 400);
+      }
+      if (entry.mediaUrl && entry.mediaType !== "IMAGE" && entry.mediaType !== "VIDEO") {
+        return context.json({ error: `post[${postIndex}] has mediaUrl without a valid mediaType` }, 400);
+      }
+    }
+  } else if (body.text !== undefined) {
+    if (typeof body.text !== "string" || !body.text.trim()) {
+      return context.json({ error: "text is required" }, 400);
+    }
+    if (body.text.length > 500) {
+      return context.json({ error: "text must be 500 characters or fewer" }, 400);
+    }
+    if (body.mediaUrl && body.mediaType !== "IMAGE" && body.mediaType !== "VIDEO") {
+      return context.json({ error: "mediaUrl requires a valid mediaType" }, 400);
+    }
+  }
+
+  let scheduledAt: Date | undefined;
+  if (body.scheduledAt) {
+    scheduledAt = new Date(body.scheduledAt);
+    if (isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) {
+      return context.json({ error: "scheduledAt must be a future date" }, 400);
+    }
+  }
+
+  const updated = await prisma.scheduledPost.update({
+    where: { id: postId },
+    data: {
+      ...(isThread
+        ? { text: normalizedPosts?.[0]?.text ?? post.text, posts: normalizedPosts, mediaType: "TEXT", mediaUrl: null }
+        : {
+            ...(body.text !== undefined ? { text: body.text } : {}),
+            posts: undefined,
+            ...(body.mediaType !== undefined ? { mediaType: body.mediaType } : {}),
+            ...(body.mediaUrl !== undefined ? { mediaUrl: body.mediaUrl } : {}),
+          }),
+      ...(scheduledAt ? { scheduledAt } : {}),
+    },
+  });
+
+  return context.json({ scheduledPost: updated });
 });
 
 // DELETE /threads/scheduled/:id — cancel a scheduled post

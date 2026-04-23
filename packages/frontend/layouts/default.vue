@@ -125,15 +125,18 @@ async function handleStartSession(): Promise<void> {
 
 async function handleLogout(): Promise<void> {
   try {
-    await $fetch(`${config.public.apiBaseUrl}/api/auth/sign-out`, {
+    await $fetch(`${config.public.apiBaseUrl}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: {},
     });
-  } finally {
-    const isAuthenticated = useState<boolean | null>('auth:authenticated');
-    isAuthenticated.value = false;
-    router.replace('/');
+  } catch {
+    // Swallow — we still reset client state and reload below.
   }
+  const isAuthenticated = useState<boolean | null>('auth:authenticated');
+  isAuthenticated.value = false;
+  window.location.assign('/');
 }
 
 onMounted(() => {

@@ -1,15 +1,16 @@
 <template>
   <div class="ob-connect">
     <PrimaryCta
-      :icon="loading ? undefined : Link"
+      :icon="loading ? undefined : buttonIcon"
       :disabled="loading"
       @click="$emit('connect')"
     >
       <span v-if="loading" class="ob-connect__spinner" aria-hidden="true" />
-      {{ loading ? 'Redirecting…' : 'Connect Threads' }}
+      {{ buttonLabel }}
     </PrimaryCta>
 
     <button
+      v-if="!alreadyConnected"
       type="button"
       class="ob-tertiary-link"
       :disabled="loading"
@@ -21,11 +22,23 @@
 </template>
 
 <script setup lang="ts">
-import { Link } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { Link, ArrowRight } from 'lucide-vue-next';
 import PrimaryCta from '../PrimaryCta.vue';
 
-defineProps<{ loading?: boolean }>();
+const props = defineProps<{
+  loading?: boolean;
+  alreadyConnected?: boolean;
+}>();
+
 defineEmits<{ connect: []; skip: [] }>();
+
+const buttonIcon = computed(() => (props.alreadyConnected ? ArrowRight : Link));
+
+const buttonLabel = computed(() => {
+  if (props.loading) return 'Loading…';
+  return props.alreadyConnected ? 'Continue' : 'Connect Threads';
+});
 </script>
 
 <style scoped>

@@ -37,6 +37,7 @@ const { typed, done } = useTypewriter(() => props.text, props.speed ?? 16);
   line-height: 1.55;
   color: #1a1c2a;
   letter-spacing: -0.005em;
+  white-space: pre-line;
   animation: ob-bubble-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 

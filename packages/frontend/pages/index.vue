@@ -44,7 +44,7 @@
               <em>Just think.</em>
             </h1>
             <p class="hero-sub">
-              HeyPostrr turns voice notes into posts that sound exactly like <span class="underline-scribble">you</span> - on LinkedIn, Threads, Instagram, and X.
+              HeyPostrr turns voice notes into posts that sound exactly like <span class="underline-scribble">you</span>, on Threads. LinkedIn, Instagram, X coming soon.
             </p>
             <div class="hero-ctas">
               <div class="hero-cta-col">
@@ -53,18 +53,6 @@
                   Start talking
                 </button>
                 <span class="no-card-text">No credit card required</span>
-              </div>
-              <div class="hero-meta">
-                <div class="avatar-stack">
-                  <span style="background: linear-gradient(135deg, #ffb695, #ff8a5b)" />
-                  <span style="background: linear-gradient(135deg, #89f5e7, #006a61)" />
-                  <span style="background: linear-gradient(135deg, #c3c0ff, #3525cd)" />
-                  <span style="background: linear-gradient(135deg, #ffdad6, #ba1a1a)" />
-                </div>
-                <div class="hero-meta-text">
-                  <b>1,247 creators</b><br>
-                  <span>posting from their walk today</span>
-                </div>
               </div>
             </div>
           </div>
@@ -111,18 +99,14 @@
         <!-- Tape - scrolling voice note ribbon -->
         <div class="tape">
           <div class="tape-inner">
-            <span>"ok so I was walking and thought - what if habits are actually the new procrastination, like</span>
-            <span class="tape-dot">•</span>
-            <span>we're tracking water intake instead of output, right?"</span>
-            <span class="tape-dot">•</span>
-            <span>"also reply to Cheyenne about the timeline, she's probably waiting"</span>
-            <span class="tape-dot">•</span>
-            <span>"don't forget - call mom"</span>
-            <span class="tape-dot">•</span>
-            <span>"ok so I was walking and thought - what if habits are actually the new procrastination, like</span>
-            <span class="tape-dot">•</span>
-            <span>we're tracking water intake instead of output, right?"</span>
-            <span class="tape-dot">•</span>
+            <template v-for="(fragment, tapeIndex) in tapeFragments" :key="`tape-${tapeIndex}`">
+              <span>{{ fragment }}</span>
+              <span class="tape-dot">•</span>
+            </template>
+            <template v-for="(fragment, tapeIndex) in tapeFragments" :key="`tape-dup-${tapeIndex}`">
+              <span>{{ fragment }}</span>
+              <span class="tape-dot">•</span>
+            </template>
           </div>
         </div>
 
@@ -239,28 +223,33 @@
             <button
               v-for="tab in platformTabs"
               :key="tab.id"
-              :class="['platform-tab', activePlatform === tab.id ? 'platform-tab--active' : '']"
-              @click="activePlatform = tab.id"
+              :class="[
+                'platform-tab',
+                tab.id === 'threads' && activePlatform === tab.id ? 'platform-tab--active' : '',
+                tab.id !== 'threads' ? 'platform-tab--soon' : '',
+              ]"
+              type="button"
+              :disabled="tab.id !== 'threads'"
+              @click="tab.id === 'threads' && (activePlatform = tab.id)"
             >
               <!-- Threads logo -->
-              <svg v-if="tab.id === 'threads'" class="platform-tab-logo" viewBox="0 0 192 192" width="18" height="18">
-                <path :fill="activePlatform === 'threads' ? '#fff' : 'currentColor'" d="M141.537 88.988c-.62-.296-1.248-.581-1.885-.852-1.104-20.344-12.215-32.007-30.872-32.127-9.05-.054-16.58 3.802-21.223 10.955l9.97 6.805c3.483-5.277 8.93-6.406 12.821-6.406.056 0 .112 0 .167.001 4.744.03 8.255 1.403 10.426 4.082 1.563 1.93 2.642 4.572 3.237 7.922-4.45-.744-9.257-.977-14.407-.689-14.554.827-23.896 9.222-23.264 20.874.316 5.84 3.235 10.814 8.21 14.01 4.203 2.704 9.6 4.024 15.154 3.735 7.335-.403 13.082-3.205 17.099-8.307 3.085-3.958 4.93-9.092 5.66-15.613 3.02 1.835 5.253 4.25 6.48 7.148 2.1 4.947 2.22 13.071-4.412 19.707-5.83 5.83-12.85 8.38-23.383 8.43-11.661-.086-20.463-3.835-26.186-11.147C81.82 108.77 78.8 97.69 78.693 86.001c.108-11.687 3.126-22.769 8.471-31.223 5.723-7.311 14.525-11.06 26.186-11.146 11.649.086 20.57 3.849 26.516 11.185 2.914 3.605 5.111 8.138 6.573 13.365l11.94-3.31c-1.775-6.43-4.572-11.969-8.391-16.686-7.623-9.415-18.766-14.24-33.121-14.34h-.082c-14.326.1-25.343 4.942-32.744 14.394C77.484 57.593 74.073 70.16 73.972 86.04v.008c.1 15.88 3.512 28.452 10.067 36.803 7.401 9.451 18.418 14.293 32.744 14.394h.082c12.731-.09 21.716-3.414 29.115-10.812 9.684-9.69 9.39-21.822 6.195-29.304-2.302-5.402-6.733-9.789-12.638-12.14zm-29.014 16.4c-6.22.352-12.707-2.442-13.022-8.258-.22-4.136 2.904-8.76 13.385-9.367 1.2-.07 2.378-.103 3.528-.103 3.78 0 7.326.364 10.55 1.059-1.204 15.077-8.17 16.408-14.441 16.669z" />
+              <svg v-if="tab.id === 'threads'" class="platform-tab-logo" viewBox="0 0 24 24" width="18" height="18">
+                <path :fill="activePlatform === 'threads' ? '#fff' : 'currentColor'" d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32L7.734 7.847c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388.108.046.216.094.321.142 1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69c-.242 0-.487.007-.739.021-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221z" />
               </svg>
               <!-- LinkedIn logo -->
-              <svg v-else-if="tab.id === 'linkedin'" class="platform-tab-logo" viewBox="0 0 24 24" width="16" height="16">
-                <path :fill="activePlatform === 'linkedin' ? '#fff' : 'currentColor'" d="M7.5 9.5h-3v10h3v-10zm-1.5-4.5a1.75 1.75 0 100 3.5 1.75 1.75 0 000-3.5zm13.5 7.7c0-2.5-1.3-3.8-3-3.8-1.4 0-2 .75-2.4 1.3v-1.2h-3v10h3v-5.5c0-1 .15-2.3 1.55-2.3 1.4 0 1.55 1.3 1.55 2.3v5.5h3v-6z" />
+              <svg v-else-if="tab.id === 'linkedin'" class="platform-tab-logo" viewBox="0 0 24 24" width="18" height="18">
+                <path fill="currentColor" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
               </svg>
               <!-- Instagram logo -->
-              <svg v-else-if="tab.id === 'instagram'" class="platform-tab-logo" viewBox="0 0 24 24" width="16" height="16" fill="none">
-                <rect x="2.5" y="2.5" width="19" height="19" rx="5" :stroke="activePlatform === 'instagram' ? '#fff' : 'currentColor'" stroke-width="1.6" />
-                <circle cx="12" cy="12" r="4" :stroke="activePlatform === 'instagram' ? '#fff' : 'currentColor'" stroke-width="1.6" />
-                <circle cx="17.5" cy="6.5" r="1.1" :fill="activePlatform === 'instagram' ? '#fff' : 'currentColor'" />
+              <svg v-else-if="tab.id === 'instagram'" class="platform-tab-logo" viewBox="0 0 24 24" width="18" height="18">
+                <path fill="currentColor" d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077" />
               </svg>
               <!-- X logo -->
-              <svg v-else-if="tab.id === 'x'" class="platform-tab-logo" viewBox="0 0 24 24" width="14" height="14" :fill="activePlatform === 'x' ? '#fff' : 'currentColor'">
+              <svg v-else-if="tab.id === 'x'" class="platform-tab-logo" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                 <path d="M18.244 2H21l-6.53 7.464L22 22h-6.29l-4.933-6.44L5.06 22H2.303l6.98-7.977L2 2h6.412l4.462 5.9L18.244 2zm-1.103 18.25h1.71L7.04 3.62H5.2l11.94 16.63z" />
               </svg>
               {{ tab.label }}
+              <span v-if="tab.id !== 'threads'" class="platform-tab__soon">Soon</span>
             </button>
           </div>
 
@@ -286,7 +275,7 @@
               <div v-if="activePlatform === 'threads'" class="mock mock--threads">
                 <div class="mock-head">
                   <div class="mock-avatar" style="background:#000;display:flex;align-items:center;justify-content:center">
-                    <svg viewBox="0 0 192 192" fill="white" width="20" height="20"><path d="M141.537 88.988c-.62-.296-1.248-.581-1.885-.852-1.104-20.344-12.215-32.007-30.872-32.127-9.05-.054-16.58 3.802-21.223 10.955l9.97 6.805c3.483-5.277 8.93-6.406 12.821-6.406.056 0 .112 0 .167.001 4.744.03 8.255 1.403 10.426 4.082 1.563 1.93 2.642 4.572 3.237 7.922-4.45-.744-9.257-.977-14.407-.689-14.554.827-23.896 9.222-23.264 20.874.316 5.84 3.235 10.814 8.21 14.01 4.203 2.704 9.6 4.024 15.154 3.735 7.335-.403 13.082-3.205 17.099-8.307 3.085-3.958 4.93-9.092 5.66-15.613 3.02 1.835 5.253 4.25 6.48 7.148 2.1 4.947 2.22 13.071-4.412 19.707-5.83 5.83-12.85 8.38-23.383 8.43-11.661-.086-20.463-3.835-26.186-11.147C81.82 108.77 78.8 97.69 78.693 86.001c.108-11.687 3.126-22.769 8.471-31.223 5.723-7.311 14.525-11.06 26.186-11.146 11.649.086 20.57 3.849 26.516 11.185 2.914 3.605 5.111 8.138 6.573 13.365l11.94-3.31c-1.775-6.43-4.572-11.969-8.391-16.686-7.623-9.415-18.766-14.24-33.121-14.34h-.082c-14.326.1-25.343 4.942-32.744 14.394C77.484 57.593 74.073 70.16 73.972 86.04v.008c.1 15.88 3.512 28.452 10.067 36.803 7.401 9.451 18.418 14.293 32.744 14.394h.082c12.731-.09 21.716-3.414 29.115-10.812 9.684-9.69 9.39-21.822 6.195-29.304-2.302-5.402-6.733-9.789-12.638-12.14zm-29.014 16.4c-6.22.352-12.707-2.442-13.022-8.258-.22-4.136 2.904-8.76 13.385-9.367 1.2-.07 2.378-.103 3.528-.103 3.78 0 7.326.364 10.55 1.059-1.204 15.077-8.17 16.408-14.441 16.669z"/></svg>
+                    <svg viewBox="0 0 24 24" fill="white" width="20" height="20"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32L7.734 7.847c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388.108.046.216.094.321.142 1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69c-.242 0-.487.007-.739.021-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221z"/></svg>
                   </div>
                   <div style="flex:1; min-width:0">
                     <div class="mock-name">
@@ -411,22 +400,6 @@
           </div>
         </section>
 
-        <!-- QUOTE - editorial pull quote -->
-        <section class="quote">
-          <div class="quote-mark display">"</div>
-          <blockquote class="display quote-body">
-            I walk and talk for three minutes each morning.<br>
-            HeyPostrr turns it into <em>that day's posts.</em> Mine.
-          </blockquote>
-          <div class="quote-cite">
-            <div class="quote-avatar" />
-            <div>
-              <div class="quote-name">Maya Okafor</div>
-              <div class="quote-role mono-label" style="color: var(--mute)">Founder, Slow Studios · 42k followers</div>
-            </div>
-          </div>
-        </section>
-
         <!-- PRICING -->
         <section class="pricing" id="pricing">
           <div class="section-head section-head--center">
@@ -516,6 +489,18 @@
             <button :class="['auth-tab', authMode === 'login' ? 'auth-tab--active' : '']" @click="goToAuth('login')">Sign in</button>
             <button :class="['auth-tab', authMode === 'register' ? 'auth-tab--active' : '']" @click="goToAuth('register')">Create account</button>
           </div>
+
+          <button type="button" class="auth-threads-btn" @click="signInWithThreads">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path fill="currentColor" d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32L7.734 7.847c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388.108.046.216.094.321.142 1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69c-.242 0-.487.007-.739.021-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221z"/>
+            </svg>
+            Continue with Threads
+          </button>
+
+          <div class="auth-divider"><span>or</span></div>
+
+          <p v-if="threadsLoginError" class="auth-error-msg">{{ threadsLoginError }}</p>
+
           <form class="auth-form" @submit.prevent="handleAuthSubmit">
             <label v-if="authMode === 'register'" class="auth-field">
               <span>Name</span>
@@ -607,6 +592,21 @@ function closeAuth() {
   router.push('/');
 }
 
+const threadsLoginError = computed<string>(() => {
+  const errorCode = route.query.threads_login_error;
+  if (!errorCode) return '';
+  const messages: Record<string, string> = {
+    access_denied: 'Threads access was denied.',
+    invalid_state: 'Login session expired. Please try again.',
+    login_failed: "We couldn't finish the Threads login. Please try again.",
+  };
+  return messages[errorCode as string] ?? 'Threads login failed.';
+});
+
+function signInWithThreads() {
+  window.location.href = `${baseURL}/api/threads/login`;
+}
+
 async function handleAuthSubmit() {
   authError.value = '';
   authLoading.value = true;
@@ -690,9 +690,22 @@ const waveformBars = computed(() =>
 
 const loopSteps: { n: string; title: string; sub: string; icon: Component }[] = [
   { n: '01', title: 'Talk',       sub: 'Just say what\'s on your mind. Walking, driving, showering - doesn\'t matter.',   icon: Mic },
-  { n: '02', title: 'We listen',  sub: 'We find the best ideas in what you said. No filler, no fake wisdom.',             icon: Filter },
+  { n: '02', title: 'We listen',  sub: 'We find ideas. We suggest 2-3 posts worth making. You pick.',                     icon: Filter },
   { n: '03', title: 'We write',   sub: 'Each idea becomes a post made for its platform. Long for LinkedIn. Short for X.', icon: SlidersHorizontal },
   { n: '04', title: 'You post',   sub: 'Tap to approve. We post it, schedule it, or save the draft for later.',           icon: Rocket },
+];
+
+const tapeFragments = [
+  'ok so three clients this week all said the same thing and I started noticing...',
+  'been thinking about why my last launch flopped and it\'s not what I thought...',
+  'unpopular opinion but I think most productivity advice is cope...',
+  'had a call with Sarah and she said something that\'s been stuck in my head...',
+  'noticed my best posts are the ones I almost didn\'t publish...',
+  'spent an hour today on something I should have said no to...',
+  'everyone\'s talking about AI agents but nobody\'s shipping them to real users...',
+  'the thing that actually moved the needle wasn\'t on my roadmap...',
+  'three different people asked me the same question this week...',
+  'I keep telling founders to ship and then I spent 3 weeks not shipping...',
 ];
 
 const platformTabs = [
@@ -704,30 +717,30 @@ const platformTabs = [
 
 const pricingPlans = [
   {
-    name: 'Solo',
+    name: 'Free',
     price: '$0',
-    per: '/forever',
+    per: '/month',
     tag: 'Try it',
-    highlights: ['5 voice notes per month', '2 connected platforms', 'Basic voice matching'],
+    highlights: ['100 credits per month', 'Threads posting', 'Full voice matching'],
     cta: 'Start free',
     feature: false,
   },
   {
     name: 'Creator',
-    price: '$19',
+    price: '$20',
     per: '/month',
     tag: 'Most creators pick this',
-    highlights: ['Unlimited voice notes', 'All platforms connected', 'Full voice match', 'Schedule posts', 'Post stats'],
-    cta: 'Start 14-day trial',
+    highlights: ['1,000 credits per month', 'Threads posting', 'Full voice matching', 'Schedule posts'],
+    cta: 'Get started',
     feature: true,
   },
   {
-    name: 'Studio',
-    price: '$49',
+    name: 'Pro',
+    price: '$40',
     per: '/month',
-    tag: 'Teams & agencies',
-    highlights: ['Everything in Creator', '3 team members', 'Shared team voices', 'Approval flows'],
-    cta: 'Talk to us',
+    tag: 'For daily posters',
+    highlights: ['2,000 credits per month', 'Threads posting', 'Full voice matching', 'Schedule posts', 'Priority support'],
+    cta: 'Get started',
     feature: false,
   },
 ];
@@ -941,16 +954,6 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   letter-spacing: 0.01em;
 }
 .no-card-text--dark { color: rgba(255,255,255,0.5); }
-.hero-meta { display: flex; align-items: center; gap: 12px; }
-.avatar-stack { display: flex; }
-.avatar-stack span {
-  width: 28px; height: 28px; border-radius: 50%;
-  border: 2.5px solid var(--surface);
-  margin-left: -8px; display: block;
-}
-.avatar-stack span:first-child { margin-left: 0; }
-.hero-meta-text { font-size: 12px; line-height: 1.35; color: var(--mute); }
-.hero-meta-text b { color: var(--surface-ink); }
 
 /* Stage */
 .stage {
@@ -1301,6 +1304,23 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   border: 1px solid rgba(26,24,36,0.08);
   width: fit-content; margin-left: auto; margin-right: auto;
 }
+.platform-tab--soon {
+  cursor: not-allowed;
+  color: rgba(106, 102, 120, 0.6);
+  background: transparent;
+  opacity: 0.7;
+}
+.platform-tab--soon:hover { color: rgba(106, 102, 120, 0.6); }
+.platform-tab__soon {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(26, 24, 36, 0.08);
+  color: var(--mute);
+}
 .platform-tab {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 20px; border-radius: 999px;
@@ -1459,35 +1479,6 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 }
 
 /* ═══════════════════════════════════════════════════════
-   QUOTE
-   ═══════════════════════════════════════════════════════ */
-.quote {
-  max-width: 960px; margin: 24px auto;
-  padding: 48px 40px 56px; text-align: center; position: relative;
-}
-.quote-mark {
-  font-size: 180px; line-height: 0.8;
-  color: var(--primary); opacity: 0.15;
-  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
-}
-.quote-body {
-  font-size: clamp(32px, 5vw, 56px);
-  margin: 0 0 40px; position: relative; z-index: 1; line-height: 1.15;
-}
-.quote-body em {
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.quote-cite { display: inline-flex; align-items: center; gap: 14px; text-align: left; }
-.quote-avatar {
-  width: 56px; height: 56px; border-radius: 50%;
-  background: linear-gradient(135deg, #ffb695, #e66a3a);
-  border: 3px solid #fff; box-shadow: 0 4px 12px rgba(26,24,36,0.1);
-}
-.quote-name { font-weight: 700; font-size: 16px; }
-.quote-role { font-size: 10px; }
-
-/* ═══════════════════════════════════════════════════════
    PRICING
    ═══════════════════════════════════════════════════════ */
 .pricing { padding: 72px 40px 96px; max-width: 1280px; margin: 0 auto; }
@@ -1552,7 +1543,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 }
 .final-sub { font-size: 18px; line-height: 1.5; color: rgba(255,255,255,0.72); max-width: 520px; margin: 0 auto 48px; }
 .final-cta .btn-primary--big { background: #fff; color: var(--surface-ink); box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
-.final-cta .btn-primary--big:hover { background: var(--accent-2); color: #fff; }
+.final-cta .btn-primary--big:hover { background: var(--primary); color: #fff; }
 /* Arrow between subtitle and button, pointing down */
 .final-hand {
   display: flex; justify-content: center; align-items: center;
@@ -1625,6 +1616,25 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   background: #fff; color: var(--surface-ink); font-weight: 600;
   box-shadow: 0 2px 6px rgba(26,24,36,0.08);
 }
+.auth-threads-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 12px; border-radius: 10px;
+  background: #000; color: #fff; border: none;
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+}
+.auth-threads-btn:hover { background: #1a1a1a; }
+
+.auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 12px; color: var(--mute); margin: 16px 0;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--surface-dim);
+}
+
 .auth-form { display: flex; flex-direction: column; gap: 14px; }
 .auth-field { display: flex; flex-direction: column; gap: 6px; }
 .auth-field span { font-size: 12px; font-weight: 600; color: var(--mute); }
@@ -1674,7 +1684,6 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   .loop { padding: 48px 20px; }
   .voice { padding: 48px 20px; }
   .pricing { padding: 48px 20px 64px; }
-  .quote { padding: 40px 20px 48px; }
   .platform-tabs { overflow-x: auto; flex-wrap: nowrap; }
   .auth-card { margin: 20px; padding: 28px 24px; }
 }

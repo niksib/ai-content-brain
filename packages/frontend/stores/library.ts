@@ -22,6 +22,7 @@ export interface LibraryContentIdea {
   status: string;
   publishStatus?: string | null;
   scheduledAt?: string | null;
+  publishedAt?: string | null;
   threadsPostId?: string | null;
   contentPlan?: { chatSessionId: string };
   insightsSnapshots?: ThreadsInsightsSnapshot[];
@@ -115,6 +116,7 @@ export const useLibraryStore = defineStore('library', () => {
       item.contentIdea.publishStatus = 'posted';
       item.contentIdea.threadsPostId = threadsPostId;
       item.contentIdea.scheduledAt = null;
+      item.contentIdea.publishedAt = new Date().toISOString();
     }
   }
 
