@@ -46,6 +46,19 @@ export const useBillingStore = defineStore('billing', () => {
   const transactions = ref<CreditTransaction[]>([]);
   const transactionsTotal = ref(0);
   const isLoading = ref(false);
+  const isPricingModalOpen = ref(false);
+
+  function openPricingModal(): void {
+    isPricingModalOpen.value = true;
+    if (plans.value.length === 0) {
+      void loadPlans();
+    }
+    void loadSubscription();
+  }
+
+  function closePricingModal(): void {
+    isPricingModalOpen.value = false;
+  }
 
   async function loadBalance(): Promise<void> {
     try {
@@ -112,11 +125,14 @@ export const useBillingStore = defineStore('billing', () => {
     transactions,
     transactionsTotal,
     isLoading,
+    isPricingModalOpen,
     loadBalance,
     loadPlans,
     loadSubscription,
     loadTransactions,
     startCheckout,
     openPortal,
+    openPricingModal,
+    closePricingModal,
   };
 });

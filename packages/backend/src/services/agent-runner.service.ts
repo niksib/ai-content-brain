@@ -4,8 +4,9 @@ import { deductCreditsForLlmCall, type LlmActionType } from "./llm-cost.js";
 export type { AgentToolOptions };
 
 interface SSEWriter {
-  send: (event: string, data: unknown) => void;
+  send: (event: string, data: unknown) => boolean | void;
   close: () => void;
+  isClosed?: () => boolean;
 }
 
 interface HistoryMessage {
@@ -17,6 +18,7 @@ interface BillingOptions {
   userId: string;
   actionType: LlmActionType;
   reference?: string;
+  reservedCents?: number;
 }
 
 export class AgentRunnerService {
@@ -80,6 +82,10 @@ export class AgentRunnerService {
       let continueLoop = true;
 
       while (continueLoop) {
+        if (sse.isClosed?.()) {
+          continueLoop = false;
+          break;
+        }
         const stream = this.anthropic.messages.stream({
           model: "claude-sonnet-4-6",
           system: systemBlocks,
@@ -196,6 +202,7 @@ export class AgentRunnerService {
             },
             actionType: billing.actionType,
             reference: billing.reference,
+            reservedCents: billing.reservedCents,
           });
           costUsd = result.costCents / 100;
         } catch (billingError) {

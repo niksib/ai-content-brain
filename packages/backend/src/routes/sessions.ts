@@ -9,8 +9,12 @@ export const sessionRoutes = new Hono<AppEnv>();
 sessionRoutes.post("/sessions", requireAuth, async (context) => {
   const user = context.get("user");
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Store sessionDate as UTC midnight so the @@unique([userId, sessionDate])
+  // constraint is consistent regardless of what timezone the server runs in.
+  // Clients that care about local-midnight grouping should handle timezone
+  // conversion on their side (frontend calendar already does).
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
   // Try to find existing daily session for today
   const existingSession = await prisma.chatSession.findFirst({
@@ -25,16 +29,27 @@ sessionRoutes.post("/sessions", requireAuth, async (context) => {
     return context.json({ session: existingSession });
   }
 
-  const newSession = await prisma.chatSession.create({
-    data: {
-      userId: user.id,
-      type: "daily",
-      status: "active",
-      sessionDate: today,
-    },
-  });
-
-  return context.json({ session: newSession }, 201);
+  try {
+    const newSession = await prisma.chatSession.create({
+      data: {
+        userId: user.id,
+        type: "daily",
+        status: "active",
+        sessionDate: today,
+      },
+    });
+    return context.json({ session: newSession }, 201);
+  } catch (error) {
+    // Unique constraint race: another concurrent request created today's
+    // session between our findFirst and create. Re-fetch and return it.
+    if ((error as { code?: string }).code === "P2002") {
+      const session = await prisma.chatSession.findFirst({
+        where: { userId: user.id, sessionDate: today, type: "daily" },
+      });
+      if (session) return context.json({ session });
+    }
+    throw error;
+  }
 });
 
 // List user sessions for calendar

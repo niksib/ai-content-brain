@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 
-export const TRIAL_CREDITS = 150;
+export const TRIAL_CREDITS = 100;
 
 export async function grantTrialCredits(userId: string): Promise<void> {
   const existingBalance = await prisma.creditBalance.findUnique({

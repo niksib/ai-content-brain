@@ -63,9 +63,10 @@ ideaRoutes.get("/sessions/:id/ideas", requireAuth, async (context) => {
 ideaRoutes.patch(
   "/ideas/:id/approve",
   requireAuth,
-  requireCredits(20, "content_production"),
+  requireCredits(2, "content_production"),
   async (context) => {
     const user = context.get("user");
+    const reservedCents = (context.get("creditReservation" as never) as number | undefined) ?? 0;
     const ideaId = context.req.param("id");
 
     const idea = await prisma.contentIdea.findUnique({
@@ -82,15 +83,15 @@ ideaRoutes.patch(
     });
 
     const agent = await resolvePlatformAgent(idea, user.id);
-    const { send, close, response } = createSSEStream(context);
+    const { send, close, response, isClosed } = createSSEStream(context);
 
-    agentRunner
+    void agentRunner
       .stream(
         agent,
         [{ role: "user", content: agent.buildProductionPrompt() }],
-        { send, close },
+        { send, close, isClosed },
         undefined,
-        { userId: user.id, actionType: "content_production", reference: ideaId }
+        { userId: user.id, actionType: "content_production", reference: ideaId, reservedCents }
       )
       .then(async () => {
         await prisma.contentIdea.update({
@@ -98,11 +99,16 @@ ideaRoutes.patch(
           data: { status: "completed" },
         });
       })
-      .catch(async () => {
-        await prisma.contentIdea.update({
-          where: { id: ideaId },
-          data: { status: "approved" },
-        });
+      .catch(async (error) => {
+        console.error("[ideas/approve] Agent stream failed:", error);
+        try {
+          await prisma.contentIdea.update({
+            where: { id: ideaId },
+            data: { status: "approved" },
+          });
+        } catch (dbError) {
+          console.error("[ideas/approve] Failed to revert status:", dbError);
+        }
       });
 
     return response;
@@ -134,9 +140,10 @@ ideaRoutes.patch("/ideas/:id/reject", requireAuth, async (context) => {
 ideaRoutes.post(
   "/ideas/:id/message",
   requireAuth,
-  requireCredits(10, "content_plan"),
+  requireCredits(2, "content_plan"),
   async (context) => {
     const user = context.get("user");
+    const reservedCents = (context.get("creditReservation" as never) as number | undefined) ?? 0;
     const ideaId = context.req.param("id");
     const body = await context.req.json();
     const { content, aiContext } = body;
@@ -221,13 +228,13 @@ ideaRoutes.post(
       }
     };
 
-    agentRunner
+    void agentRunner
       .stream(
         agent,
         messageHistory,
         wrappedSse,
         { onContentSaved },
-        { userId: user.id, actionType: "agent_call", reference: ideaId }
+        { userId: user.id, actionType: "agent_call", reference: ideaId, reservedCents }
       )
       .then(async ({ costUsd }) => {
         const assistantContent = tokenChunks.join("");
@@ -242,6 +249,9 @@ ideaRoutes.post(
             },
           });
         }
+      })
+      .catch((error) => {
+        console.error("[ideas/message] Post-stream save failed:", error);
       });
 
     return response;

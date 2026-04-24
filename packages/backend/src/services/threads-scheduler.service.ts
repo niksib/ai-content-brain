@@ -1,6 +1,10 @@
 import cron from "node-cron";
 import { prisma } from "../lib/prisma.js";
 import { threadsApiService } from "./threads-api.service.js";
+import { redactSecrets } from "../lib/redact.js";
+
+const MAX_ATTEMPTS = 3;
+const STUCK_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes — long enough for slow video uploads to Threads
 
 export class ThreadsSchedulerService {
   start(): void {
@@ -12,14 +16,58 @@ export class ThreadsSchedulerService {
   }
 
   private async processDuePosts(): Promise<void> {
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const now = new Date();
+    const stuckCutoff = new Date(now.getTime() - STUCK_THRESHOLD_MS);
 
+    // Atomically claim all due pending posts in one pass.
+    // updateMany with publishingAt = null filter prevents concurrent ticks
+    // (or parallel workers) from claiming the same row twice.
+    await prisma.scheduledPost.updateMany({
+      where: {
+        status: "pending",
+        scheduledAt: { lte: now },
+        publishingAt: null,
+        attempts: { lt: MAX_ATTEMPTS },
+      },
+      data: {
+        status: "publishing",
+        publishingAt: now,
+        attempts: { increment: 1 },
+      },
+    });
+
+    // Reclaim stuck "publishing" posts whose worker never finished (crash, timeout).
+    await prisma.scheduledPost.updateMany({
+      where: {
+        status: "publishing",
+        publishingAt: { lt: stuckCutoff },
+        attempts: { lt: MAX_ATTEMPTS },
+      },
+      data: {
+        publishingAt: now,
+        attempts: { increment: 1 },
+      },
+    });
+
+    // Any row still in publishing that has hit the attempt limit is failed permanently.
+    await prisma.scheduledPost.updateMany({
+      where: {
+        status: "publishing",
+        attempts: { gte: MAX_ATTEMPTS },
+        publishingAt: { lt: stuckCutoff },
+      },
+      data: {
+        status: "failed",
+        errorMessage: "Exceeded maximum retry attempts",
+      },
+    });
+
+    // Load the posts we just claimed. `publishingAt` was just set to `now`,
+    // so we filter tightly to avoid racing a concurrent tick.
     const duePosts = await prisma.scheduledPost.findMany({
       where: {
-        OR: [
-          { status: "pending", scheduledAt: { lte: new Date() } },
-          { status: "publishing", updatedAt: { lte: fiveMinutesAgo } },
-        ],
+        status: "publishing",
+        publishingAt: now,
       },
       include: {
         threadsAccount: true,
@@ -27,9 +75,7 @@ export class ThreadsSchedulerService {
     });
 
     await Promise.allSettled(
-      duePosts.map((scheduledPost) =>
-        this.publishScheduledPost(scheduledPost)
-      )
+      duePosts.map((scheduledPost) => this.publishScheduledPost(scheduledPost))
     );
   }
 
@@ -48,13 +94,10 @@ export class ThreadsSchedulerService {
     const { id: postId, threadsAccountId, contentIdeaId, text, posts, mediaType, mediaUrl, threadsAccount } = scheduledPost;
     const { threadsUserId, accessToken } = threadsAccount;
 
-    await prisma.scheduledPost.update({
-      where: { id: postId },
-      data: { status: "publishing" },
-    });
-
     try {
-      const postsArray = Array.isArray(posts) ? (posts as Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>) : null;
+      const postsArray = Array.isArray(posts)
+        ? (posts as Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>)
+        : null;
       const isThread = postsArray !== null && postsArray.length > 1;
 
       let firstPostId: string;
@@ -78,7 +121,7 @@ export class ThreadsSchedulerService {
 
       await prisma.scheduledPost.update({
         where: { id: postId },
-        data: { status: "published", threadsPostId: firstPostId },
+        data: { status: "published", threadsPostId: firstPostId, publishingAt: null },
       });
 
       await prisma.threadsAccount.update({
@@ -94,11 +137,16 @@ export class ThreadsSchedulerService {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      // Release the claim so the next tick can retry (unless attempts exhausted).
       await prisma.scheduledPost.update({
         where: { id: postId },
-        data: { status: "failed", errorMessage },
+        data: {
+          status: "pending",
+          publishingAt: null,
+          errorMessage,
+        },
       });
-      console.error(`[ThreadsScheduler] Failed to publish post ${postId}:`, error);
+      console.error(`[ThreadsScheduler] Failed to publish post ${postId}:`, redactSecrets(error));
     }
   }
 }

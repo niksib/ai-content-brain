@@ -17,6 +17,7 @@ import { billingRoutes } from "./routes/billing.js";
 import { threadsRoutes } from "./routes/threads.js";
 import { mediaRoutes } from "./routes/media.js";
 import { threadsSchedulerService } from "./services/threads-scheduler.service.js";
+import { rateLimit } from "./middleware/rate-limit.middleware.js";
 
 const app = new Hono();
 
@@ -28,6 +29,19 @@ app.use(
     credentials: true,
   })
 );
+
+// Global fallback limiter — 120 req/min per user/IP covers normal UI polling
+// with plenty of headroom. Stricter per-route limits apply below.
+app.use("/api/*", rateLimit({ windowMs: 60_000, max: 120, keyPrefix: "global" }));
+
+// Auth brute-force / password spraying: 10 attempts per 15 minutes.
+app.use("/api/auth/*", rateLimit({ windowMs: 15 * 60_000, max: 10, keyPrefix: "auth" }));
+
+// Paid API calls (LLM, transcription, media upload): stricter to cap cost abuse.
+app.use("/api/voice/*", rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "voice" }));
+app.use("/api/media/*", rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "media" }));
+app.use("/api/sessions/:id/message", rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "chat" }));
+app.use("/api/ideas/:id/*", rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "ideas" }));
 
 app.route("/api", healthRoute);
 app.route("/api", authRoutes);

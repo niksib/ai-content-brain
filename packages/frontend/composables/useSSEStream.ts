@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { useBillingStore } from '~/stores/billing';
 
 interface SSEIdea {
   id: string;
@@ -88,6 +89,9 @@ export function useSSEStream() {
       });
 
       if (!response.ok) {
+        if (response.status === 402) {
+          useBillingStore().openPricingModal();
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 

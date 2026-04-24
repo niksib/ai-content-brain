@@ -391,8 +391,8 @@ onMounted(async () => {
 });
 
 async function handleStartSession(): Promise<void> {
-  if (billingStore.balance === 0) {
-    router.push('/pricing');
+  if (billingStore.balance < 2) {
+    billingStore.openPricingModal();
     return;
   }
   isStarting.value = true;

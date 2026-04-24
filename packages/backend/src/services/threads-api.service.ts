@@ -1,3 +1,5 @@
+import { redactSecrets } from "../lib/redact.js";
+
 export const THREADS_BASE_URL = "https://graph.threads.net/v1.0";
 const THREADS_AUTH_URL = "https://threads.net/oauth/authorize";
 const THREADS_TOKEN_URL = "https://graph.threads.net/oauth/access_token";
@@ -122,7 +124,7 @@ export class ThreadsApiService {
     const response = await fetch(`${THREADS_BASE_URL}/me?${params.toString()}`);
 
     if (!response.ok) {
-      const errorBody = await response.text();
+      const errorBody = redactSecrets(await response.text());
       throw new Error(`Threads user info fetch failed: ${response.status} — ${errorBody}`);
     }
 
@@ -245,7 +247,7 @@ export class ThreadsApiService {
     );
 
     if (!containerResponse.ok) {
-      const errorBody = await containerResponse.text().catch(() => "");
+      const errorBody = redactSecrets(await containerResponse.text().catch(() => ""));
       throw new Error(`Media container creation failed (${containerResponse.status}): ${errorBody}`);
     }
 
@@ -264,7 +266,7 @@ export class ThreadsApiService {
     );
 
     if (!publishResponse.ok) {
-      const errorBody = await publishResponse.text().catch(() => "");
+      const errorBody = redactSecrets(await publishResponse.text().catch(() => ""));
       throw new Error(`Media publish failed (${publishResponse.status}): ${errorBody}`);
     }
 
@@ -295,7 +297,7 @@ export class ThreadsApiService {
       );
 
       if (!itemResponse.ok) {
-        const errorBody = await itemResponse.text().catch(() => "");
+        const errorBody = redactSecrets(await itemResponse.text().catch(() => ""));
         throw new Error(`Carousel item container creation failed (${itemResponse.status}): ${errorBody}`);
       }
 
@@ -317,7 +319,7 @@ export class ThreadsApiService {
     );
 
     if (!carouselResponse.ok) {
-      const errorBody = await carouselResponse.text().catch(() => "");
+      const errorBody = redactSecrets(await carouselResponse.text().catch(() => ""));
       throw new Error(`Carousel container creation failed (${carouselResponse.status}): ${errorBody}`);
     }
 
@@ -338,7 +340,7 @@ export class ThreadsApiService {
     );
 
     if (!publishResponse.ok) {
-      const errorBody = await publishResponse.text().catch(() => "");
+      const errorBody = redactSecrets(await publishResponse.text().catch(() => ""));
       throw new Error(`Carousel publish failed (${publishResponse.status}): ${errorBody}`);
     }
 
@@ -406,7 +408,7 @@ export class ThreadsApiService {
       );
 
       if (!containerResponse.ok) {
-        const errorBody = await containerResponse.text().catch(() => "");
+        const errorBody = redactSecrets(await containerResponse.text().catch(() => ""));
         throw new Error(
           `Thread post ${index + 1}/${posts.length} container failed (${containerResponse.status}): ${errorBody}. Successful post IDs so far: ${postIds.join(", ") || "none"}`
         );
@@ -432,7 +434,7 @@ export class ThreadsApiService {
       );
 
       if (!publishResponse.ok) {
-        const errorBody = await publishResponse.text().catch(() => "");
+        const errorBody = redactSecrets(await publishResponse.text().catch(() => ""));
         throw new Error(
           `Thread post ${index + 1}/${posts.length} publish failed (${publishResponse.status}): ${errorBody}. Successful post IDs so far: ${postIds.join(", ") || "none"}`
         );

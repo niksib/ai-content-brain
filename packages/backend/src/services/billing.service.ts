@@ -43,6 +43,22 @@ export class BillingService {
   }
 
   async handleWebhook(event: Stripe.Event): Promise<void> {
+    // Idempotency: record the event.id up-front. If a duplicate delivery
+    // lands (network retry, dashboard replay), the unique constraint throws
+    // and we bail out before re-applying side effects.
+    try {
+      await prisma.stripeWebhookEvent.create({
+        data: { eventId: event.id, type: event.type },
+      });
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (code === "P2002") {
+        console.log(`[billing/webhook] Duplicate event ${event.id} (${event.type}) — skipping`);
+        return;
+      }
+      throw error;
+    }
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -93,6 +109,17 @@ export class BillingService {
           : null;
         if (!subscriptionId) return;
 
+        // Only handle renewals here. Other billing reasons are covered
+        // elsewhere to avoid double-granting credits:
+        //   - subscription_create  → checkout.session.completed grants first allowance
+        //   - subscription_update  → customer.subscription.updated handles plan change
+        //   - manual / threshold   → out of scope for MVP
+        const billingReason = (invoice as { billing_reason?: string }).billing_reason;
+        if (billingReason !== "subscription_cycle") {
+          console.log(`[billing/webhook] invoice.paid ignored (billing_reason=${billingReason}, ${subscriptionId})`);
+          break;
+        }
+
         const subscription = await prisma.subscription.findUnique({
           where: { stripeSubscriptionId: subscriptionId },
         });
@@ -126,6 +153,7 @@ export class BillingService {
 
         const priceId = stripeSub.items.data[0]?.price.id;
         const plan = priceId ? getPlanByStripePriceId(priceId) : null;
+        const planChanged = plan && plan.id !== subscription.plan;
 
         await prisma.subscription.update({
           where: { userId: subscription.userId },
@@ -139,6 +167,12 @@ export class BillingService {
             cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
           },
         });
+
+        // Refresh credits immediately on plan upgrade/downgrade so the user
+        // sees their new allowance without waiting for the next billing cycle.
+        if (planChanged && plan) {
+          await this.resetCreditsForPlan(subscription.userId, plan.monthlyCredits, stripeSub.id);
+        }
         break;
       }
 

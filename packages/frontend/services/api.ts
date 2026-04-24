@@ -8,14 +8,24 @@ export function useApiClient() {
   ): Promise<T> {
     const url = `${baseURL}${path}`;
 
-    const response = await $fetch<T>(url, {
-      method: options.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-      headers: options.headers as Record<string, string>,
-      body: options.body as string | undefined,
-      credentials: 'include',
-    });
+    try {
+      const response = await $fetch<T>(url, {
+        method: options.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+        headers: options.headers as Record<string, string>,
+        body: options.body as string | undefined,
+        credentials: 'include',
+      });
 
-    return response;
+      return response;
+    } catch (error: unknown) {
+      const status = (error as { status?: number; response?: { status?: number } })?.status
+        ?? (error as { response?: { status?: number } })?.response?.status;
+      if (status === 402 && import.meta.client) {
+        const { useBillingStore } = await import('~/stores/billing');
+        useBillingStore().openPricingModal();
+      }
+      throw error;
+    }
   }
 
   function get<T>(path: string): Promise<T> {

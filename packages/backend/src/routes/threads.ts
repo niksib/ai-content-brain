@@ -1,50 +1,87 @@
-import { createHmac, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { threadsApiService, THREADS_BASE_URL } from "../services/threads-api.service.js";
 import { auth } from "../lib/auth.js";
+import { redactSecrets } from "../lib/redact.js";
 import type { AppEnv } from "../types/hono.js";
 
 const LOGIN_STATE_PREFIX = "login";
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-function signOAuthState(userId: string): string {
-  const secret = process.env.THREADS_APP_SECRET!;
-  const sig = createHmac("sha256", secret).update(userId).digest("hex").slice(0, 16);
-  return `${userId}:${sig}`;
+async function issueConnectState(userId: string): Promise<string> {
+  const nonce = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + OAUTH_STATE_TTL_MS);
+  await prisma.oAuthState.create({
+    data: { nonce, purpose: "connect", userId, expiresAt },
+  });
+  return nonce;
 }
 
-function verifyOAuthState(state: string): string | null {
-  const parts = state.split(":");
-  if (parts.length !== 2) return null;
-  const [userId, sig] = parts;
-  const expected = createHmac("sha256", process.env.THREADS_APP_SECRET!).update(userId).digest("hex").slice(0, 16);
-  if (sig !== expected) return null;
-  return userId;
+/**
+ * Consume a connect-mode state. Returns bound userId or null on invalid/expired/replay.
+ * Delete-on-read guarantees single-use semantics.
+ */
+async function consumeConnectState(nonce: string): Promise<string | null> {
+  try {
+    const deleted = await prisma.oAuthState.delete({ where: { nonce } });
+    if (deleted.purpose !== "connect") return null;
+    if (deleted.expiresAt.getTime() < Date.now()) return null;
+    return deleted.userId ?? null;
+  } catch {
+    return null;
+  }
 }
 
-function signLoginState(): string {
-  const nonce = randomBytes(12).toString("hex");
-  const secret = process.env.THREADS_APP_SECRET!;
-  const sig = createHmac("sha256", secret).update(`${LOGIN_STATE_PREFIX}:${nonce}`).digest("hex").slice(0, 16);
-  return `${LOGIN_STATE_PREFIX}:${nonce}:${sig}`;
+async function issueLoginState(): Promise<string> {
+  const nonce = `${LOGIN_STATE_PREFIX}_${randomBytes(32).toString("hex")}`;
+  const expiresAt = new Date(Date.now() + OAUTH_STATE_TTL_MS);
+  await prisma.oAuthState.create({
+    data: { nonce, purpose: "login", expiresAt },
+  });
+  return nonce;
 }
 
-function verifyLoginState(state: string): boolean {
-  const parts = state.split(":");
-  if (parts.length !== 3 || parts[0] !== LOGIN_STATE_PREFIX) return false;
-  const [, nonce, sig] = parts;
-  const expected = createHmac("sha256", process.env.THREADS_APP_SECRET!).update(`${LOGIN_STATE_PREFIX}:${nonce}`).digest("hex").slice(0, 16);
-  return sig === expected;
-}
-
-function derivePasswordForThreadsUser(threadsUserId: string): string {
-  const secret = process.env.BETTER_AUTH_SECRET || process.env.THREADS_APP_SECRET!;
-  return createHmac("sha256", secret).update(`threads-login:${threadsUserId}`).digest("hex");
+async function consumeLoginState(nonce: string): Promise<boolean> {
+  try {
+    const deleted = await prisma.oAuthState.delete({ where: { nonce } });
+    if (deleted.purpose !== "login") return false;
+    if (deleted.expiresAt.getTime() < Date.now()) return false;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function buildThreadsLoginEmail(threadsUserId: string): string {
   return `threads-${threadsUserId}@postrr.local`;
+}
+
+// 256 bits of entropy; stored on the user's ThreadsAccount row and used only
+// as the opaque password better-auth needs to establish a session. Secret
+// rotation (env var changes) does NOT invalidate existing logins.
+function generateLoginSecret(): string {
+  return randomBytes(32).toString("hex");
+}
+
+/**
+ * Reject any mediaUrl that doesn't correspond to a MediaFile owned by the
+ * caller. Prevents users from pointing Threads at an attacker-controlled
+ * server (fingerprinting, tracking, content swap on refresh).
+ */
+async function assertMediaUrlsOwnedBy(userId: string, urls: string[]): Promise<string | null> {
+  const unique = Array.from(new Set(urls.filter((url): url is string => Boolean(url))));
+  if (unique.length === 0) return null;
+
+  const found = await prisma.mediaFile.findMany({
+    where: { userId, url: { in: unique } },
+    select: { url: true },
+  });
+
+  const foundSet = new Set(found.map((row) => row.url));
+  const unknown = unique.find((url) => !foundSet.has(url));
+  return unknown ?? null;
 }
 
 export const threadsRoutes = new Hono<AppEnv>();
@@ -74,13 +111,15 @@ threadsRoutes.get("/threads/account", requireAuth, async (context) => {
 // GET /threads/auth — redirect user to Threads OAuth
 threadsRoutes.get("/threads/auth", requireAuth, async (context) => {
   const user = context.get("user");
-  const authUrl = threadsApiService.buildAuthorizationUrl(signOAuthState(user.id));
+  const state = await issueConnectState(user.id);
+  const authUrl = threadsApiService.buildAuthorizationUrl(state);
   return context.redirect(authUrl);
 });
 
 // GET /threads/login — start Threads OAuth login flow (no existing session required)
 threadsRoutes.get("/threads/login", async (context) => {
-  const authUrl = threadsApiService.buildAuthorizationUrl(signLoginState());
+  const state = await issueLoginState();
+  const authUrl = threadsApiService.buildAuthorizationUrl(state);
   return context.redirect(authUrl);
 });
 
@@ -91,10 +130,10 @@ threadsRoutes.get("/threads/callback", async (context) => {
   const error = context.req.query("error");
 
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-  const isLoginMode = typeof state === "string" && state.startsWith(`${LOGIN_STATE_PREFIX}:`);
+  const isLoginMode = typeof state === "string" && state.startsWith(`${LOGIN_STATE_PREFIX}_`);
 
   if (error || !code || !state) {
-    const errorPath = isLoginMode ? "/?threads_login_error=access_denied" : "/profile?threads_error=access_denied";
+    const errorPath = isLoginMode ? "/?threads_login_error=access_denied" : "/settings?threads_error=access_denied";
     return context.redirect(`${frontendUrl}${errorPath}`);
   }
 
@@ -111,9 +150,9 @@ async function handleConnectCallback(
   state: string,
   frontendUrl: string,
 ) {
-  const verifiedUserId = verifyOAuthState(state);
+  const verifiedUserId = await consumeConnectState(state);
   if (!verifiedUserId) {
-    return context.redirect(`${frontendUrl}/profile?threads_error=invalid_state`);
+    return context.redirect(`${frontendUrl}/settings?threads_error=invalid_state`);
   }
 
   try {
@@ -154,8 +193,8 @@ async function handleConnectCallback(
 
     return context.redirect(`${frontendUrl}${returnPath}?threads_connected=true`);
   } catch (connectError) {
-    console.error("[threads/callback] Failed to connect Threads account:", connectError);
-    return context.redirect(`${frontendUrl}/profile?threads_error=connection_failed`);
+    console.error("[threads/callback] Failed to connect Threads account:", redactSecrets(connectError));
+    return context.redirect(`${frontendUrl}/settings?threads_error=connection_failed`);
   }
 }
 
@@ -165,7 +204,7 @@ async function handleLoginCallback(
   state: string,
   frontendUrl: string,
 ) {
-  if (!verifyLoginState(state)) {
+  if (!(await consumeLoginState(state))) {
     return context.redirect(`${frontendUrl}/?threads_login_error=invalid_state`);
   }
 
@@ -176,10 +215,12 @@ async function handleLoginCallback(
     const tokenExpiresAt = new Date(Date.now() + tokenData.expiresInSeconds * 1000);
 
     const email = buildThreadsLoginEmail(userInfo.id);
-    const password = derivePasswordForThreadsUser(userInfo.id);
     const displayName = userInfo.name?.trim() || userInfo.username || "Threads creator";
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingThreadsAccount = existingUser
+      ? await prisma.threadsAccount.findFirst({ where: { threadsUserId: userInfo.id } })
+      : null;
 
     const authHeaders = new Headers({
       "content-type": "application/json",
@@ -187,7 +228,29 @@ async function handleLoginCallback(
     });
 
     let authResult;
+    let loginSecretToPersist: string | null = null;
+
     if (existingUser) {
+      // Returning Threads user. Use the random secret stored on their
+      // ThreadsAccount row. If missing (pre-migration accounts), issue a
+      // one-time rekey directly via better-auth's internal adapter — the
+      // derived-password migration path. New secret is then persisted on
+      // the ThreadsAccount row below.
+      let password = existingThreadsAccount?.loginSecret ?? null;
+      if (!password) {
+        password = generateLoginSecret();
+        const ctx = await auth.$context;
+        const accounts = await ctx.internalAdapter.findAccounts(existingUser.id);
+        const credentialAccount = accounts.find(
+          (account: { providerId: string; password?: string | null }) =>
+            account.providerId === "credential" && account.password
+        );
+        if (credentialAccount) {
+          const passwordHash = await ctx.password.hash(password);
+          await ctx.internalAdapter.updateAccount(credentialAccount.id, { password: passwordHash });
+        }
+        loginSecretToPersist = password;
+      }
       authResult = await auth.api.signInEmail({
         body: { email, password },
         headers: authHeaders,
@@ -195,6 +258,10 @@ async function handleLoginCallback(
         asResponse: false,
       });
     } else {
+      // New Threads user — generate a fresh random secret, sign up with it,
+      // and persist it below alongside the ThreadsAccount row.
+      const password = generateLoginSecret();
+      loginSecretToPersist = password;
       authResult = await auth.api.signUpEmail({
         body: { email, password, name: displayName },
         headers: authHeaders,
@@ -217,6 +284,7 @@ async function handleLoginCallback(
         accessToken: tokenData.accessToken,
         tokenExpiresAt,
         scopes: "threads_basic,threads_content_publish,threads_keyword_search,threads_manage_insights,threads_manage_replies,threads_profile_discovery,threads_read_replies",
+        loginSecret: loginSecretToPersist,
       },
       update: {
         threadsUserId: userInfo.id,
@@ -226,6 +294,7 @@ async function handleLoginCallback(
         profilePictureUrl: userInfo.profilePictureUrl ?? null,
         accessToken: tokenData.accessToken,
         tokenExpiresAt,
+        ...(loginSecretToPersist ? { loginSecret: loginSecretToPersist } : {}),
       },
     });
 
@@ -247,7 +316,7 @@ async function handleLoginCallback(
 
     return new Response(null, { status: 302, headers: responseHeaders });
   } catch (loginError) {
-    console.error("[threads/callback] Threads login failed:", loginError);
+    console.error("[threads/callback] Threads login failed:", redactSecrets(loginError));
     return context.redirect(`${frontendUrl}/?threads_login_error=login_failed`);
   }
 }
@@ -288,6 +357,15 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
 
   if (hasCarousel && body.carouselItems!.length > 20) {
     return context.json({ error: "Carousel supports 2–20 items" }, 400);
+  }
+
+  const publishMediaUrls: string[] = [
+    ...(hasMedia ? [body.mediaUrl!] : []),
+    ...(hasCarousel ? body.carouselItems!.map((item) => item.mediaUrl) : []),
+  ];
+  const unknownPublishUrl = await assertMediaUrlsOwnedBy(user.id, publishMediaUrls);
+  if (unknownPublishUrl) {
+    return context.json({ error: "mediaUrl does not match any uploaded media" }, 400);
   }
 
   const account = await prisma.threadsAccount.findUnique({
@@ -342,7 +420,7 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
 
     return context.json({ postId: result.postId });
   } catch (publishError) {
-    console.error("[threads/publish] Publish failed:", publishError);
+    console.error("[threads/publish] Publish failed:", redactSecrets(publishError));
     return context.json({ error: "Failed to publish post. Please try again." }, 500);
   }
 });
@@ -373,6 +451,14 @@ threadsRoutes.post("/threads/publish-thread", requireAuth, async (context) => {
     if (post.mediaUrl && post.mediaType !== "IMAGE" && post.mediaType !== "VIDEO") {
       return context.json({ error: `post[${postIndex}] has mediaUrl without a valid mediaType` }, 400);
     }
+  }
+
+  const threadMediaUrls = normalized
+    .map((post) => post.mediaUrl)
+    .filter((url): url is string => typeof url === "string");
+  const unknownThreadUrl = await assertMediaUrlsOwnedBy(user.id, threadMediaUrls);
+  if (unknownThreadUrl) {
+    return context.json({ error: "mediaUrl does not match any uploaded media" }, 400);
   }
 
   const account = await prisma.threadsAccount.findUnique({
@@ -408,7 +494,7 @@ threadsRoutes.post("/threads/publish-thread", requireAuth, async (context) => {
 
     return context.json({ postIds: result.postIds });
   } catch (publishError) {
-    console.error("[threads/publish-thread] Thread publish failed:", publishError);
+    console.error("[threads/publish-thread] Thread publish failed:", redactSecrets(publishError));
     return context.json({ error: "Failed to publish thread. Please try again." }, 500);
   }
 });
@@ -462,6 +548,14 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
   const scheduledAt = new Date(body.scheduledAt);
   if (isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) {
     return context.json({ error: "scheduledAt must be a future date" }, 400);
+  }
+
+  const mediaUrls = isThread && normalizedPosts
+    ? normalizedPosts.map((post) => post.mediaUrl).filter((url): url is string => typeof url === "string")
+    : body.mediaUrl ? [body.mediaUrl] : [];
+  const unknownUrl = await assertMediaUrlsOwnedBy(user.id, mediaUrls);
+  if (unknownUrl) {
+    return context.json({ error: "mediaUrl does not match any uploaded media" }, 400);
   }
 
   const account = await prisma.threadsAccount.findUnique({
@@ -565,6 +659,14 @@ threadsRoutes.patch("/threads/scheduled/:id", requireAuth, async (context) => {
     }
   }
 
+  const editMediaUrls = isThread && normalizedPosts
+    ? normalizedPosts.map((entry) => entry.mediaUrl).filter((url): url is string => typeof url === "string")
+    : typeof body.mediaUrl === "string" ? [body.mediaUrl] : [];
+  const unknownEditUrl = await assertMediaUrlsOwnedBy(user.id, editMediaUrls);
+  if (unknownEditUrl) {
+    return context.json({ error: "mediaUrl does not match any uploaded media" }, 400);
+  }
+
   let scheduledAt: Date | undefined;
   if (body.scheduledAt) {
     scheduledAt = new Date(body.scheduledAt);
@@ -653,7 +755,7 @@ threadsRoutes.get("/threads/insights", requireAuth, async (context) => {
       },
     });
   } catch (insightsError) {
-    console.error("[threads/insights] Failed to fetch insights:", insightsError);
+    console.error("[threads/insights] Failed to fetch insights:", redactSecrets(insightsError));
     return context.json({ error: "Failed to fetch insights. Please try again." }, 500);
   }
 });
@@ -691,7 +793,7 @@ threadsRoutes.post("/threads/insights/:contentIdeaId/refresh", requireAuth, asyn
 
     const response = await fetch(url.toString());
     if (!response.ok) {
-      const errorBody = await response.text().catch(() => "(unreadable)");
+      const errorBody = redactSecrets(await response.text().catch(() => "(unreadable)"));
       console.error(`[threads/insights/refresh] Threads API ${response.status}:`, errorBody);
       return context.json({ error: "Failed to fetch post insights from Threads", threadsStatus: response.status }, 502);
     }
@@ -717,7 +819,7 @@ threadsRoutes.post("/threads/insights/:contentIdeaId/refresh", requireAuth, asyn
 
     return context.json({ snapshot });
   } catch (refreshError) {
-    console.error("[threads/insights/refresh] Failed:", refreshError);
+    console.error("[threads/insights/refresh] Failed:", redactSecrets(refreshError));
     return context.json({ error: "Failed to refresh insights. Please try again." }, 500);
   }
 });
@@ -757,7 +859,7 @@ threadsRoutes.get("/threads/post-insights/:threadsPostId", requireAuth, async (c
 
     return context.json({ metrics });
   } catch (insightsError) {
-    console.error("[threads/post-insights] Failed:", insightsError);
+    console.error("[threads/post-insights] Failed:", redactSecrets(insightsError));
     return context.json({ error: "Failed to fetch post insights" }, 500);
   }
 });

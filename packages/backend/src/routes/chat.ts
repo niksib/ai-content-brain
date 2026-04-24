@@ -10,8 +10,9 @@ import type { AppEnv } from "../types/hono.js";
 export const chatRoutes = new Hono<AppEnv>();
 
 // Send message to strategist agent
-chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "content_plan"), async (context) => {
+chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(2, "content_plan"), async (context) => {
   const user = context.get("user");
+  const reservedCents = (context.get("creditReservation" as never) as number | undefined) ?? 0;
   const sessionId = context.req.param("id");
 
   const chatSession = await prisma.chatSession.findUnique({
@@ -66,13 +67,13 @@ chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "conten
 
   const agent = await StrategistAgent.create(user.id, chatSession.id);
 
-  agentRunner
+  void agentRunner
     .stream(
       agent,
       messageHistory,
       wrappedSse,
       undefined,
-      { userId: user.id, actionType: "content_plan", reference: chatSession.id }
+      { userId: user.id, actionType: "content_plan", reference: chatSession.id, reservedCents }
     )
     .then(async ({ costUsd }) => {
       // Save assistant message with accumulated text and real cost
@@ -87,6 +88,9 @@ chatRoutes.post("/sessions/:id/message", requireAuth, requireCredits(10, "conten
           },
         });
       }
+    })
+    .catch((error) => {
+      console.error("[chat/message] Post-stream save failed:", error);
     });
 
   return response;

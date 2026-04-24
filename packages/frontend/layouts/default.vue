@@ -67,6 +67,8 @@
     <main class="flex-1 min-w-0 overflow-y-auto relative">
       <slot />
     </main>
+
+    <PricingModal />
   </div>
 </template>
 
@@ -76,6 +78,7 @@ import { Plus, LogOut, LayoutGrid, CalendarDays, User } from 'lucide-vue-next';
 import { useDashboardStore } from '~/stores/dashboard';
 import { useBillingStore } from '~/stores/billing';
 import { useProfileStore } from '~/stores/profile';
+import PricingModal from '~/components/PricingModal.vue';
 
 const config = useRuntimeConfig();
 const router = useRouter();
@@ -110,8 +113,8 @@ const userInitials = computed(() => {
 });
 
 async function handleStartSession(): Promise<void> {
-  if (billingStore.balance === 0) {
-    router.push('/pricing');
+  if (billingStore.balance < 2) {
+    billingStore.openPricingModal();
     return;
   }
   isStarting.value = true;
@@ -136,6 +139,8 @@ async function handleLogout(): Promise<void> {
   }
   const isAuthenticated = useState<boolean | null>('auth:authenticated');
   isAuthenticated.value = false;
+  const authCheckedAt = useState<number>('auth:checked-at');
+  authCheckedAt.value = Date.now();
   window.location.assign('/');
 }
 

@@ -82,6 +82,13 @@ export interface DeductCreditsParams {
   usage: AnthropicUsageLike;
   actionType: LlmActionType;
   reference?: string;
+  /**
+   * Credits already deducted by `requireCredits` middleware before the call ran.
+   * The final deduction is `costCents - reservedCents`:
+   *   - if positive, we charge the remainder (clamped to current balance)
+   *   - if negative, we refund the excess to the user's balance
+   */
+  reservedCents?: number;
 }
 
 export interface DeductCreditsResult {
@@ -97,12 +104,32 @@ export async function deductCreditsForLlmCall(
     model: params.model,
     usage: normalized,
   });
+  const reserved = Math.max(0, params.reservedCents ?? 0);
 
-  const [, balanceRow] = await prisma.$transaction([
-    prisma.creditTransaction.create({
+  // Adjustment = real cost minus what was already reserved in middleware.
+  // Positive => charge the remainder (clamped at current balance).
+  // Negative => refund the over-reservation to the user.
+  const adjustment = costCents - reserved;
+
+  const newBalance = await prisma.$transaction(async (tx) => {
+    const existing = await tx.creditBalance.findUnique({
+      where: { userId: params.userId },
+      select: { balance: true },
+    });
+    const currentBalance = existing?.balance ?? 0;
+
+    const actualAdjustment =
+      adjustment >= 0 ? Math.min(currentBalance, adjustment) : adjustment;
+    const nextBalance = Math.max(0, currentBalance - actualAdjustment);
+
+    // Record the total credits actually deducted for this operation
+    // (reservation + extra charge, minus any refund).
+    const totalDeducted = reserved + actualAdjustment;
+
+    await tx.creditTransaction.create({
       data: {
         userId: params.userId,
-        amount: -costCents,
+        amount: -totalDeducted,
         type: params.actionType,
         reference: params.reference,
         model: params.model,
@@ -112,13 +139,16 @@ export async function deductCreditsForLlmCall(
         outputTokens: normalized.outputTokens,
         costCents,
       },
-    }),
-    prisma.creditBalance.upsert({
-      where: { userId: params.userId },
-      create: { userId: params.userId, balance: -costCents },
-      update: { balance: { decrement: costCents } },
-    }),
-  ]);
+    });
 
-  return { costCents, newBalance: balanceRow.balance };
+    const updated = await tx.creditBalance.upsert({
+      where: { userId: params.userId },
+      create: { userId: params.userId, balance: nextBalance },
+      update: { balance: nextBalance },
+    });
+
+    return updated.balance;
+  });
+
+  return { costCents, newBalance };
 }

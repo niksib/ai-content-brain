@@ -267,6 +267,27 @@ enum SubscriptionStatus {
   incomplete
 }
 
+// Log of processed Stripe webhook events. Existence of a row with a given
+// `eventId` means we've already applied that event's side effects — skip reprocess.
+model StripeWebhookEvent {
+  eventId    String   @id
+  type       String
+  receivedAt DateTime @default(now())
+}
+
+// Single-use OAuth state nonces for Threads login / connect flows.
+// A row is created when we issue a state, deleted on the callback. Expired
+// rows are cleaned up opportunistically.
+model OAuthState {
+  nonce     String   @id
+  purpose   String   // "login" | "connect"
+  userId    String?  // bound user for "connect" flow; null for "login"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
 model CreditTransaction {
   id        String                @id @default(cuid())
   userId    String
@@ -331,6 +352,12 @@ model ThreadsAccount {
   styleAnalyzed     Boolean  @default(false)
   styleAnalyzedAt   DateTime?
 
+  // Random per-user secret used to drive better-auth signIn on Threads OAuth
+  // callback. Never exposed to clients. Nullable for backward compat with
+  // rows created before the migration — those users go through the one-time
+  // rekey path on their next OAuth callback.
+  loginSecret       String?
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -350,12 +377,16 @@ model ScheduledPost {
   mediaUrl         String?
 
   scheduledAt      DateTime
+  publishingAt     DateTime?              // set when worker picks up the post; null otherwise
+  attempts         Int                    @default(0)
   status           ScheduledPostStatus    @default(pending)
   threadsPostId    String?
   errorMessage     String?
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  @@index([status, scheduledAt])
 }
 
 // ==================== THREADS INSIGHTS ====================

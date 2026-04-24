@@ -14,8 +14,8 @@
       </div>
       <div class="credits-progress-wrap">
         <div class="credits-progress__header">
-          <span class="info-label">Monthly Limit</span>
-          <span class="credits-progress__stat">{{ creditsUsedPercent }}%</span>
+          <span class="info-label">Monthly usage</span>
+          <span class="credits-progress__stat">{{ creditsUsedPercent }}% used</span>
         </div>
         <div class="credits-progress__bar">
           <div
@@ -23,10 +23,11 @@
             :style="{ width: creditsUsedPercent + '%' }"
           ></div>
         </div>
-        <p class="credits-progress__hint">{{ billingStore.balance }} of {{ planMonthlyCredits }} credits remaining</p>
       </div>
       <div class="subscription-actions">
-        <NuxtLink to="/pricing" class="btn btn--primary">{{ isPaidPlan ? 'Change plan' : 'Upgrade' }}</NuxtLink>
+        <button type="button" class="btn btn--primary" @click="billingStore.openPricingModal">
+          {{ isPaidPlan ? 'Change plan' : 'Upgrade' }}
+        </button>
         <button
           v-if="isPaidPlan"
           type="button"

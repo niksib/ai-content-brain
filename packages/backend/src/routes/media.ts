@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { fileTypeFromBuffer } from "file-type";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
@@ -7,9 +8,21 @@ import type { AppEnv } from "../types/hono.js";
 
 export const mediaRoutes = new Hono<AppEnv>();
 
+// Hard cap on request body size. Aligns with the video ceiling in gcs.service.ts
+// (100 MB) plus a small overhead for multipart boundaries + form fields.
+const UPLOAD_BODY_LIMIT_BYTES = 105 * 1024 * 1024;
+
 // POST /media/upload — upload one file to GCS, store metadata in DB
 // Accepts multipart/form-data with field "file"
-mediaRoutes.post("/media/upload", requireAuth, async (context) => {
+mediaRoutes.post(
+  "/media/upload",
+  requireAuth,
+  bodyLimit({
+    maxSize: UPLOAD_BODY_LIMIT_BYTES,
+    onError: (context) =>
+      context.json({ error: "File exceeds maximum upload size of 100 MB" }, 413),
+  }),
+  async (context) => {
   const user = context.get("user");
 
   const formData = await context.req.formData();
@@ -74,4 +87,5 @@ mediaRoutes.post("/media/upload", requireAuth, async (context) => {
     height: mediaFile.height,
     duration: mediaFile.duration,
   }, 201);
-});
+  }
+);

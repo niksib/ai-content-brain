@@ -5,8 +5,8 @@
 - [ ] Запустить миграции: `cd packages/backend && npx prisma migrate deploy`
 - [ ] Перегенерить Prisma client: `npx prisma generate`
 - [ ] В Stripe Dashboard (test mode) создать 2 продукта:
-  - Creator — $20/month recurring → скопировать `price_xxx` в `STRIPE_PRICE_CREATOR`
-  - Pro — $40/month recurring → `STRIPE_PRICE_PRO`
+  - Creator — $20/month recurring → скопировать `price_xxx` в `STRIPE_PRICE_VOICE`
+  - Pro — $40/month recurring → `STRIPE_PRICE_CHORUS`
 - [ ] Запустить `stripe listen --forward-to localhost:3001/api/billing/webhook` → webhook secret в `STRIPE_WEBHOOK_SECRET`
 - [ ] Поднять backend + frontend, открыть `/` в инкогнито
 

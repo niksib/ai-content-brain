@@ -431,7 +431,30 @@ class OnboardingService {
     const session = await this.requireActiveSession(userId);
     const analysis = (session.threadsAnalysis as unknown as ThreadsAnalysis | null) ?? null;
     if (!analysis || analysis.blocks.length === 0) {
-      throw new Error("Cannot complete onboarding without normalized blocks");
+      throw new OnboardingBusinessRuleError(
+        "Cannot complete onboarding without normalized blocks",
+        "blocks_missing",
+        422,
+      );
+    }
+
+    // Race guard: two concurrent complete() calls would both pass the
+    // requireActiveSession check above, but only one should actually write
+    // memory blocks + flip completedAt. updateMany WHERE completedAt IS NULL
+    // claims the session atomically; count === 0 means another request won.
+    const claim = await prisma.onboardingSession.updateMany({
+      where: { id: session.id, completedAt: null },
+      data: {
+        currentStep: "done",
+        completedAt: new Date(),
+      },
+    });
+    if (claim.count === 0) {
+      throw new OnboardingBusinessRuleError(
+        "Onboarding already completed",
+        "already_completed",
+        409,
+      );
     }
 
     await Promise.all(
@@ -453,11 +476,10 @@ class OnboardingService {
       });
     }
 
+    // Clear the heavy JSON payloads now that they're redundant.
     const updated = await prisma.onboardingSession.update({
       where: { id: session.id },
       data: {
-        currentStep: "done",
-        completedAt: new Date(),
         threadsAnalysis: Prisma.JsonNull,
         generatedQuestions: Prisma.JsonNull,
       },
@@ -472,10 +494,18 @@ class OnboardingService {
       where: { userId },
     });
     if (!session) {
-      throw new Error("Onboarding session not started");
+      throw new OnboardingBusinessRuleError(
+        "Onboarding session not started",
+        "session_not_started",
+        404,
+      );
     }
     if (session.completedAt) {
-      throw new Error("Onboarding already completed");
+      throw new OnboardingBusinessRuleError(
+        "Onboarding already completed",
+        "already_completed",
+        409,
+      );
     }
     return session;
   }

@@ -6,7 +6,7 @@ const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png"]);
 const ALLOWED_VIDEO_TYPES = new Set(["video/mp4", "video/quicktime"]);
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;   // 8 MB
-const MAX_VIDEO_BYTES = 1024 * 1024 * 1024; // 1 GB
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100 MB
 
 export interface UploadedFile {
   id: string;

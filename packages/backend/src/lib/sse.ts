@@ -1,20 +1,51 @@
 import type { Context } from "hono";
 
-export function createSSEStream(context: Context) {
+export interface SSEHandle {
+  send: (event: string, data: unknown) => boolean;
+  close: () => void;
+  response: Response;
+  isClosed: () => boolean;
+}
+
+export function createSSEStream(context: Context): SSEHandle {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
 
-  const send = (event: string, data: unknown) => {
+  let closed = false;
+
+  const markClosed = (reason?: unknown): void => {
+    if (closed) return;
+    closed = true;
+    if (reason) {
+      console.warn("[SSE] Stream closed early:", reason instanceof Error ? reason.message : reason);
+    }
+  };
+
+  // If the client disconnects, writer.closed rejects. Cache that once.
+  writer.closed.catch((err) => markClosed(err));
+
+  const send = (event: string, data: unknown): boolean => {
+    if (closed) return false;
     const payload =
       typeof data === "string"
         ? data.split("\n").map((line) => `data: ${line}`).join("\n")
         : `data: ${JSON.stringify(data)}`;
-    writer.write(encoder.encode(`event: ${event}\n${payload}\n\n`));
+    try {
+      writer.write(encoder.encode(`event: ${event}\n${payload}\n\n`)).catch(markClosed);
+      return true;
+    } catch (err) {
+      markClosed(err);
+      return false;
+    }
   };
 
-  const close = () => {
-    writer.close();
+  const close = (): void => {
+    if (closed) return;
+    closed = true;
+    writer.close().catch(() => {
+      // Writer already errored — nothing to do.
+    });
   };
 
   const response = new Response(readable, {
@@ -25,5 +56,5 @@ export function createSSEStream(context: Context) {
     },
   });
 
-  return { send, close, response };
+  return { send, close, response, isClosed: () => closed };
 }

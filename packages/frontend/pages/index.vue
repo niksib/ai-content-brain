@@ -437,6 +437,51 @@
 
         <!-- FINAL CTA -->
         <section class="final-cta">
+          <!-- Decorative floating thought chips + geometric accents (dark-mode variant) -->
+          <div class="final-decor" aria-hidden="true">
+            <div class="final-chip final-chip--l1">
+              <span class="chip-dot" />
+              <span class="chip-text">spent 30 min overthinking that tweet</span>
+            </div>
+            <div class="final-chip final-chip--l2">
+              <span class="chip-dot" />
+              <span class="chip-text">notes app is 80% half-posts</span>
+            </div>
+            <div class="final-chip final-chip--l3">
+              <span class="chip-dot" />
+              <span class="chip-text">why is writing so hard when I know what I mean</span>
+            </div>
+            <div class="final-chip final-chip--r1">
+              <span class="chip-dot" />
+              <span class="chip-text">had an idea in the shower, forgot by noon</span>
+            </div>
+            <div class="final-chip final-chip--r2">
+              <span class="chip-dot" />
+              <span class="chip-text">should have just hit post</span>
+            </div>
+            <div class="final-chip final-chip--r3">
+              <span class="chip-dot" />
+              <span class="chip-text">draft #14 never shipped</span>
+            </div>
+
+            <!-- Geometric accents -->
+            <svg class="final-ring final-ring--a" viewBox="0 0 120 120" aria-hidden="true">
+              <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1" stroke-dasharray="2 6" />
+            </svg>
+            <svg class="final-ring final-ring--b" viewBox="0 0 80 80" aria-hidden="true">
+              <circle cx="40" cy="40" r="36" fill="none" stroke="rgba(192,132,252,0.35)" stroke-width="1" stroke-dasharray="1 4" />
+            </svg>
+            <span class="final-dot final-dot--a" />
+            <span class="final-dot final-dot--b" />
+            <span class="final-dot final-dot--c" />
+            <svg class="final-squiggle" viewBox="0 0 120 20" aria-hidden="true">
+              <path d="M2 10 Q 20 2, 40 10 T 80 10 T 118 10" fill="none" stroke="rgba(224,231,255,0.28)" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            <svg class="final-plus" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 1 L8 15 M1 8 L15 8" stroke="rgba(192,132,252,0.5)" stroke-width="1.2" stroke-linecap="round" />
+            </svg>
+          </div>
+
           <div class="final-inner">
             <h2 class="display final-title">
               Your next post is<br>
@@ -721,7 +766,7 @@ const pricingPlans = [
     price: '$0',
     per: '/month',
     tag: 'Try it',
-    highlights: ['100 credits per month', 'Threads posting', 'Full voice matching'],
+    highlights: ['Casual usage', 'Threads posting', 'Full voice matching'],
     cta: 'Start free',
     feature: false,
   },
@@ -730,7 +775,7 @@ const pricingPlans = [
     price: '$20',
     per: '/month',
     tag: 'Most creators pick this',
-    highlights: ['1,000 credits per month', 'Threads posting', 'Full voice matching', 'Schedule posts'],
+    highlights: ['Daily posting', 'Threads posting', 'Full voice matching', 'Schedule posts'],
     cta: 'Get started',
     feature: true,
   },
@@ -739,7 +784,7 @@ const pricingPlans = [
     price: '$40',
     per: '/month',
     tag: 'For daily posters',
-    highlights: ['2,000 credits per month', 'Threads posting', 'Full voice matching', 'Schedule posts', 'Priority support'],
+    highlights: ['Multiple posts per day', 'Threads posting', 'Full voice matching', 'Schedule posts', 'Priority support'],
     cta: 'Get started',
     feature: false,
   },
@@ -1553,6 +1598,88 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   display: inline-flex; flex-direction: column; align-items: center; gap: 12px;
 }
 
+/* Decorative thought chips + geometric accents scattered around the CTA.
+   Pinned absolutely so they sit behind the copy (z-index 0) and don't take
+   layout flow. Each element has its own float/drift animation with staggered
+   delay so the block feels alive without competing with the CTA. */
+.final-decor {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+.final-chip {
+  position: absolute;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 13px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  font-family: 'Caveat', cursive;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.78);
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden; text-overflow: ellipsis;
+  animation: final-chip-float 10s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+.final-chip .chip-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); opacity: 0.7; flex-shrink: 0;
+}
+@keyframes final-chip-float {
+  0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); }
+  50%      { transform: translateY(-8px) rotate(calc(var(--tilt, 0deg) + 0.8deg)); }
+}
+
+/* Left column — stacked at varying angles */
+.final-chip--l1 { top: 18%;  left: 4%;  --tilt: -6deg; --delay: 0s;   }
+.final-chip--l2 { top: 42%;  left: 2%;  --tilt:  4deg; --delay: 1.4s; }
+.final-chip--l3 { top: 68%;  left: 6%;  --tilt: -3deg; --delay: 2.8s; }
+
+/* Right column */
+.final-chip--r1 { top: 22%;  right: 3%; --tilt:  5deg; --delay: 0.7s; }
+.final-chip--r2 { top: 46%;  right: 6%; --tilt: -5deg; --delay: 2.1s; }
+.final-chip--r3 { top: 70%;  right: 2%; --tilt:  3deg; --delay: 3.3s; }
+
+/* Geometric accents */
+.final-ring {
+  position: absolute;
+  animation: final-chip-float 14s ease-in-out infinite;
+}
+.final-ring--a { top: 10%;  left: 18%; width: 90px; height: 90px; --tilt: 0deg; animation-delay: 0.4s; }
+.final-ring--b { bottom: 12%; right: 22%; width: 60px; height: 60px; --tilt: 0deg; animation-delay: 2.2s; }
+
+.final-dot {
+  position: absolute;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(192, 132, 252, 0.6);
+  box-shadow: 0 0 14px 2px rgba(192, 132, 252, 0.35);
+  animation: final-chip-float 9s ease-in-out infinite;
+  --tilt: 0deg;
+}
+.final-dot--a { top: 28%; left: 30%; animation-delay: 0.6s; }
+.final-dot--b { bottom: 22%; left: 24%; animation-delay: 1.9s; }
+.final-dot--c { top: 34%; right: 28%; animation-delay: 3.1s; background: rgba(224,231,255,0.7); }
+
+.final-squiggle {
+  position: absolute; width: 120px; height: 20px;
+  bottom: 28%; left: 14%;
+  animation: final-chip-float 12s ease-in-out infinite;
+  animation-delay: 1.2s;
+  --tilt: -8deg;
+}
+.final-plus {
+  position: absolute; width: 16px; height: 16px;
+  top: 18%; right: 14%;
+  animation: final-chip-float 11s ease-in-out infinite;
+  animation-delay: 2.6s;
+  --tilt: 12deg;
+}
+
 /* ═══════════════════════════════════════════════════════
    FOOTER
    ═══════════════════════════════════════════════════════ */
@@ -1661,30 +1788,67 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 /* ═══════════════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════════════ */
+/* Tablet: collapse hero to single column, 2×2 Loop grid, stacked pricing with max-width
+   so cards don't stretch across ~1000px of whitespace. Also tighten nav so links
+   don't wrap mid-word before the mobile breakpoint kicks in. */
 @media (max-width: 1023px) {
   .hero { grid-template-columns: 1fr; padding-bottom: 40px; }
   .stage { display: none; }
   .voice-grid { grid-template-columns: 1fr; gap: 48px; }
   .platform-stage { grid-template-columns: 1fr; }
   .platform-arrow { transform: rotate(90deg); }
-  .pricing-grid { grid-template-columns: 1fr; }
+  .loop-grid { grid-template-columns: repeat(2, 1fr); }
+  .loop-grid::before { display: none; }
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
   .plan--feature { transform: none; }
   .plan--feature:hover { transform: translateY(-4px); }
+  .nav-inner { gap: 16px; padding: 16px 24px; }
+  .nav-links { gap: 18px; }
+  .nav-links a { font-size: 13px; white-space: nowrap; }
+  .nav-cta .btn { white-space: nowrap; }
+  /* On tablet chips get smaller + clamped so they live in the corners
+     rather than overlapping the headline. Middle chips hidden since there
+     isn't room for three on each side. */
+  .final-chip { max-width: 200px; font-size: 15px; padding: 6px 11px; }
+  .final-chip--l1 { top: 6%;  left: 2%; }
+  .final-chip--l2 { display: none; }
+  .final-chip--l3 { bottom: 12%; top: auto; left: 2%; }
+  .final-chip--r1 { top: 6%;  right: 2%; }
+  .final-chip--r2 { display: none; }
+  .final-chip--r3 { bottom: 12%; top: auto; right: 2%; }
+  .final-ring--a { top: 2%; left: 44%; width: 70px; height: 70px; }
+  .final-ring--b { bottom: 4%; right: 38%; width: 50px; height: 50px; }
+  .final-squiggle, .final-plus { display: none; }
 }
 @media (max-width: 760px) {
   .nav-links { display: none; }
   .hero { padding: 40px 20px 32px; }
   .hero-title { font-size: 56px; }
-  .loop-grid { grid-template-columns: 1fr; }
-  .loop-grid::before { display: none; }
+  .loop-grid { grid-template-columns: 1fr; padding: 0; }
   .footer-inner { grid-template-columns: 1fr; }
   .footer-cols { grid-template-columns: repeat(2, 1fr); }
   .final-cta { margin: 16px; padding: 80px 20px; }
+  /* All decorative elements hidden on mobile — too little room for them
+     to breathe, and the radial glow + copy carry the section on their own. */
+  .final-decor { display: none; }
   .platforms { padding: 48px 20px; }
   .loop { padding: 48px 20px; }
   .voice { padding: 48px 20px; }
   .pricing { padding: 48px 20px 64px; }
-  .platform-tabs { overflow-x: auto; flex-wrap: nowrap; }
+  /* Tabs wrap into two rows instead of being cut off at the viewport edge. */
+  .platform-tabs {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 6px;
+    width: 100%;
+    max-width: 100%;
+  }
+  .platform-tab { padding: 8px 14px; font-size: 13px; }
   .auth-card { margin: 20px; padding: 28px 24px; }
 }
 </style>
