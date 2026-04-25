@@ -50,7 +50,7 @@
               <span v-if="day.isToday" class="calendar-cell__today-label">Today</span>
             </div>
             <div v-if="day.entries.length > 0" class="calendar-cell__bubbles">
-              <template v-for="entry in day.entries.slice(0, 3)" :key="entry.key">
+              <template v-for="entry in day.entries" :key="entry.key">
                 <div
                   v-if="entry.kind === 'library'"
                   class="calendar-bubble"
@@ -60,7 +60,7 @@
                   <div class="calendar-bubble__meta">
                     <PlatformIcon :platform="(entry.item.platform as any)" :size="11" />
                     <span class="calendar-bubble__format">{{ formatLabel(entry.item.format) }}</span>
-                    <span class="calendar-bubble__status">{{ chipStatusLabel(entry.item) }}</span>
+                    <span class="calendar-bubble__status">{{ entryTimeLabel(entry) || chipStatusLabel(entry.item) }}</span>
                   </div>
                   <p class="calendar-bubble__title">{{ entry.item.contentIdea.angle }}</p>
                 </div>
@@ -73,19 +73,11 @@
                   <div class="calendar-bubble__meta">
                     <PlatformIcon :platform="(entry.post.platform as any)" :size="11" />
                     <span class="calendar-bubble__format">{{ standaloneFormatLabel(entry.post) }}</span>
-                    <span class="calendar-bubble__status">{{ standaloneStatusLabel(entry.post) }}</span>
+                    <span class="calendar-bubble__status">{{ entryTimeLabel(entry) || standaloneStatusLabel(entry.post) }}</span>
                   </div>
                   <p class="calendar-bubble__title">{{ entry.post.text || '(empty)' }}</p>
                 </div>
               </template>
-              <button
-                v-if="day.entries.length > 3 && sessionIdForDay(day)"
-                type="button"
-                class="calendar-bubble__overflow"
-                @click.stop="emit('navigate-session', sessionIdForDay(day)!)"
-              >
-                +{{ day.entries.length - 3 }} more
-              </button>
             </div>
           </div>
         </div>
@@ -536,7 +528,8 @@ function nextMonth(): void {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 9rem;
 }
 
 /* ── Content bubble ── */
@@ -681,11 +674,6 @@ function nextMonth(): void {
 
   .cal-desktop { display: none; }
   .cal-mobile-list { display: block; }
-
-  .cal-mobile-list {
-    max-height: 16rem;
-    overflow-y: auto;
-  }
 
   .cal-list-row {
     display: flex;
