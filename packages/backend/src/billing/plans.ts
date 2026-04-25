@@ -21,14 +21,14 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     name: "Creator",
     priceUsd: 20,
     monthlyCredits: 1000,
-    stripePriceId: process.env.STRIPE_PRICE_VOICE ?? null,
+    stripePriceId: process.env.STRIPE_PRICE_CREATOR ?? null,
   },
   pro: {
     id: "pro",
     name: "Pro",
     priceUsd: 40,
     monthlyCredits: 2000,
-    stripePriceId: process.env.STRIPE_PRICE_CHORUS ?? null,
+    stripePriceId: process.env.STRIPE_PRICE_PRO ?? null,
   },
 };
 
