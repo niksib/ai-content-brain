@@ -76,46 +76,46 @@
 
         <!-- Step: Connect Threads -->
         <div v-if="hasThreadsPlatform" class="checklist-step" :class="{ 'checklist-step--done': threadsConnected }">
-          <div class="checklist-step__header">
-            <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': threadsConnected }">
-              <CheckCircle v-if="threadsConnected" :size="20" />
-              <Link v-else :size="20" />
-            </div>
-            <p class="checklist-step__title">Connect your Threads account</p>
+          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': threadsConnected }">
+            <CheckCircle v-if="threadsConnected" :size="20" />
+            <Link v-else :size="20" />
           </div>
-          <p class="checklist-step__desc">
-            {{ threadsConnected ? `Connected as @${threadsAccount?.username}` : 'So AI can learn your voice and write content that sounds like you' }}
-          </p>
+          <div class="checklist-step__content">
+            <p class="checklist-step__title">Connect your Threads account</p>
+            <p class="checklist-step__desc">
+              {{ threadsConnected ? `Connected as @${threadsAccount?.username}` : 'So AI can learn your voice and write content that sounds like you' }}
+            </p>
+          </div>
           <a v-if="!threadsConnected" :href="threadsAuthUrl" class="checklist-step__btn">Connect</a>
         </div>
 
         <!-- Step: Analyze writing style (shows only after Threads connected) -->
         <div v-if="hasThreadsPlatform && threadsConnected" class="checklist-step" :class="{ 'checklist-step--done': styleAnalyzed }">
-          <div class="checklist-step__header">
-            <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': styleAnalyzed, 'checklist-step__icon-wrap--pending': !styleAnalyzed }">
-              <CheckCircle v-if="styleAnalyzed" :size="20" />
-              <span v-else class="checklist-step__spinner"></span>
-            </div>
-            <p class="checklist-step__title">Analyze your writing style</p>
+          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': styleAnalyzed, 'checklist-step__icon-wrap--pending': !styleAnalyzed }">
+            <CheckCircle v-if="styleAnalyzed" :size="20" />
+            <span v-else class="checklist-step__spinner"></span>
           </div>
-          <p class="checklist-step__desc">
-            {{ styleAnalyzed ? 'AI learned your tone from your posts' : 'Analyzing your last 20 posts...' }}
-          </p>
+          <div class="checklist-step__content">
+            <p class="checklist-step__title">Analyze your writing style</p>
+            <p class="checklist-step__desc">
+              {{ styleAnalyzed ? 'AI learned your tone from your posts' : 'Analyzing your last 20 posts...' }}
+            </p>
+          </div>
         </div>
 
         <!-- Step: Start first session -->
         <div class="checklist-step" :class="{ 'checklist-step--done': hasAnySessions, 'checklist-step--locked': sessionStepLocked }">
-          <div class="checklist-step__header">
-            <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasAnySessions, 'checklist-step__icon-wrap--locked': sessionStepLocked }">
-              <CheckCircle v-if="hasAnySessions" :size="20" />
-              <Lock v-else-if="sessionStepLocked" :size="20" />
-              <Mic v-else :size="20" />
-            </div>
-            <p class="checklist-step__title">Start your first session</p>
+          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasAnySessions, 'checklist-step__icon-wrap--locked': sessionStepLocked }">
+            <CheckCircle v-if="hasAnySessions" :size="20" />
+            <Lock v-else-if="sessionStepLocked" :size="20" />
+            <Mic v-else :size="20" />
           </div>
-          <p class="checklist-step__desc">
-            {{ hasAnySessions ? 'You\'ve already started creating' : 'Talk freely — AI turns it into ready-to-post content' }}
-          </p>
+          <div class="checklist-step__content">
+            <p class="checklist-step__title">Start your first session</p>
+            <p class="checklist-step__desc">
+              {{ hasAnySessions ? 'You\'ve already started creating' : 'Talk freely — AI turns it into ready-to-post content' }}
+            </p>
+          </div>
           <button v-if="!hasAnySessions && !sessionStepLocked" class="checklist-step__btn" :disabled="isStarting" @click="handleStartSession">
             Start session
           </button>
@@ -123,17 +123,17 @@
 
         <!-- Step: Publish first post -->
         <div class="checklist-step" :class="{ 'checklist-step--done': hasPublishedPost, 'checklist-step--locked': publishStepLocked }">
-          <div class="checklist-step__header">
-            <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasPublishedPost, 'checklist-step__icon-wrap--locked': publishStepLocked }">
-              <CheckCircle v-if="hasPublishedPost" :size="20" />
-              <Lock v-else-if="publishStepLocked" :size="20" />
-              <Rocket v-else :size="20" />
-            </div>
-            <p class="checklist-step__title">Publish your first post</p>
+          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasPublishedPost, 'checklist-step__icon-wrap--locked': publishStepLocked }">
+            <CheckCircle v-if="hasPublishedPost" :size="20" />
+            <Lock v-else-if="publishStepLocked" :size="20" />
+            <Rocket v-else :size="20" />
           </div>
-          <p class="checklist-step__desc">
-            {{ hasPublishedPost ? 'Your first post is live' : 'Review your AI-generated posts and publish to Threads' }}
-          </p>
+          <div class="checklist-step__content">
+            <p class="checklist-step__title">Publish your first post</p>
+            <p class="checklist-step__desc">
+              {{ hasPublishedPost ? 'Your first post is live' : 'Review your AI-generated posts and publish to Threads' }}
+            </p>
+          </div>
           <button
             v-if="!hasPublishedPost && !publishStepLocked && latestSessionId"
             class="checklist-step__btn"
@@ -1022,6 +1022,7 @@ const daysInMonth = computed(() => {
 
 @media (max-width: 899px) {
   .dashboard { padding: 1rem 0.875rem 3rem; gap: 1.5rem; }
+
   .calendar-section__month-label {
     min-width: auto;
     padding: 0 0.25rem;
@@ -1184,8 +1185,9 @@ const daysInMonth = computed(() => {
 
 .checklist-step {
   display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 1.25rem;
   padding: 1.25rem 1.5rem;
   border-radius: 20px;
   background: #f7f9fb;
@@ -1193,10 +1195,9 @@ const daysInMonth = computed(() => {
   transition: background 0.15s, border-color 0.15s;
 }
 
-.checklist-step__header {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
+.checklist-step__content {
+  flex: 1;
+  min-width: 0;
 }
 
 .checklist-step--done {
@@ -1272,8 +1273,7 @@ const daysInMonth = computed(() => {
   text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
-  align-self: flex-start;
-  margin-top: 0.25rem;
+  flex-shrink: 0;
   transition: opacity 0.15s, transform 0.1s;
 }
 
@@ -1421,6 +1421,23 @@ const daysInMonth = computed(() => {
 
 .momentum-chart__bar--active {
   background: #3525cd;
+}
+
+@media (max-width: 899px) {
+  .checklist-step {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.375rem;
+  }
+
+  .checklist-step__content {
+    width: 100%;
+  }
+
+  .checklist-step__btn {
+    align-self: flex-start;
+    margin-top: 0.125rem;
+  }
 }
 
 .momentum-chart__labels {

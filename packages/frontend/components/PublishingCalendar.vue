@@ -118,7 +118,7 @@
             >
               <PlatformIcon :platform="(entry.kind === 'library' ? entry.item.platform : entry.post.platform) as any" :size="10" />
               <span class="cal-list-bubble__text">{{ entry.kind === 'library' ? entry.item.contentIdea.angle : (entry.post.text || '(empty)') }}</span>
-              <span class="cal-list-bubble__status">{{ entry.kind === 'library' ? chipStatusLabel(entry.item) : standaloneStatusLabel(entry.post) }}</span>
+              <span class="cal-list-bubble__time">{{ entryTimeLabel(entry) }}</span>
             </div>
             <span v-if="day.entries.length > 2" class="cal-list-more">+{{ day.entries.length - 2 }} more</span>
           </template>
@@ -275,6 +275,21 @@ function standaloneStatusLabel(post: StandalonePost): string {
   if (post.status === 'failed') return 'Failed';
   if (post.status === 'publishing') return 'Sending';
   return 'Sched';
+}
+
+function entryTimeLabel(entry: DayEntry): string {
+  let iso: string | null = null;
+  if (entry.kind === 'library') {
+    const { publishStatus, scheduledAt, publishedAt } = entry.item.contentIdea;
+    if (publishStatus === 'posted' && publishedAt) iso = publishedAt;
+    else if (publishStatus === 'scheduled' && scheduledAt) iso = scheduledAt;
+  } else {
+    iso = entry.post.status === 'published' && entry.post.publishedAt
+      ? entry.post.publishedAt
+      : entry.post.scheduledAt;
+  }
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function standaloneFormatLabel(post: StandalonePost): string {
@@ -667,6 +682,11 @@ function nextMonth(): void {
   .cal-desktop { display: none; }
   .cal-mobile-list { display: block; }
 
+  .cal-mobile-list {
+    max-height: 16rem;
+    overflow-y: auto;
+  }
+
   .cal-list-row {
     display: flex;
     align-items: flex-start;
@@ -731,12 +751,12 @@ function nextMonth(): void {
     white-space: nowrap;
   }
 
-  .cal-list-bubble__status {
-    font-size: 0.5625rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+  .cal-list-bubble__time {
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: #777587;
     flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .cal-list-more {
