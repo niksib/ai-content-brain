@@ -47,25 +47,11 @@ services:
     image: ${REGISTRY}/backend:${IMAGE_TAG}
     ports:
       - "3001:3001"
+    env_file: .env
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://app:${DB_PASSWORD}@postgres:5432/daily_content_brain
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      GROQ_API_KEY: ${GROQ_API_KEY}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
-      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
-      STRIPE_PRICE_VOICE: ${STRIPE_PRICE_VOICE}
-      STRIPE_PRICE_CHORUS: ${STRIPE_PRICE_CHORUS}
-      THREADS_APP_ID: ${THREADS_APP_ID}
-      THREADS_APP_SECRET: ${THREADS_APP_SECRET}
-      THREADS_REDIRECT_URI: ${THREADS_REDIRECT_URI}
-      FRONTEND_URL: ${FRONTEND_URL}
-      BACKEND_URL: ${BACKEND_URL}
     depends_on:
       postgres:
         condition: service_healthy
