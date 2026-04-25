@@ -167,6 +167,10 @@ onMounted(async () => {
   padding: 2.5rem 2rem 4rem;
 }
 
+@media (max-width: 899px) {
+  .pub-page { padding: 1rem 0.75rem 3rem; }
+}
+
 .pub-page__loading {
   color: #9ca3af;
   font-size: 0.9375rem;

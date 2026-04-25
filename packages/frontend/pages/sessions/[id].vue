@@ -166,6 +166,8 @@
               @input="autoResizeChatInput"
               @keydown.enter.exact.prevent="submitChatInput"
               @keydown.enter.shift.exact="onShiftEnter"
+              @keydown.meta.enter.prevent="submitChatInput"
+              @keydown.ctrl.enter.prevent="submitChatInput"
             />
             <button
               class="transcript-input__send"

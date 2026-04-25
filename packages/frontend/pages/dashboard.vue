@@ -63,7 +63,7 @@
     </div>
 
     <!-- ── Onboarding Checklist ── -->
-    <section v-if="showOnboardingBlock" class="onboarding-checklist">
+    <section v-if="showOnboardingBlock" class="card onboarding-checklist">
       <div class="onboarding-checklist__header">
         <div>
           <p class="onboarding-checklist__eyebrow">Setup</p>
@@ -76,46 +76,46 @@
 
         <!-- Step: Connect Threads -->
         <div v-if="hasThreadsPlatform" class="checklist-step" :class="{ 'checklist-step--done': threadsConnected }">
-          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': threadsConnected }">
-            <CheckCircle v-if="threadsConnected" :size="20" />
-            <Link v-else :size="20" />
-          </div>
-          <div class="checklist-step__content">
+          <div class="checklist-step__header">
+            <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': threadsConnected }">
+              <CheckCircle v-if="threadsConnected" :size="20" />
+              <Link v-else :size="20" />
+            </div>
             <p class="checklist-step__title">Connect your Threads account</p>
-            <p class="checklist-step__desc">
-              {{ threadsConnected ? `Connected as @${threadsAccount?.username}` : 'So AI can learn your voice and write content that sounds like you' }}
-            </p>
           </div>
+          <p class="checklist-step__desc">
+            {{ threadsConnected ? `Connected as @${threadsAccount?.username}` : 'So AI can learn your voice and write content that sounds like you' }}
+          </p>
           <a v-if="!threadsConnected" :href="threadsAuthUrl" class="checklist-step__btn">Connect</a>
         </div>
 
         <!-- Step: Analyze writing style (shows only after Threads connected) -->
         <div v-if="hasThreadsPlatform && threadsConnected" class="checklist-step" :class="{ 'checklist-step--done': styleAnalyzed }">
-          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': styleAnalyzed, 'checklist-step__icon-wrap--pending': !styleAnalyzed }">
-            <CheckCircle v-if="styleAnalyzed" :size="20" />
-            <span v-else class="checklist-step__spinner"></span>
-          </div>
-          <div class="checklist-step__content">
+          <div class="checklist-step__header">
+            <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': styleAnalyzed, 'checklist-step__icon-wrap--pending': !styleAnalyzed }">
+              <CheckCircle v-if="styleAnalyzed" :size="20" />
+              <span v-else class="checklist-step__spinner"></span>
+            </div>
             <p class="checklist-step__title">Analyze your writing style</p>
-            <p class="checklist-step__desc">
-              {{ styleAnalyzed ? 'AI learned your tone from your posts' : 'Analyzing your last 20 posts...' }}
-            </p>
           </div>
+          <p class="checklist-step__desc">
+            {{ styleAnalyzed ? 'AI learned your tone from your posts' : 'Analyzing your last 20 posts...' }}
+          </p>
         </div>
 
         <!-- Step: Start first session -->
         <div class="checklist-step" :class="{ 'checklist-step--done': hasAnySessions, 'checklist-step--locked': sessionStepLocked }">
-          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasAnySessions, 'checklist-step__icon-wrap--locked': sessionStepLocked }">
-            <CheckCircle v-if="hasAnySessions" :size="20" />
-            <Lock v-else-if="sessionStepLocked" :size="20" />
-            <Mic v-else :size="20" />
-          </div>
-          <div class="checklist-step__content">
+          <div class="checklist-step__header">
+            <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasAnySessions, 'checklist-step__icon-wrap--locked': sessionStepLocked }">
+              <CheckCircle v-if="hasAnySessions" :size="20" />
+              <Lock v-else-if="sessionStepLocked" :size="20" />
+              <Mic v-else :size="20" />
+            </div>
             <p class="checklist-step__title">Start your first session</p>
-            <p class="checklist-step__desc">
-              {{ hasAnySessions ? 'You\'ve already started creating' : 'Talk freely — AI turns it into ready-to-post content' }}
-            </p>
           </div>
+          <p class="checklist-step__desc">
+            {{ hasAnySessions ? 'You\'ve already started creating' : 'Talk freely — AI turns it into ready-to-post content' }}
+          </p>
           <button v-if="!hasAnySessions && !sessionStepLocked" class="checklist-step__btn" :disabled="isStarting" @click="handleStartSession">
             Start session
           </button>
@@ -123,17 +123,17 @@
 
         <!-- Step: Publish first post -->
         <div class="checklist-step" :class="{ 'checklist-step--done': hasPublishedPost, 'checklist-step--locked': publishStepLocked }">
-          <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasPublishedPost, 'checklist-step__icon-wrap--locked': publishStepLocked }">
-            <CheckCircle v-if="hasPublishedPost" :size="20" />
-            <Lock v-else-if="publishStepLocked" :size="20" />
-            <Rocket v-else :size="20" />
-          </div>
-          <div class="checklist-step__content">
+          <div class="checklist-step__header">
+            <div class="checklist-step__icon-wrap" :class="{ 'checklist-step__icon-wrap--done': hasPublishedPost, 'checklist-step__icon-wrap--locked': publishStepLocked }">
+              <CheckCircle v-if="hasPublishedPost" :size="20" />
+              <Lock v-else-if="publishStepLocked" :size="20" />
+              <Rocket v-else :size="20" />
+            </div>
             <p class="checklist-step__title">Publish your first post</p>
-            <p class="checklist-step__desc">
-              {{ hasPublishedPost ? 'Your first post is live' : 'Review your AI-generated posts and publish to Threads' }}
-            </p>
           </div>
+          <p class="checklist-step__desc">
+            {{ hasPublishedPost ? 'Your first post is live' : 'Review your AI-generated posts and publish to Threads' }}
+          </p>
           <button
             v-if="!hasPublishedPost && !publishStepLocked && latestSessionId"
             class="checklist-step__btn"
@@ -147,90 +147,131 @@
     </section>
 
     <!-- ── Content Calendar ── -->
-    <section class="calendar-section">
+    <section class="card calendar-section">
       <div class="calendar-section__header">
-        <div class="calendar-section__header-left">
-          <h3 class="calendar-section__title">Content Calendar</h3>
-          <span class="calendar-section__badge">
-            {{ currentMonthLabel }}
-          </span>
-        </div>
-        <div class="calendar-section__nav">
+        <h3 class="calendar-section__title">Content Calendar</h3>
+        <div class="calendar-section__month-nav">
           <button class="calendar-nav-btn" @click="goToPrevMonth">
-            <ChevronLeft :size="20" />
+            <ChevronLeft :size="18" />
           </button>
+          <span class="calendar-section__month-label">{{ currentMonthLabel }}</span>
           <button class="calendar-nav-btn" @click="goToNextMonth">
-            <ChevronRight :size="20" />
+            <ChevronRight :size="18" />
           </button>
         </div>
       </div>
 
-      <!-- Day headers -->
-      <div class="calendar-grid">
-        <div v-for="day in dayNames" :key="day" class="calendar-day-name">{{ day }}</div>
+      <!-- Day headers + grid (desktop) -->
+      <div class="cal-desktop">
+        <div class="calendar-grid">
+          <div v-for="day in dayNames" :key="day" class="calendar-day-name">{{ day }}</div>
 
-        <!-- Empty leading cells -->
-        <div
-          v-for="n in leadingDays"
-          :key="`empty-${n}`"
-          class="calendar-cell calendar-cell--empty"
-        ></div>
+          <!-- Empty leading cells -->
+          <div
+            v-for="n in leadingDays"
+            :key="`empty-${n}`"
+            class="calendar-cell calendar-cell--empty"
+          ></div>
 
-        <!-- Day cells -->
+          <!-- Day cells -->
+          <div
+            v-for="day in daysInMonth"
+            :key="day.number"
+            class="calendar-cell"
+            :class="{
+              'calendar-cell--today': day.isToday,
+              'calendar-cell--today-completed': day.isToday && day.sessions.length > 0 && day.sessions[0].status === 'completed',
+              'calendar-cell--has-sessions': day.sessions.length > 0 && !day.isToday,
+              'calendar-cell--day-completed': day.sessions.length > 0 && !day.isToday && day.sessions[0].status === 'completed',
+              'calendar-cell--empty-day': day.sessions.length === 0 && !day.isToday,
+            }"
+            :style="{ cursor: day.sessions.length > 0 || day.isToday ? 'pointer' : undefined }"
+            @click="handleCellClick(day)"
+          >
+            <div class="calendar-cell__header">
+              <span class="calendar-cell__number">{{ day.number }}</span>
+              <span v-if="day.isToday" class="calendar-cell__today-badge">Today</span>
+            </div>
+
+            <template v-if="day.isToday">
+              <template v-if="day.sessions.length > 0 && day.sessions[0].status === 'completed'">
+                <div class="calendar-cell__done-row">
+                  <CheckCircle :size="16" />
+                  <span class="calendar-cell__done-label">Day completed</span>
+                </div>
+                <div class="calendar-cell__counts">
+                  <CalendarCounts :session="day.sessions[0]" white />
+                </div>
+              </template>
+              <template v-else-if="day.sessions.length > 0 && day.sessions[0].ideaCount > 0">
+                <div class="calendar-cell__counts">
+                  <CalendarCounts :session="day.sessions[0]" white />
+                </div>
+              </template>
+              <template v-else>
+                <div class="calendar-cell__start-session">
+                  <Mic :size="28" class="calendar-cell__mic-icon" />
+                  <span class="calendar-cell__start-label">Start Session</span>
+                </div>
+              </template>
+            </template>
+
+            <template v-else-if="day.sessions.length > 0">
+              <div class="calendar-cell__session-count">
+                <CheckCircle :size="32" class="calendar-cell__session-icon" :style="{color: day.sessions[0].status === 'completed' ? '#16a34a' : '#6366f1'}" />
+                <div class="calendar-cell__counts">
+                  <CalendarCounts :session="day.sessions[0]" />
+                </div>
+              </div>
+            </template>
+
+            <template v-else>
+              <Plus :size="24" class="calendar-cell__add-icon" />
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile list view (< 640px) -->
+      <div class="cal-mobile-list">
         <div
           v-for="day in daysInMonth"
-          :key="day.number"
-          class="calendar-cell"
+          :key="'ml-' + day.number"
+          class="cal-list-row"
           :class="{
-            'calendar-cell--today': day.isToday,
-            'calendar-cell--today-completed': day.isToday && day.sessions.length > 0 && day.sessions[0].status === 'completed',
-            'calendar-cell--has-sessions': day.sessions.length > 0 && !day.isToday,
-            'calendar-cell--day-completed': day.sessions.length > 0 && !day.isToday && day.sessions[0].status === 'completed',
-            'calendar-cell--empty-day': day.sessions.length === 0 && !day.isToday,
+            'cal-list-row--today': day.isToday,
+            'cal-list-row--today-done': day.isToday && day.sessions.length > 0 && day.sessions[0].status === 'completed',
+            'cal-list-row--session': day.sessions.length > 0 && !day.isToday,
+            'cal-list-row--done': day.sessions.length > 0 && !day.isToday && day.sessions[0].status === 'completed',
           }"
-          :style="{ cursor: day.sessions.length > 0 || day.isToday ? 'pointer' : undefined }"
           @click="handleCellClick(day)"
         >
-          <div class="calendar-cell__header">
-            <span class="calendar-cell__number">{{ day.number }}</span>
-            <span v-if="day.isToday" class="calendar-cell__today-badge">Today</span>
+          <div class="cal-list-row__date">
+            <span class="cal-list-row__num">{{ day.number }}</span>
+            <span class="cal-list-row__dow">{{ day.dayName }}</span>
           </div>
-
-          <template v-if="day.isToday">
-            <template v-if="day.sessions.length > 0 && day.sessions[0].status === 'completed'">
-              <div class="calendar-cell__done-row">
-                <CheckCircle :size="16" />
-                <span class="calendar-cell__done-label">Day completed</span>
-              </div>
-              <div class="calendar-cell__counts">
-                <CalendarCounts :session="day.sessions[0]" white />
-              </div>
+          <div class="cal-list-row__body">
+            <template v-if="day.isToday">
+              <span class="cal-list-row__tag cal-list-row__tag--today">Today</span>
+              <template v-if="day.sessions.length > 0 && day.sessions[0].status === 'completed'">
+                <CheckCircle :size="13" style="color:#4ade80;flex-shrink:0" />
+                <span class="cal-list-row__label">Day complete</span>
+              </template>
+              <template v-else-if="day.sessions.length > 0 && day.sessions[0].ideaCount > 0">
+                <span class="cal-list-row__label">{{ day.sessions[0].ideaCount }} ideas</span>
+              </template>
+              <template v-else>
+                <span class="cal-list-row__label cal-list-row__label--cta">Tap to start session</span>
+              </template>
             </template>
-            <template v-else-if="day.sessions.length > 0 && day.sessions[0].ideaCount > 0">
-              <div class="calendar-cell__counts">
-                <CalendarCounts :session="day.sessions[0]" white />
-              </div>
+            <template v-else-if="day.sessions.length > 0">
+              <CheckCircle :size="13" :style="{color: day.sessions[0].status === 'completed' ? '#16a34a' : '#6366f1', flexShrink: 0}" />
+              <span class="cal-list-row__label">{{ day.sessions[0].ideaCount }} ideas</span>
             </template>
             <template v-else>
-              <div class="calendar-cell__start-session">
-                <Mic :size="28" class="calendar-cell__mic-icon" />
-                <span class="calendar-cell__start-label">Start Session</span>
-              </div>
+              <span class="cal-list-row__empty">No session</span>
             </template>
-          </template>
-
-          <template v-else-if="day.sessions.length > 0">
-            <div class="calendar-cell__session-count">
-              <CheckCircle :size="32" class="calendar-cell__session-icon" :style="{color: day.sessions[0].status === 'completed' ? '#16a34a' : '#6366f1'}" />
-              <div class="calendar-cell__counts">
-                <CalendarCounts :session="day.sessions[0]" />
-              </div>
-            </div>
-          </template>
-
-          <template v-else>
-            <Plus :size="24" class="calendar-cell__add-icon" />
-          </template>
+          </div>
         </div>
       </div>
     </section>
@@ -365,23 +406,28 @@ const greetingName = computed(() => {
   return profileStore.userName || profileStore.userEmail.split('@')[0];
 });
 
-const greetingPhrase = computed(() => {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return 'Good Morning';
-  if (hour >= 12 && hour < 17) return 'Good Afternoon';
-  if (hour >= 17 && hour < 22) return 'Good Evening';
-  return 'Good Night';
-});
+const greetingPhrase = ref('');
+const greetingLabel = ref('');
 
-const greetingLabel = computed(() => {
+function computeGreeting(): void {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return 'Morning session';
-  if (hour >= 12 && hour < 17) return 'Afternoon session';
-  if (hour >= 17 && hour < 22) return 'Evening session';
-  return 'Late night session';
-});
+  if (hour >= 5 && hour < 12) {
+    greetingPhrase.value = 'Good Morning';
+    greetingLabel.value = 'Morning session';
+  } else if (hour >= 12 && hour < 17) {
+    greetingPhrase.value = 'Good Afternoon';
+    greetingLabel.value = 'Afternoon session';
+  } else if (hour >= 17 && hour < 22) {
+    greetingPhrase.value = 'Good Evening';
+    greetingLabel.value = 'Evening session';
+  } else {
+    greetingPhrase.value = 'Good Night';
+    greetingLabel.value = 'Late night session';
+  }
+}
 
 onMounted(async () => {
+  computeGreeting();
   await Promise.all([
     dashboardStore.loadSessions(),
     billingStore.loadBalance(),
@@ -473,7 +519,8 @@ const daysInMonth = computed(() => {
       const d = new Date(s.sessionDate);
       return d.getUTCFullYear() === year && d.getUTCMonth() === month && d.getUTCDate() === dayNumber;
     });
-    return { number: dayNumber, isToday, sessions };
+    const dayOfWeek = (leadingDays.value + i) % 7;
+    return { number: dayNumber, isToday, sessions, dayName: dayNames[dayOfWeek] };
   });
 });
 
@@ -706,25 +753,14 @@ const daysInMonth = computed(() => {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ─── Calendar ─── */
-.calendar-section {
-  background: #ffffff;
-  border-radius: 32px;
-  padding: 2.5rem;
-  box-shadow: 0 12px 32px -4px rgba(25, 28, 30, 0.06);
-  border: 1px solid rgba(241, 241, 241, 0.8);
-}
+.calendar-section {}
 
 .calendar-section__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
   margin-bottom: 2rem;
-}
-
-.calendar-section__header-left {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
 }
 
 .calendar-section__title {
@@ -735,20 +771,19 @@ const daysInMonth = computed(() => {
   margin: 0;
 }
 
-.calendar-section__badge {
-  padding: 0.3rem 0.875rem;
-  background: rgba(53, 37, 205, 0.07);
-  color: #3525cd;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.calendar-section__month-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.calendar-section__nav {
-  display: flex;
-  gap: 0.5rem;
+.calendar-section__month-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #191c1e;
+  min-width: 130px;
+  text-align: center;
+  letter-spacing: -0.01em;
 }
 
 .calendar-nav-btn {
@@ -981,14 +1016,129 @@ const daysInMonth = computed(() => {
   color: rgba(255, 255, 255, 0.75);
 }
 
-/* ─── Onboarding Checklist ─── */
-.onboarding-checklist {
-  background: #ffffff;
-  border-radius: 32px;
-  padding: 2.5rem;
-  box-shadow: 0 12px 32px -4px rgba(25, 28, 30, 0.06);
-  border: 1px solid rgba(241, 241, 241, 0.8);
+/* ─── Responsive calendar ─── */
+.cal-desktop { display: block; }
+.cal-mobile-list { display: none; }
+
+@media (max-width: 899px) {
+  .dashboard { padding: 1rem 0.875rem 3rem; gap: 1.5rem; }
+  .calendar-section__month-label {
+    min-width: auto;
+    padding: 0 0.25rem;
+  }
+
+  .calendar-nav-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .cal-list-row__empty {
+    font-size: 0.75rem;
+    color: #d1d5db;
+    font-style: italic;
+  }
+
+  .cal-desktop { display: none; }
+  .cal-mobile-list { display: block; }
+
+  .cal-list-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-radius: 10px;
+    margin-bottom: 0.25rem;
+    cursor: default;
+  }
+
+  .cal-list-row--today {
+    background: #3525cd;
+    cursor: pointer;
+  }
+
+  .cal-list-row--today-done {
+    background: #052e16;
+  }
+
+  .cal-list-row--session {
+    background: #f2f4f6;
+    cursor: pointer;
+  }
+
+  .cal-list-row--done {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+  }
+
+  .cal-list-row__date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 34px;
+  }
+
+  .cal-list-row__num {
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: #191c1e;
+  }
+
+  .cal-list-row--today .cal-list-row__num,
+  .cal-list-row--today-done .cal-list-row__num {
+    color: #fff;
+  }
+
+  .cal-list-row__dow {
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9ca3af;
+  }
+
+  .cal-list-row--today .cal-list-row__dow,
+  .cal-list-row--today-done .cal-list-row__dow {
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  .cal-list-row__body {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+  }
+
+  .cal-list-row__tag--today {
+    font-size: 0.5625rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.15rem 0.45rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .cal-list-row__label {
+    font-size: 0.8125rem;
+    color: #374151;
+  }
+
+  .cal-list-row--today .cal-list-row__label,
+  .cal-list-row--today-done .cal-list-row__label {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .cal-list-row__label--cta {
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.65);
+  }
 }
+
+/* ─── Onboarding Checklist ─── */
+.onboarding-checklist {}
 
 .onboarding-checklist__header {
   display: flex;
@@ -1034,13 +1184,19 @@ const daysInMonth = computed(() => {
 
 .checklist-step {
   display: flex;
-  align-items: center;
-  gap: 1.25rem;
+  flex-direction: column;
+  gap: 0.375rem;
   padding: 1.25rem 1.5rem;
   border-radius: 20px;
   background: #f7f9fb;
   border: 1.5px solid #f1f1f1;
   transition: background 0.15s, border-color 0.15s;
+}
+
+.checklist-step__header {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
 }
 
 .checklist-step--done {
@@ -1080,11 +1236,6 @@ const daysInMonth = computed(() => {
   color: #9ca3af;
 }
 
-.checklist-step__content {
-  flex: 1;
-  min-width: 0;
-}
-
 .checklist-step__title {
   font-family: 'Manrope', sans-serif;
   font-size: 0.9375rem;
@@ -1121,7 +1272,8 @@ const daysInMonth = computed(() => {
   text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 0.25rem;
   transition: opacity 0.15s, transform 0.1s;
 }
 

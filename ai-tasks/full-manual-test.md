@@ -9,6 +9,29 @@
 
 ---
 
+## 📐 Responsive & UI/UX (сквозная проверка)
+
+На каждой продуктовой секции (§4–§10, §11.7) после functional-шагов прогнать **3 breakpoint'а** и фиксировать на каждом:
+
+| Preset | Viewport | Что проверяем |
+|---|---|---|
+| Desktop | 1440×900 | Основной layout, hover-состояния, focus rings |
+| Tablet | 768×1024 | Стек/grid переходы, nav не рвётся, модалки ≤viewport |
+| Mobile | 390×844 | 1-кол layout, нет горизонтального overflow, touch-targets ≥40px, модалки full-width |
+
+**Общие acceptance для каждого viewport:**
+- [ ] `document.documentElement.scrollWidth === window.innerWidth` (нет гориз. overflow)
+- [ ] Нет рваных слов в заголовках/кнопках/nav (`word-break` не ломает)
+- [ ] Все интерактивные элементы видны и кликабельны (ничего не за viewport)
+- [ ] Primary-кнопки: hover меняет bg/shadow; disabled — opacity 0.5–0.7 + `cursor: not-allowed`
+- [ ] Инпуты: focus-state с outline или border-color change
+- [ ] Формы: error-state красный border + читаемый текст ошибки
+- [ ] Модалки: backdrop кликабельный для close, на mobile занимают ≈100% ширины с мелким padding
+- [ ] Console: 0 ошибок за время прохождения
+- [ ] Network: 0 красных статусов (404/5xx) кроме ожидаемых 402 на credit gate
+
+---
+
 ## 0. Preflight
 
 ### 0.1 Окружение
@@ -122,6 +145,11 @@
 - [ ] Удалить кастомный блок → Remove → исчез, refresh → его нет
 - [ ] Reload страницы → блоки на месте
 
+### 4.R Responsive
+- [ ] **Desktop 1440:** блоки канонические + Add-кнопка читаемы, sidebar виден, форма Add memory (title + textarea) не съезжает
+- [ ] **Tablet 768:** блоки 1-кол, заголовок не рвётся, textarea full-width внутри карточки
+- [ ] **Mobile 390:** sidebar collapsed/hamburger или скрыт; блоки stack'аются, Remove-кнопка доступна пальцем (≥40px target), live-preview key не выезжает
+
 ---
 
 ## 5. Dashboard + кредитный гейт
@@ -146,6 +174,12 @@
 ### 5.2 402 из любого API → модалка
 - [ ] Искусственно обнулить баланс, начать streamable endpoint (chat, session runner)
 - [ ] HTTP 402 от backend → глобальный интерцептор в `billing.ts` store открывает `PricingModal`
+
+### 5.R Responsive
+- [ ] **Desktop 1440:** dashboard grid (greeting + сегодняшняя сессия + прошлые) читается, sidebar с nav виден, «Create New Post» primary-кнопка
+- [ ] **Tablet 768:** grid stack'ается в 1–2 колонки, контент не обрезан
+- [ ] **Mobile 390:** sidebar скрыт/hamburger; «Create New Post» доступна; PricingModal на mobile = 1 колонка планов, кнопка Close (X) в углу читается и кликается
+- [ ] PricingModal scroll: на mobile содержимое скроллится внутри модалки, а не за её пределами
 
 ---
 
@@ -186,6 +220,12 @@
 - [ ] Подтвердить → `ScheduledPost` с будущим `scheduledAt`
 - [ ] Дождаться cron → `posted`
 
+### 6.R Responsive
+- [ ] **Desktop 1440:** chat panel + workspace panel + idea cards в 2-колонном layout; hover-highlight на idea card чёткий
+- [ ] **Tablet 768:** панели стек'аются или сжимаются; кнопка Publish now + Schedule видны
+- [ ] **Mobile 390:** chat / idea в 1 кол; record-кнопка (мик) доступна; attach media попап не обрезан; «+ Add reply» читается
+- [ ] Media preview (IMAGE/VIDEO badge) корректно масштабируется на mobile, Remove-кнопка ≥40px
+
 ---
 
 ## 7. Content Calendar
@@ -220,6 +260,12 @@
 ### 7.3 Published
 - [ ] Клик по bubble **Posted** → ничего не происходит, cursor обычный, hover-эффекта нет
 
+### 7.R Responsive
+- [ ] **Desktop 1440:** full 7-day grid, bubbles в ячейках не обрезаны, Schedule post в хедере
+- [ ] **Tablet 768:** grid скроллится горизонтально или показывает 3–4 дня, Schedule post доступен
+- [ ] **Mobile 390:** календарь 1-col day list или horizontal scroll, bubbles bottom-align, tap-targets ≥40px
+- [ ] Schedule popup на mobile: date/time picker не обрезан, +Add reply доступен, Attach media попап не вылезает за экран
+
 ---
 
 ## 8. Settings
@@ -239,7 +285,12 @@
 - [ ] Mismatch confirm → ошибка валидации
 - [ ] Password <8 символов → ошибка
 - [ ] Неправильный current → API ошибка отображается
-- [ ] **Delete Account** — НЕ нажимать на рабочем юзере. На одноразовом: confirm → logout + редирект на `/`
+
+### 8.R Responsive
+- [ ] **Desktop 1440:** Subscription + Account секции в читаемых карточках; «Upgrade» + «Manage billing» рядом
+- [ ] **Tablet 768:** карточки full-width, progress bar растягивается, форма Change Password не ломается
+- [ ] **Mobile 390:** секции стек'аются, кнопки full-width или читаемые, Delete Account красный CTA не вызывает случайный клик
+- [ ] Progress bar на всех viewport: ширина анимируется плавно, `%` читается контрастно
 
 ---
 
@@ -411,6 +462,11 @@ stripe trigger invoice.payment_failed \
 | Payment failed | без изменений | — |
 | Webhook replay | без изменений | — |
 
+### 9.R Responsive (UI-часть флоу)
+- [ ] **Desktop 1440:** PricingModal 3-col, Stripe Checkout читается, `/settings?billing=success` banner центрирован
+- [ ] **Tablet 768:** PricingModal 1-col с max-width, Checkout адаптируется, success banner не ломает layout
+- [ ] **Mobile 390:** PricingModal full-width, scroll внутри модалки работает, Stripe Checkout mobile-friendly (это ответственность Stripe, но переход из модалки не должен ломаться), возврат на `/settings?billing=success` показывает успех
+
 ---
 
 ## 10. Logout / auth regression
@@ -422,6 +478,11 @@ stripe trigger invoice.payment_failed \
 - [ ] В новой вкладке `/dashboard` → редирект на `/` (middleware)
 - [ ] Снова Sign in через Threads → тот же `User.id`, сессия восстановлена
 - [ ] Backend выключен → попытка logout → frontend всё равно чистит локальный state и редирект
+
+### 10.R Responsive
+- [ ] **Desktop 1440:** Logout-кнопка в sidebar видна, редирект на `/` чист
+- [ ] **Tablet 768:** Logout доступен (sidebar compact или hamburger)
+- [ ] **Mobile 390:** Logout доступен через hamburger/menu; после редиректа `/` рендерится без overflow
 
 ---
 

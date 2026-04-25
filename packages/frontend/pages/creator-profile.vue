@@ -1,7 +1,7 @@
 <template>
   <div class="creator-profile-page">
     <!-- Connected Platforms -->
-    <section class="profile-section">
+    <section class="card profile-section">
       <h2 class="section-title">Connected Platforms</h2>
       <p class="section-subtitle">Connect your social accounts to publish and schedule posts directly from the workspace.</p>
       <div class="platforms-list">
@@ -19,14 +19,17 @@
           </div>
           <div class="platform-row__right">
             <ThreadsConnect v-if="platform === 'threads'" />
-            <button v-else class="platform-card__connect-btn" type="button" disabled>Connect</button>
+            <div v-else class="platform-card__connect-wrap">
+              <span class="platform-card__soon-badge">Soon</span>
+              <button class="platform-card__connect-btn" type="button" disabled>Connect</button>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- Memory blocks -->
-    <section class="profile-section">
+    <section class="card profile-section">
       <h2 class="section-title">Creator Memory</h2>
       <p class="section-subtitle">Edit any block to refine how Postrr understands your voice, audience, goals, and content focus.</p>
 
@@ -327,12 +330,7 @@ onMounted(async () => {
   gap: 1.5rem;
 }
 
-.profile-section {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 1.75rem;
-}
+.profile-section {}
 
 .section-title {
   font-size: 1.125rem;
@@ -414,6 +412,25 @@ onMounted(async () => {
 
 .platform-row__right {
   flex-shrink: 0;
+}
+
+.platform-card__connect-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.platform-card__soon-badge {
+  padding: 0.2rem 0.5rem;
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .platform-card__connect-btn {

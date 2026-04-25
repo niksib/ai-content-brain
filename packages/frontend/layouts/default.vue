@@ -1,8 +1,20 @@
 <template>
   <div class="bg-background font-body text-on-surface flex h-screen overflow-hidden">
+    <!-- Mobile overlay backdrop -->
+    <Transition name="fade">
+      <div
+        v-if="sidebarOpen"
+        class="fixed inset-0 bg-black/40 z-30 lg:hidden"
+        @click="sidebarOpen = false"
+      />
+    </Transition>
+
     <!-- Sidebar -->
-    <aside class="w-64 border-r border-slate-200 bg-slate-100 flex flex-col py-6 shrink-0 overflow-y-auto">
-      <NuxtLink to="/dashboard" class="px-6 mb-8 flex items-center gap-2.5 no-underline">
+    <aside
+      class="sidebar fixed inset-y-0 left-0 z-40 w-64 border-r border-slate-200 bg-slate-100 flex flex-col py-6 overflow-y-auto transition-transform duration-300 lg:relative lg:translate-x-0 lg:shrink-0"
+      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+    >
+      <NuxtLink to="/dashboard" class="px-6 mb-8 flex items-center gap-2.5 no-underline" @click="sidebarOpen = false">
         <div
           class="shrink-0 rounded-full relative overflow-hidden"
           style="width:28px;height:28px;background:linear-gradient(135deg,#4f46e5,#8b5cf6,#c084fc);box-shadow:0 4px 12px rgba(79,70,229,0.3);"
@@ -34,6 +46,7 @@
           :to="link.to"
           class="flex items-center gap-3 py-2.5 px-4 rounded-lg mx-2 transition-all no-underline"
           :class="isActive(link.to) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-200/50'"
+          @click="sidebarOpen = false"
         >
           <component :is="link.icon" :size="18" />
           <span class="font-medium">{{ link.label }}</span>
@@ -51,13 +64,14 @@
         <NuxtLink
           to="/settings"
           class="mt-4 flex items-center gap-3 border-t border-slate-200 pt-4 px-4 py-3 rounded-lg no-underline hover:bg-slate-200/40 transition-colors"
+          @click="sidebarOpen = false"
         >
           <div class="w-8 h-8 rounded-full overflow-hidden bg-indigo-100 flex items-center justify-center shrink-0">
-            <span class="text-xs font-bold text-indigo-700">{{ userInitials }}</span>
+            <img v-if="threadsProfilePic" :src="threadsProfilePic" class="w-full h-full object-cover" />
+            <span v-else class="text-xs font-bold text-indigo-700">{{ userInitials }}</span>
           </div>
           <div class="overflow-hidden min-w-0">
             <p class="text-xs font-bold truncate text-slate-900">{{ profileStore.userName || 'You' }}</p>
-            <p class="text-[10px] text-on-surface-variant truncate">{{ profileStore.userEmail }}</p>
           </div>
         </NuxtLink>
       </div>
@@ -65,6 +79,18 @@
 
     <!-- Main canvas -->
     <main class="flex-1 min-w-0 overflow-y-auto relative">
+      <!-- Mobile header bar with hamburger -->
+      <div class="sticky top-0 z-20 flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 lg:hidden">
+        <button
+          aria-label="Open menu"
+          class="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors touch-target"
+          @click="sidebarOpen = true"
+        >
+          <Menu :size="22" />
+        </button>
+        <span style="font-family:'Manrope',sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.02em;color:#111827;">HeyPostrr</span>
+      </div>
+
       <slot />
     </main>
 
@@ -74,7 +100,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, type Component } from 'vue';
-import { Plus, LogOut, LayoutGrid, CalendarDays, User } from 'lucide-vue-next';
+import { Plus, LogOut, LayoutGrid, CalendarDays, User, Menu } from 'lucide-vue-next';
 import { useDashboardStore } from '~/stores/dashboard';
 import { useBillingStore } from '~/stores/billing';
 import { useProfileStore } from '~/stores/profile';
@@ -88,6 +114,8 @@ const billingStore = useBillingStore();
 const profileStore = useProfileStore();
 
 const isStarting = ref(false);
+const sidebarOpen = ref(false);
+const threadsProfilePic = ref<string | null>(null);
 
 interface NavLink {
   to: string;
@@ -144,15 +172,39 @@ async function handleLogout(): Promise<void> {
   window.location.assign('/');
 }
 
-onMounted(() => {
+onMounted(async () => {
   billingStore.loadBalance();
   profileStore.loadProfile();
+  try {
+    const res = await $fetch<{ account: { profilePictureUrl: string | null } | null }>(
+      `${config.public.apiBaseUrl}/api/threads/account`,
+      { credentials: 'include' },
+    );
+    threadsProfilePic.value = res.account?.profilePictureUrl ?? null;
+  } catch { /* no threads account */ }
 });
 </script>
 
 <style scoped>
 .btn-primary-gradient {
   background: linear-gradient(135deg, #3525cd 0%, #4f46e5 100%);
+}
+
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .btn-spinner {

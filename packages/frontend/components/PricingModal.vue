@@ -56,7 +56,7 @@
             <button
               class="plan-card__btn"
               :class="plan.id === 'creator' ? 'plan-card__btn--primary' : 'plan-card__btn--secondary'"
-              :disabled="isCurrentPlan(plan.id) || isSubmitting"
+              :disabled="isCurrentPlan(plan.id) || !plan.purchasable || isSubmitting"
               @click="onSelect(plan.id)"
             >
               {{ ctaLabel(plan.id) }}
@@ -113,6 +113,8 @@ function isCurrentPlan(planId: PlanId): boolean {
 function ctaLabel(planId: PlanId): string {
   if (isCurrentPlan(planId)) return 'Current plan';
   if (planId === 'free') return 'Free tier';
+  const plan = billing.plans.find((p) => p.id === planId);
+  if (plan && !plan.purchasable) return 'Unavailable';
   return 'Choose plan';
 }
 
@@ -128,7 +130,11 @@ async function onSelect(planId: PlanId): Promise<void> {
     await billing.startCheckout(planId);
   } catch (error: unknown) {
     const apiError = (error as { data?: { error?: string } })?.data?.error;
-    errorMessage.value = apiError ?? 'Failed to start checkout. Please try again.';
+    if (apiError === 'This plan is not purchasable') {
+      errorMessage.value = 'Subscription temporarily unavailable. Please try again later or contact support.';
+    } else {
+      errorMessage.value = apiError ?? 'Failed to start checkout. Please try again.';
+    }
   } finally {
     isSubmitting.value = false;
   }

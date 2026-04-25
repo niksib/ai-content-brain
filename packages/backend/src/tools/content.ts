@@ -11,11 +11,6 @@ export const saveContentIdeaTool: Anthropic.Tool = {
   input_schema: {
     type: "object",
     properties: {
-      userId: { type: "string", description: "The user ID" },
-      chatSessionId: {
-        type: "string",
-        description: "The chat session ID (provided in the system prompt as CURRENT SESSION ID)",
-      },
       platform: {
         type: "string",
         enum: ["threads", "linkedin", "tiktok", "instagram"],
@@ -29,7 +24,7 @@ export const saveContentIdeaTool: Anthropic.Tool = {
       angle: { type: "string", description: "The angle or hook of the content idea" },
       description: { type: "string", description: "Detailed description of the content idea" },
     },
-    required: ["userId", "chatSessionId", "platform", "format", "angle", "description"],
+    required: ["platform", "format", "angle", "description"],
   },
 };
 
@@ -153,11 +148,9 @@ export async function loadStrategistSessionContext(
   ].join("\n");
 }
 
-export function makeSaveContentIdea(onIdeaSaved?: (idea: ContentIdea) => void) {
+export function makeSaveContentIdea(userId: string, chatSessionId: string, onIdeaSaved?: (idea: ContentIdea) => void) {
   return async (input: Record<string, unknown>): Promise<string> => {
-    const { userId, chatSessionId, platform, format, angle, description } = input as {
-      userId: string;
-      chatSessionId: string;
+    const { platform, format, angle, description } = input as {
       platform: string;
       format: string;
       angle: string;

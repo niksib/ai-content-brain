@@ -35,7 +35,7 @@ export class StrategistAgent extends BaseAgent {
       definitions: [webSearchTool, readMemoryTool, saveContentIdeaTool, updateContentIdeaTool],
       executors: {
         read_memory: makeReadMemory(this.userId),
-        save_content_idea: makeSaveContentIdea(options.onIdeaSaved),
+        save_content_idea: makeSaveContentIdea(this.userId, this.chatSessionId, options.onIdeaSaved),
         update_content_idea: makeUpdateContentIdea(options.onIdeaUpdating, options.onIdeaUpdated),
       },
     };

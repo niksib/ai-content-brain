@@ -2,7 +2,7 @@
   <div class="settings-page">
 
     <!-- Subscription -->
-    <section class="settings-section">
+    <section class="card settings-section">
       <h2 class="section-title">Subscription</h2>
       <div class="info-row">
         <span class="info-label">Plan</span>
@@ -43,7 +43,7 @@
     </section>
 
     <!-- Account -->
-    <section class="settings-section">
+    <section class="card settings-section">
       <h2 class="section-title">Account</h2>
 
       <div class="info-row">
@@ -297,10 +297,6 @@ onMounted(async () => {
 }
 
 .settings-section {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 1.75rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -333,6 +329,8 @@ onMounted(async () => {
   font-size: 0.875rem;
   font-weight: 500;
   color: #111827;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .credits-progress-wrap {

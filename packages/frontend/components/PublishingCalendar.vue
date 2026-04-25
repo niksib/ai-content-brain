@@ -1,101 +1,131 @@
 <template>
-  <section class="calendar-section">
+  <section class="card calendar-section">
     <!-- Header -->
     <div class="calendar-section__header">
-      <div class="calendar-section__header-left">
+      <div class="calendar-section__title-row">
         <h3 class="calendar-section__title">Content Calendar</h3>
-        <span class="calendar-section__badge">{{ currentMonthLabel }}</span>
+        <div class="calendar-section__month-nav">
+          <button class="calendar-nav-btn" @click="prevMonth">
+            <ChevronLeft :size="18" />
+          </button>
+          <span class="calendar-section__month-label">{{ currentMonthLabel }}</span>
+          <button class="calendar-nav-btn" @click="nextMonth">
+            <ChevronRight :size="18" />
+          </button>
+        </div>
       </div>
-      <div class="calendar-section__nav">
-        <button
-          type="button"
-          class="calendar-schedule-btn"
-          @click="emit('schedule')"
-        >
+      <div class="calendar-section__actions">
+        <button type="button" class="calendar-schedule-btn" @click="emit('schedule')">
           <CalendarPlus :size="16" />
           Schedule post
         </button>
-        <button class="calendar-nav-btn" @click="prevMonth">
-          <ChevronLeft :size="20" />
-        </button>
-        <button class="calendar-nav-btn" @click="nextMonth">
-          <ChevronRight :size="20" />
-        </button>
       </div>
     </div>
 
-    <!-- Day names -->
-    <div class="calendar-grid-header">
-      <div v-for="day in dayNames" :key="day" class="calendar-day-name">{{ day }}</div>
+    <!-- Desktop: day names + grid -->
+    <div class="cal-desktop">
+      <div class="calendar-grid-header">
+        <div v-for="day in dayNames" :key="day" class="calendar-day-name">{{ day }}</div>
+      </div>
+      <div class="calendar-body custom-scrollbar">
+        <div class="calendar-grid">
+          <div
+            v-for="n in leadingDays"
+            :key="`empty-${n}`"
+            class="calendar-cell calendar-cell--inactive"
+          />
+          <div
+            v-for="day in daysInMonth"
+            :key="day.number"
+            class="calendar-cell"
+            :class="{
+              'calendar-cell--today': day.isToday,
+              'calendar-cell--weekend': day.isWeekend,
+              'calendar-cell--empty': day.entries.length === 0 && !day.isToday,
+              'calendar-cell--has-items': day.entries.length > 0,
+            }"
+          >
+            <div class="calendar-cell__header">
+              <span class="calendar-cell__number">{{ day.number }}</span>
+              <span v-if="day.isToday" class="calendar-cell__today-label">Today</span>
+            </div>
+            <div v-if="day.entries.length > 0" class="calendar-cell__bubbles">
+              <template v-for="entry in day.entries.slice(0, 3)" :key="entry.key">
+                <div
+                  v-if="entry.kind === 'library'"
+                  class="calendar-bubble"
+                  :class="bubbleClass(entry.item)"
+                  @click.stop="emit('navigate', entry.item)"
+                >
+                  <div class="calendar-bubble__meta">
+                    <PlatformIcon :platform="(entry.item.platform as any)" :size="11" />
+                    <span class="calendar-bubble__format">{{ formatLabel(entry.item.format) }}</span>
+                    <span class="calendar-bubble__status">{{ chipStatusLabel(entry.item) }}</span>
+                  </div>
+                  <p class="calendar-bubble__title">{{ entry.item.contentIdea.angle }}</p>
+                </div>
+                <div
+                  v-else
+                  class="calendar-bubble calendar-bubble--standalone"
+                  :class="[standaloneBubbleClass(entry.post), entry.post.status !== 'pending' ? 'calendar-bubble--readonly' : '']"
+                  @click.stop="onStandaloneClick(entry.post)"
+                >
+                  <div class="calendar-bubble__meta">
+                    <PlatformIcon :platform="(entry.post.platform as any)" :size="11" />
+                    <span class="calendar-bubble__format">{{ standaloneFormatLabel(entry.post) }}</span>
+                    <span class="calendar-bubble__status">{{ standaloneStatusLabel(entry.post) }}</span>
+                  </div>
+                  <p class="calendar-bubble__title">{{ entry.post.text || '(empty)' }}</p>
+                </div>
+              </template>
+              <button
+                v-if="day.entries.length > 3 && sessionIdForDay(day)"
+                type="button"
+                class="calendar-bubble__overflow"
+                @click.stop="emit('navigate-session', sessionIdForDay(day)!)"
+              >
+                +{{ day.entries.length - 3 }} more
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Calendar body -->
-    <div class="calendar-body custom-scrollbar">
-      <div class="calendar-grid">
-        <!-- Empty leading cells -->
-        <div
-          v-for="n in leadingDays"
-          :key="`empty-${n}`"
-          class="calendar-cell calendar-cell--inactive"
-        />
-
-        <!-- Day cells -->
-        <div
-          v-for="day in daysInMonth"
-          :key="day.number"
-          class="calendar-cell"
-          :class="{
-            'calendar-cell--today': day.isToday,
-            'calendar-cell--weekend': day.isWeekend,
-            'calendar-cell--empty': day.entries.length === 0 && !day.isToday,
-            'calendar-cell--has-items': day.entries.length > 0,
-          }"
-        >
-          <!-- Day number -->
-          <div class="calendar-cell__header">
-            <span class="calendar-cell__number">{{ day.number }}</span>
-            <span v-if="day.isToday" class="calendar-cell__today-label">Today</span>
-          </div>
-
-          <!-- Content bubbles -->
-          <div v-if="day.entries.length > 0" class="calendar-cell__bubbles">
-            <template v-for="entry in day.entries.slice(0, 3)" :key="entry.key">
-              <div
-                v-if="entry.kind === 'library'"
-                class="calendar-bubble"
-                :class="bubbleClass(entry.item)"
-                @click.stop="emit('navigate', entry.item)"
-              >
-                <div class="calendar-bubble__meta">
-                  <PlatformIcon :platform="(entry.item.platform as any)" :size="11" />
-                  <span class="calendar-bubble__format">{{ formatLabel(entry.item.format) }}</span>
-                  <span class="calendar-bubble__status">{{ chipStatusLabel(entry.item) }}</span>
-                </div>
-                <p class="calendar-bubble__title">{{ entry.item.contentIdea.angle }}</p>
-              </div>
-              <div
-                v-else
-                class="calendar-bubble calendar-bubble--standalone"
-                :class="[standaloneBubbleClass(entry.post), entry.post.status !== 'pending' ? 'calendar-bubble--readonly' : '']"
-                @click.stop="onStandaloneClick(entry.post)"
-              >
-                <div class="calendar-bubble__meta">
-                  <PlatformIcon :platform="(entry.post.platform as any)" :size="11" />
-                  <span class="calendar-bubble__format">{{ standaloneFormatLabel(entry.post) }}</span>
-                  <span class="calendar-bubble__status">{{ standaloneStatusLabel(entry.post) }}</span>
-                </div>
-                <p class="calendar-bubble__title">{{ entry.post.text || '(empty)' }}</p>
-              </div>
-            </template>
-            <button
-              v-if="day.entries.length > 3 && sessionIdForDay(day)"
-              type="button"
-              class="calendar-bubble__overflow"
-              @click.stop="emit('navigate-session', sessionIdForDay(day)!)"
+    <!-- Mobile list view (< 640px) -->
+    <div class="cal-mobile-list">
+      <div
+        v-for="day in daysInMonth"
+        :key="'ml-' + day.number"
+        class="cal-list-row"
+        :class="{
+          'cal-list-row--today': day.isToday,
+          'cal-list-row--has-items': day.entries.length > 0,
+        }"
+      >
+        <div class="cal-list-row__date">
+          <span class="cal-list-row__num">{{ day.number }}</span>
+          <span class="cal-list-row__dow">{{ day.dayName }}</span>
+        </div>
+        <div class="cal-list-row__entries">
+          <template v-if="day.entries.length > 0">
+            <div
+              v-for="entry in day.entries.slice(0, 2)"
+              :key="entry.key"
+              class="cal-list-bubble"
+              :class="entry.kind === 'library' ? bubbleClass(entry.item) : [standaloneBubbleClass(entry.post), entry.post.status !== 'pending' ? 'calendar-bubble--readonly' : '']"
+              @click.stop="entry.kind === 'library' ? emit('navigate', entry.item) : onStandaloneClick(entry.post)"
             >
-              +{{ day.entries.length - 3 }} more
-            </button>
-          </div>
+              <PlatformIcon :platform="(entry.kind === 'library' ? entry.item.platform : entry.post.platform) as any" :size="10" />
+              <span class="cal-list-bubble__text">{{ entry.kind === 'library' ? entry.item.contentIdea.angle : (entry.post.text || '(empty)') }}</span>
+              <span class="cal-list-bubble__status">{{ entry.kind === 'library' ? chipStatusLabel(entry.item) : standaloneStatusLabel(entry.post) }}</span>
+            </div>
+            <span v-if="day.entries.length > 2" class="cal-list-more">+{{ day.entries.length - 2 }} more</span>
+          </template>
+          <template v-else>
+            <span class="cal-list-row__empty-today" v-if="day.isToday">Nothing scheduled</span>
+            <span class="cal-list-row__empty" v-else>No posts planned</span>
+          </template>
         </div>
       </div>
     </div>
@@ -205,7 +235,7 @@ const daysInMonth = computed(() => {
 
     const entries = [...libraryEntries, ...standaloneEntries];
 
-    return { number, isToday, isWeekend, entries };
+    return { number, isToday, isWeekend, entries, dayName: dayNames[(leadingDays.value + i) % 7] };
   });
 });
 
@@ -281,26 +311,27 @@ function nextMonth(): void {
 <style scoped>
 /* ── Section wrapper ── */
 .calendar-section {
-  background: #ffffff;
-  border-radius: 24px;
-  padding: 2rem;
-  box-shadow: 0 12px 32px -4px rgba(25, 28, 30, 0.06);
-  border: 1px solid rgba(199, 196, 216, 0.12);
   overflow: hidden;
 }
 
 /* ── Header ── */
 .calendar-section__header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.625rem;
   margin-bottom: 1.5rem;
 }
 
-.calendar-section__header-left {
+.calendar-section__title-row {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.calendar-section__actions {
+  display: flex;
+  align-items: center;
 }
 
 .calendar-section__title {
@@ -312,21 +343,26 @@ function nextMonth(): void {
   letter-spacing: -0.01em;
 }
 
-.calendar-section__badge {
-  padding: 0.25rem 0.75rem;
-  background: rgba(53, 37, 205, 0.07);
-  color: #3525cd;
-  border-radius: 9999px;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.calendar-section__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
-.calendar-section__nav {
+.calendar-section__month-nav {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.calendar-section__month-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #191c1e;
+  min-width: 130px;
+  text-align: center;
+  letter-spacing: -0.01em;
 }
 
 .calendar-schedule-btn {
@@ -610,4 +646,119 @@ function nextMonth(): void {
   background: #c7c4d8;
   border-radius: 10px;
 }
+
+/* ── Responsive ── */
+.cal-desktop { display: block; }
+.cal-mobile-list { display: none; }
+
+@media (max-width: 899px) {
+  .calendar-section__header { gap: 0.25rem; }
+
+  .calendar-section__month-label {
+    min-width: auto;
+    padding: 0 0.25rem;
+  }
+
+  .calendar-nav-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .cal-desktop { display: none; }
+  .cal-mobile-list { display: block; }
+
+  .cal-list-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .cal-list-row--today { background: rgba(53, 37, 205, 0.04); border-radius: 10px; border-bottom: none; margin-bottom: 0.25rem; }
+  .cal-list-row--has-items { cursor: pointer; }
+
+  .cal-list-row__date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 36px;
+    padding-top: 0.125rem;
+  }
+
+  .cal-list-row__num {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #191c1e;
+    line-height: 1.1;
+  }
+
+  .cal-list-row--today .cal-list-row__num { color: #3525cd; font-weight: 900; }
+
+  .cal-list-row__dow {
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9ca3af;
+  }
+
+  .cal-list-row__entries {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .cal-list-bubble {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .cal-list-bubble__text {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #191c1e;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cal-list-bubble__status {
+    font-size: 0.5625rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+
+  .cal-list-more {
+    font-size: 0.75rem;
+    color: #777587;
+    font-weight: 600;
+    padding-left: 0.25rem;
+  }
+
+  .cal-list-row__empty-today {
+    font-size: 0.8125rem;
+    color: #9ca3af;
+    font-style: italic;
+    padding-top: 0.125rem;
+  }
+
+  .cal-list-row__empty {
+    font-size: 0.75rem;
+    color: #d1d5db;
+    font-style: italic;
+    padding-top: 0.125rem;
+  }
+}
+
 </style>

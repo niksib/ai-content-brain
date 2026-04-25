@@ -40,6 +40,13 @@ defineProps<{
   line-height: 1.1;
 }
 
+@media (max-width: 899px) {
+  .page-title__heading {
+    font-size: 1.75rem;
+    letter-spacing: -0.02em;
+  }
+}
+
 .page-title__subtitle {
   font-size: 0.9375rem;
   color: #6b7280;

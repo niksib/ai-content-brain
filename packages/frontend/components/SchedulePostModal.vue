@@ -61,25 +61,35 @@
         </div>
 
         <footer class="sched-modal__footer">
-          <button
-            v-if="isEditMode"
-            type="button"
-            class="sched-btn sched-btn--danger"
-            :disabled="isSubmitting || isDeleting"
-            @click="deletePost"
-          >
-            {{ isDeleting ? 'Deleting…' : 'Delete' }}
-          </button>
-          <span class="sched-modal__footer-spacer" />
-          <button type="button" class="sched-btn sched-btn--ghost" @click="close">Cancel</button>
-          <button
-            type="button"
-            class="sched-btn sched-btn--primary"
-            :disabled="!canSubmit || isSubmitting"
-            @click="submit"
-          >
-            {{ submitLabel }}
-          </button>
+          <template v-if="isEditMode && !showDeleteConfirm">
+            <button
+              type="button"
+              class="sched-btn sched-btn--danger"
+              :disabled="isSubmitting || isDeleting"
+              @click="requestDeleteConfirm"
+            >
+              {{ isDeleting ? 'Deleting…' : 'Delete' }}
+            </button>
+          </template>
+          <template v-else-if="isEditMode && showDeleteConfirm">
+            <span class="sched-modal__confirm-text">Delete this post?</span>
+            <button type="button" class="sched-btn sched-btn--ghost" @click="showDeleteConfirm = false">Cancel</button>
+            <button type="button" class="sched-btn sched-btn--danger" :disabled="isDeleting" @click="deletePost">
+              {{ isDeleting ? 'Deleting…' : 'Confirm delete' }}
+            </button>
+          </template>
+          <template v-if="!showDeleteConfirm">
+            <span class="sched-modal__footer-spacer" />
+            <button type="button" class="sched-btn sched-btn--ghost" @click="close">Cancel</button>
+            <button
+              type="button"
+              class="sched-btn sched-btn--primary"
+              :disabled="!canSubmit || isSubmitting"
+              @click="submit"
+            >
+              {{ submitLabel }}
+            </button>
+          </template>
         </footer>
       </div>
     </div>
@@ -136,6 +146,7 @@ const scheduleTime = ref('');
 const errorMessage = ref('');
 const isSubmitting = ref(false);
 const isDeleting = ref(false);
+const showDeleteConfirm = ref(false);
 
 const threadsPosts = ref<ThreadsSchedulePost[]>([{ text: '', media: null }]);
 
@@ -175,6 +186,7 @@ const canSubmit = computed(() => {
 });
 
 function close(): void {
+  showDeleteConfirm.value = false;
   emit('close');
 }
 
@@ -258,10 +270,13 @@ async function submit(): Promise<void> {
   }
 }
 
+function requestDeleteConfirm(): void {
+  showDeleteConfirm.value = true;
+}
+
 async function deletePost(): Promise<void> {
   if (!props.edit) return;
-  const confirmed = window.confirm('Delete this scheduled post?');
-  if (!confirmed) return;
+  showDeleteConfirm.value = false;
   errorMessage.value = '';
   isDeleting.value = true;
   try {
@@ -462,4 +477,11 @@ async function deletePost(): Promise<void> {
 .sched-btn--danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .sched-modal__footer-spacer { flex: 1; }
+
+.sched-modal__confirm-text {
+  font-size: 0.875rem;
+  color: #dc2626;
+  font-weight: 500;
+  white-space: nowrap;
+}
 </style>
