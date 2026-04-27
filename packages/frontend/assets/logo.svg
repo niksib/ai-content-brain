@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#4f46e5"/>
+      <stop offset="50%"  stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="35%" cy="30%" r="50%">
+      <stop offset="0%"   stop-color="rgba(255,255,255,0.7)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <clipPath id="circle-clip">
+      <circle cx="14" cy="14" r="14"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background gradient circle -->
+  <circle cx="14" cy="14" r="14" fill="url(#bg)"/>
+
+  <!-- Inner highlight (inset 4px → r=10, same center) -->
+  <circle cx="14" cy="14" r="10" fill="url(#shine)" clip-path="url(#circle-clip)"/>
+</svg>

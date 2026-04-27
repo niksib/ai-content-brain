@@ -44,7 +44,7 @@
               <em>Just think.</em>
             </h1>
             <p class="hero-sub">
-              HeyPostrr turns voice notes into posts that sound exactly like <span class="underline-scribble">you</span>, on Threads. LinkedIn, Instagram, X coming soon.
+              HeyPostrr turns your thoughts into posts that sound exactly like <span class="underline-scribble">you</span>, on Threads, LinkedIn, Instagram, X.
             </p>
             <div class="hero-ctas">
               <div class="hero-cta-col">
@@ -339,7 +339,7 @@
                 <div class="mock-reel-bg" />
                 <div class="mock-reel-content">
                   <div class="mock-reel-top">
-                    <span>Reels</span>
+                    <span>Instagram</span>
                   </div>
                   <div class="mock-reel-side">
                     <div class="mock-reel-side-item">
@@ -755,9 +755,9 @@ const tapeFragments = [
 
 const platformTabs = [
   { id: 'threads',   label: 'Threads' },
-  { id: 'linkedin',  label: 'LinkedIn' },
-  { id: 'instagram', label: 'Reels' },
-  { id: 'x',         label: 'X' },
+  { id: 'linkedin',  label: '' },
+  { id: 'instagram', label: '' },
+  { id: 'x',         label: '' },
 ];
 
 const pricingPlans = [
