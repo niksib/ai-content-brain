@@ -243,6 +243,7 @@
               :avatar-url="idea.platform === 'threads' ? (threadsAccount?.profilePictureUrl ?? null) : null"
               :username="idea.platform === 'threads' ? (threadsAccount?.username ?? null) : null"
               :is-updating="store.recentlyUpdatedIdeaIds.has(idea.id)"
+              :cost-cents="idea.costCents"
               variant="session"
               @select="store.selectedIdeaId = $event"
               @approve="handleApproveIdea"

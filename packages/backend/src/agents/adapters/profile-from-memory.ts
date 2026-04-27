@@ -1,31 +1,21 @@
 import { memoryService } from "../../services/memory.service.js";
 
-export interface LegacyCreatorProfile {
+export interface CreatorProfile {
   niche: string;
-  topics: string[];
   audienceDescription: string;
-  audiencePainPoints: string;
   toneOfVoice: string;
-  toneExamples: string[];
   goals: string[];
-  rawNotes: string;
-  contentLanguage: string;
   contentPillars: string[];
   contentFormats: string[];
   currentProjects: string;
   antiPatterns: string;
 }
 
-const EMPTY_PROFILE: LegacyCreatorProfile = {
+const EMPTY_PROFILE: CreatorProfile = {
   niche: "",
-  topics: [],
   audienceDescription: "",
-  audiencePainPoints: "",
   toneOfVoice: "",
-  toneExamples: [],
   goals: [],
-  rawNotes: "",
-  contentLanguage: "English",
   contentPillars: [],
   contentFormats: [],
   currentProjects: "",
@@ -41,39 +31,27 @@ function splitBulletList(content: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-export async function buildLegacyProfile(userId: string): Promise<LegacyCreatorProfile> {
+export async function buildCreatorProfile(userId: string): Promise<CreatorProfile> {
   const blocks = await memoryService.getAllBlocks(userId);
   if (blocks.length === 0) return EMPTY_PROFILE;
 
   const map = new Map(blocks.map((block) => [block.key, block.content]));
-  const niche = map.get("niche")?.trim() ?? "";
-  const audienceDescription = map.get("audience")?.trim() ?? "";
-  const voiceTone = map.get("voice_tone")?.trim() ?? "";
   const goal = map.get("goal")?.trim() ?? "";
   const pillars = splitBulletList(map.get("content_pillars") ?? "");
-  const formats = splitBulletList(map.get("content_formats") ?? "");
-  const transcript = map.get("onboarding_transcript")?.trim() ?? "";
-  const currentProjects = map.get("current_projects")?.trim() ?? "";
-  const antiPatterns = map.get("anti_patterns")?.trim() ?? "";
 
   return {
-    niche,
-    topics: pillars,
-    audienceDescription,
-    audiencePainPoints: "",
-    toneOfVoice: voiceTone,
-    toneExamples: [],
+    niche: map.get("niche")?.trim() ?? "",
+    audienceDescription: map.get("audience")?.trim() ?? "",
+    toneOfVoice: map.get("voice_tone")?.trim() ?? "",
     goals: goal ? [goal] : [],
-    rawNotes: transcript,
-    contentLanguage: "English",
     contentPillars: pillars,
-    contentFormats: formats,
-    currentProjects,
-    antiPatterns,
+    contentFormats: splitBulletList(map.get("content_formats") ?? ""),
+    currentProjects: map.get("current_projects")?.trim() ?? "",
+    antiPatterns: map.get("anti_patterns")?.trim() ?? "",
   };
 }
 
-export function formatLegacyProfileForPrompt(profile: LegacyCreatorProfile): string {
+export function formatCreatorProfileForPrompt(profile: CreatorProfile): string {
   if (!profile.niche && !profile.audienceDescription) {
     return "(no creator profile yet — onboarding may be incomplete)";
   }

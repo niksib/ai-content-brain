@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
+import { maybeAttachCostsForAdmin } from "../services/idea-cost.service.js";
 import type { AppEnv } from "../types/hono.js";
 
 export const sessionRoutes = new Hono<AppEnv>();
@@ -161,6 +162,13 @@ sessionRoutes.get("/sessions/:id", requireAuth, async (context) => {
 
   if (!session) {
     return context.json({ error: "Session not found" }, 404);
+  }
+
+  if (session.contentPlan?.ideas?.length) {
+    session.contentPlan.ideas = await maybeAttachCostsForAdmin(
+      user.id,
+      session.contentPlan.ideas,
+    );
   }
 
   return context.json({ session });

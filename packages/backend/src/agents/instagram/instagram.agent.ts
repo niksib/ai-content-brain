@@ -1,7 +1,10 @@
 import { BaseAgent, PlatformAgent, type AgentToolSet, type AgentToolOptions } from "../base.agent.js";
-import { buildLegacyProfile, formatLegacyProfileForPrompt } from "../adapters/profile-from-memory.js";
+import { buildCreatorProfile, formatCreatorProfileForPrompt } from "../adapters/profile-from-memory.js";
+import { formatStrategistHints } from "../adapters/idea-hints.js";
 import { saveProducedContentTool, makeSaveProducedContent } from "../../tools/content.js";
 import type { ContentIdea } from "../../generated/prisma/client.js";
+
+const LANGUAGE_RULE = `**CRITICAL — Content Language**: Write the content in the same language the idea is written in (look at the angle and description above). If the idea is in Russian, write in Russian. If English, English. Never mix languages within a post.`;
 
 export class InstagramAgent extends PlatformAgent {
   private constructor(userId: string, private readonly idea: ContentIdea) {
@@ -22,8 +25,8 @@ export class InstagramAgent extends PlatformAgent {
   }
 
   protected async loadContext(): Promise<string> {
-    const profile = await buildLegacyProfile(this.userId);
-    return `## Creator Profile\n${formatLegacyProfileForPrompt(profile)}`;
+    const profile = await buildCreatorProfile(this.userId);
+    return `## Creator Profile\n${formatCreatorProfileForPrompt(profile)}`;
   }
 
   buildProductionPrompt(): string {
@@ -34,9 +37,11 @@ export class InstagramAgent extends PlatformAgent {
 
 **Description:** ${this.idea.description}
 
+${formatStrategistHints(this.idea)}
+
 The Creator Profile is already loaded in your system prompt — use it to match the creator's tone, niche, and audience.
 
-**CRITICAL — Content Language**: Write the content strictly in the language specified as \`contentLanguage\` in the Creator Profile. The language of this prompt does not matter — the content language does. Do not mix languages.
+${LANGUAGE_RULE}
 
 Write carousel slide content. Apply skills: hook-formulas for slide 1, instagram-carousel-structures for flow and structure, tone-of-voice-matching to write as the creator, anti-ai-writing to sound human, cta-patterns for the last slide.
 
@@ -63,9 +68,11 @@ When done, call save_produced_content with:
 
 **Description:** ${this.idea.description}
 
+${formatStrategistHints(this.idea)}
+
 The Creator Profile is already loaded in your system prompt — use it to match the creator's tone, niche, and audience.
 
-**CRITICAL — Content Language**: Write the content strictly in the language specified as \`contentLanguage\` in the Creator Profile. The language of this prompt does not matter — the content language does. Do not mix languages.
+${LANGUAGE_RULE}
 
 Write an Instagram Stories sequence. Apply skills: hook-formulas for story 1, instagram-stories for sequence structure, tone-of-voice-matching to write as the creator, anti-ai-writing to sound human, cta-patterns for the final story.
 

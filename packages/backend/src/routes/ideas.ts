@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireCredits } from "../middleware/credits.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { agentRunner } from "../services/agent-runner.service.js";
+import { maybeAttachCostsForAdmin, isAdminUser, getIdeaCostsMap } from "../services/idea-cost.service.js";
 import { createSSEStream } from "../lib/sse.js";
 import { ThreadsAgent } from "../agents/threads/threads.agent.js";
 import { LinkedInAgent } from "../agents/linkedin/linkedin.agent.js";
@@ -56,7 +57,8 @@ ideaRoutes.get("/sessions/:id/ideas", requireAuth, async (context) => {
     return context.json({ ideas: [] });
   }
 
-  return context.json({ ideas: contentPlan.ideas });
+  const ideas = await maybeAttachCostsForAdmin(user.id, contentPlan.ideas);
+  return context.json({ ideas });
 });
 
 // Approve idea and start content production
@@ -300,5 +302,9 @@ ideaRoutes.get("/ideas/:id", requireAuth, async (context) => {
     return context.json({ error: "Idea not found" }, 404);
   }
 
-  return context.json({ idea });
+  if (!(await isAdminUser(user.id))) {
+    return context.json({ idea });
+  }
+  const costMap = await getIdeaCostsMap(user.id, [idea.id]);
+  return context.json({ idea: { ...idea, costCents: costMap.get(idea.id) ?? 0 } });
 });

@@ -1,9 +1,10 @@
 import { BaseAgent, PlatformAgent, type AgentToolSet, type AgentToolOptions } from "../base.agent.js";
-import { buildLegacyProfile, formatLegacyProfileForPrompt } from "../adapters/profile-from-memory.js";
+import { buildCreatorProfile, formatCreatorProfileForPrompt } from "../adapters/profile-from-memory.js";
+import { formatStrategistHints } from "../adapters/idea-hints.js";
 import { saveProducedContentTool, makeSaveProducedContent } from "../../tools/content.js";
 import type { ContentIdea } from "../../generated/prisma/client.js";
 
-const LANGUAGE_RULE = `**CRITICAL — Content Language**: Write the content strictly in the language specified as \`contentLanguage\` in the Creator Profile. The language of this prompt does not matter — the content language does. Do not mix languages.`;
+const LANGUAGE_RULE = `**CRITICAL — Content Language**: Write the post in the same language the idea is written in (look at the angle and description above). If the idea is in Russian, write in Russian. If English, English. Never mix languages within a post.`;
 
 const SELF_CRITIQUE = `**Internal quality check before saving (do not output this — think it silently):**
 - Hook: does the first line create tension or state something specific without asking a question?
@@ -18,10 +19,8 @@ export class ThreadsAgent extends PlatformAgent {
     super("threads", userId, {
       skills: [
         "hook-formulas",
-        "threads-post-structures",
         "tone-of-voice-matching",
         "anti-ai-writing",
-        "cta-patterns",
       ],
     });
   }
@@ -31,8 +30,8 @@ export class ThreadsAgent extends PlatformAgent {
   }
 
   protected async loadContext(): Promise<string> {
-    const profile = await buildLegacyProfile(this.userId);
-    return `## Creator Profile\n${formatLegacyProfileForPrompt(profile)}`;
+    const profile = await buildCreatorProfile(this.userId);
+    return `## Creator Profile\n${formatCreatorProfileForPrompt(profile)}`;
   }
 
   buildProductionPrompt(): string {
@@ -44,6 +43,8 @@ export class ThreadsAgent extends PlatformAgent {
 **Angle:** ${this.idea.angle}
 
 **Description:** ${this.idea.description}
+
+${formatStrategistHints(this.idea)}
 
 The Creator Profile is already loaded in your system prompt — use it to match the creator's tone, niche, and audience.
 
@@ -70,6 +71,8 @@ When done, call save_produced_content with:
 
 **Description:** ${this.idea.description}
 
+${formatStrategistHints(this.idea)}
+
 The Creator Profile is already loaded in your system prompt — use it to match the creator's tone, niche, and audience.
 
 ${LANGUAGE_RULE}
@@ -94,6 +97,8 @@ When done, call save_produced_content with:
 **Angle:** ${this.idea.angle}
 
 **Description:** ${this.idea.description}
+
+${formatStrategistHints(this.idea)}
 
 The Creator Profile is already loaded in your system prompt — use it to match the creator's tone, niche, and audience.
 

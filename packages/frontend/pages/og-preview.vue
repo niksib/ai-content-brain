@@ -42,7 +42,7 @@
             </h1>
 
             <p class="og-sub">
-              Turn your thoughts into posts that sound exactly like <em class="og-sub-em">you</em> —<br>
+              Turn your thoughts into posts that sound exactly like <em class="og-sub-em">you</em> -<br>
               on Threads, LinkedIn, Instagram, X.
             </p>
 
@@ -105,13 +105,13 @@ const scale = ref(1)
 
 const chips = [
   { text: 'hot take - most advice online is just someone\'s story in disguise', style: { top: '108px',   right: '168px',  '--tilt': '-2deg'   } },
-  { text: 'I think my pricing page is totally wrong',                           style: { top: '148px',   right: '18px',   '--tilt': '-2.5deg' } },
+  { text: 'I think my pricing page is totally wrong',                           style: { top: '148px',   right: '7px',   '--tilt': '-2.5deg' } },
   { text: 'nobody talks about the boring part between launch and getting users', style: { top: '200px',   left: '660px',   '--tilt': '1.5deg'  } },
   { text: 'everyone\'s talking about AI but nobody\'s talking about taste',     style: { top: '258px',   right: '8px',    '--tilt': '1.5deg'  } },
-  { text: 'I was in the shower and realized we built the wrong feature',        style: { bottom: '222px',left: '635px',   '--tilt': '-3deg'   } },
-  { text: 'writing is thinking slowed down enough to catch yourself',           style: { bottom: '200px',right: '16px',   '--tilt': '-1deg'   } },
-  { text: 'what if I just shared the whole messy process',                     style: { bottom: '158px',left: '710px',   '--tilt': '-1.5deg' } },
-  { text: 'my best ideas always come mid-walk, why is that',                   style: { bottom: '128px',right: '80px',   '--tilt': '3deg'    } },
+  { text: 'I was in the shower and realized we built the wrong feature',        style: { bottom: '268px',left: '635px',   '--tilt': '-3deg'   } },
+  { text: 'writing is thinking slowed down enough to catch yourself',           style: { bottom: '226px',right: '6px',   '--tilt': '11deg'   } },
+  { text: 'what if I just shared the whole messy process',                     style: { bottom: '175px',left: '698px',   '--tilt': '-1.5deg' } },
+  { text: 'my best ideas always come mid-walk, why is that',                   style: { bottom: '123px',right: '33px',   '--tilt': '-8deg'    } },
 ]
 
 onMounted(() => {
@@ -129,18 +129,19 @@ async function download() {
   if (!ogEl.value || downloading.value) return
   downloading.value = true
   try {
-    const html2canvas = (await import('html2canvas')).default
-    const canvas = await html2canvas(ogEl.value, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#f7f5f0',
+    await document.fonts.ready
+    const { toPng } = await import('html-to-image')
+    const dataUrl = await toPng(ogEl.value, {
       width: 1200,
       height: 630,
-      logging: false,
+      pixelRatio: 2,
+      backgroundColor: '#f7f5f0',
+      cacheBust: true,
+      style: { transform: 'none' },
     })
     const a = document.createElement('a')
     a.download = 'heypostrr-og.png'
-    a.href = canvas.toDataURL('image/png')
+    a.href = dataUrl
     a.click()
   } finally {
     downloading.value = false

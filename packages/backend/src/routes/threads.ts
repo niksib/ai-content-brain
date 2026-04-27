@@ -5,6 +5,8 @@ import { prisma } from "../lib/prisma.js";
 import { threadsApiService, THREADS_BASE_URL } from "../services/threads-api.service.js";
 import { auth } from "../lib/auth.js";
 import { redactSecrets } from "../lib/redact.js";
+import { parseSignedRequest } from "../lib/meta-signed-request.js";
+import { getGcsService } from "../services/gcs.service.js";
 import type { AppEnv } from "../types/hono.js";
 
 const LOGIN_STATE_PREFIX = "login";
@@ -318,6 +320,179 @@ async function handleLoginCallback(
   } catch (loginError) {
     console.error("[threads/callback] Threads login failed:", redactSecrets(loginError));
     return context.redirect(`${frontendUrl}/?threads_login_error=login_failed`);
+  }
+}
+
+// POST /threads/deauthorize — Meta calls this when a Threads user removes the
+// app authorization. We clear stored credentials but keep their content data;
+// only the Data Deletion Request callback erases the rest.
+threadsRoutes.post("/threads/deauthorize", async (context) => {
+  const appSecret = process.env.THREADS_APP_SECRET;
+  if (!appSecret) {
+    console.error("[threads/deauthorize] THREADS_APP_SECRET not configured");
+    return context.json({ error: "Server misconfigured" }, 500);
+  }
+
+  const body = await context.req.parseBody();
+  const signedRequest = typeof body.signed_request === "string" ? body.signed_request : null;
+  if (!signedRequest) {
+    return context.json({ error: "signed_request required" }, 400);
+  }
+
+  const payload = parseSignedRequest(signedRequest, appSecret);
+  if (!payload) {
+    return context.json({ error: "Invalid signed_request" }, 400);
+  }
+
+  await prisma.threadsAccount.updateMany({
+    where: { threadsUserId: payload.user_id },
+    data: {
+      accessToken: "",
+      tokenExpiresAt: new Date(0),
+      scopes: "",
+    },
+  });
+
+  return context.json({ success: true });
+});
+
+// POST /threads/data-deletion — Meta calls this when a Threads user requests
+// full data deletion. We respond synchronously with a status URL + code, then
+// run the actual deletion in the background.
+threadsRoutes.post("/threads/data-deletion", async (context) => {
+  const appSecret = process.env.THREADS_APP_SECRET;
+  if (!appSecret) {
+    console.error("[threads/data-deletion] THREADS_APP_SECRET not configured");
+    return context.json({ error: "Server misconfigured" }, 500);
+  }
+
+  const body = await context.req.parseBody();
+  const signedRequest = typeof body.signed_request === "string" ? body.signed_request : null;
+  if (!signedRequest) {
+    return context.json({ error: "signed_request required" }, 400);
+  }
+
+  const payload = parseSignedRequest(signedRequest, appSecret);
+  if (!payload) {
+    return context.json({ error: "Invalid signed_request" }, 400);
+  }
+
+  const confirmationCode = randomBytes(16).toString("hex");
+  await prisma.dataDeletionRequest.create({
+    data: {
+      confirmationCode,
+      threadsUserId: payload.user_id,
+      status: "pending",
+    },
+  });
+
+  void runDataDeletion(confirmationCode, payload.user_id);
+
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  return context.json({
+    url: `${frontendUrl}/data-deletion-status/${confirmationCode}`,
+    confirmation_code: confirmationCode,
+  });
+});
+
+// GET /threads/data-deletion-status/:code — public status check; the URL we
+// hand back to Meta points the user here so they can verify their deletion.
+threadsRoutes.get("/threads/data-deletion-status/:code", async (context) => {
+  const code = context.req.param("code");
+  const request = await prisma.dataDeletionRequest.findUnique({
+    where: { confirmationCode: code },
+    select: { status: true, requestedAt: true, completedAt: true },
+  });
+
+  if (!request) {
+    return context.json({ error: "Not found" }, 404);
+  }
+
+  return context.json(request);
+});
+
+async function runDataDeletion(confirmationCode: string, threadsUserId: string) {
+  try {
+    await prisma.dataDeletionRequest.update({
+      where: { confirmationCode },
+      data: { status: "in_progress" },
+    });
+
+    const accounts = await prisma.threadsAccount.findMany({
+      where: { threadsUserId },
+      select: { userId: true },
+    });
+
+    for (const { userId } of accounts) {
+      await deleteAllUserData(userId);
+    }
+
+    await prisma.dataDeletionRequest.update({
+      where: { confirmationCode },
+      data: { status: "completed", completedAt: new Date() },
+    });
+  } catch (deletionError) {
+    console.error("[threads/data-deletion] Deletion failed:", redactSecrets(deletionError));
+    await prisma.dataDeletionRequest
+      .update({
+        where: { confirmationCode },
+        data: {
+          status: "failed",
+          errorMessage:
+            deletionError instanceof Error ? deletionError.message : String(deletionError),
+        },
+      })
+      .catch(() => {});
+  }
+}
+
+// Hard-deletes everything tied to a single user. Order respects FK constraints:
+// children before parents. User row is deleted last and cascades the better-auth
+// tables (sessions, accounts, memoryBlocks, onboardingSession). GCS objects
+// for the user's MediaFiles are removed best-effort after the DB transaction.
+async function deleteAllUserData(userId: string): Promise<void> {
+  const mediaFiles = await prisma.mediaFile.findMany({
+    where: { userId },
+    select: { gcsPath: true },
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.threadsInsightsSnapshot.deleteMany({ where: { userId } });
+    await tx.producedContent.deleteMany({ where: { userId } });
+
+    const sessions = await tx.chatSession.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const sessionIds = sessions.map((session) => session.id);
+    if (sessionIds.length > 0) {
+      await tx.chatMessage.deleteMany({ where: { chatSessionId: { in: sessionIds } } });
+    }
+
+    await tx.contentIdea.deleteMany({ where: { userId } });
+    await tx.contentPlan.deleteMany({ where: { userId } });
+    await tx.chatSession.deleteMany({ where: { userId } });
+    await tx.scheduledPost.deleteMany({ where: { userId } });
+    await tx.threadsAccount.deleteMany({ where: { userId } });
+    await tx.mediaFile.deleteMany({ where: { userId } });
+    await tx.creditTransaction.deleteMany({ where: { userId } });
+    await tx.creditBalance.deleteMany({ where: { userId } });
+    await tx.subscription.deleteMany({ where: { userId } });
+    await tx.oAuthState.deleteMany({ where: { userId } });
+
+    await tx.user.deleteMany({ where: { id: userId } });
+  });
+
+  if (mediaFiles.length > 0) {
+    try {
+      const gcsService = getGcsService();
+      await Promise.all(mediaFiles.map((file) => gcsService.deleteFile(file.gcsPath)));
+    } catch (gcsError) {
+      // GCS not configured locally, or service init failed — log and continue.
+      // DB rows are already gone; orphaned objects can be cleaned up by a
+      // bucket lifecycle rule keyed on absence of corresponding DB row.
+      console.error("[threads/data-deletion] GCS cleanup skipped:", redactSecrets(gcsError));
+    }
   }
 }
 

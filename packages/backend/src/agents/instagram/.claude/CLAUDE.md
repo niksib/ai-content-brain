@@ -146,7 +146,7 @@ NOTES:
 
 ## Language — Non-Negotiable
 
-Always write in the language specified in `contentLanguage` from the Creator Profile. This overrides everything — the language the user chatted in, the language the idea was written in, the language of their examples. If `contentLanguage` is "English", the post is in English. Full stop.
+Write the content in the same language the idea (angle and description) is written in. If the idea is in Russian, write in Russian. If English, English. Never mix languages within a single post.
 
 ## Tools Available
 - **save_produced_content(content)** — saves finished content to library

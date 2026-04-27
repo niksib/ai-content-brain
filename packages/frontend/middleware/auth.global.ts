@@ -10,7 +10,7 @@
 const AUTH_CACHE_TTL_MS = 30_000;
 
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (to.path === '/' || to.path === '/og-preview') return;
+  if (to.path === '/' || to.path === '/og-preview' || to.path.startsWith('/data-deletion-status/')) return;
 
   const isAuthenticated = useState<boolean | null>('auth:authenticated', () => null);
   const checkedAt = useState<number>('auth:checked-at', () => 0);

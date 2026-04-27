@@ -55,54 +55,23 @@ Every piece of content must be rooted in the specific story or insight from thei
 - Include personal reactions ("Honestly surprised me." / "Still thinking about this.")
 - Write how people talk, not how they write formally
 - Vary sentence length — short. Then a longer one that explains. Then short again.
-- Use em dashes for parenthetical thoughts — like this — naturally
 - Use "but" and "and" to start sentences when it sounds right
-
+- **Specificity**: Real details from the actual story
+- **Imperfection**: Moments of uncertainty, honest reactions, things that didn't go as planned
+- **Opinion**: A clear point of view, not neutral coverage of all angles
+- **Rhythm**: Variation in sentence length and energy
+- **Voice**: Vocabulary and phrasing that belongs to this specific person
+- **Surprise**: At least one moment that the reader didn't expect
+- 
 ### Don't
 - Use formal transitions: "Furthermore," "Moreover," "In addition," "Additionally," "Thus"
 - Start with generic openers: "In today's world," "In today's fast-paced environment"
 - Use corporate/polished language: leverage, utilize, facilitate, implement, endeavor
-- Use AI red-flag words (see below)
 - Write conclusions that summarize what was just said
 - Use identical sentence length throughout
 - Repeat the same phrase multiple times in one piece
 - Add unnecessary qualifiers: "It is important to note that," "It is worth mentioning"
 - Be vague — every statement should have a specific detail behind it
-
-## AI Red-Flag Words — Never Use These
-
-### Overused AI Vocabulary
-delve, tapestry, multifaceted, nuanced, pivotal, paramount, underscore, robust, seamless, streamline, leverage, utilize, facilitate, empower, unlock, unleash, transformative, revolutionary, cutting-edge, innovative, game-changer, paradigm, synergy, ecosystem, holistic, comprehensive, dynamic, foster, cultivate, navigate, realm, landscape, testament
-
-### Overused AI Phrases
-- "In today's [adjective] world/landscape/environment"
-- "It is important to note that"
-- "It is worth mentioning"
-- "Having said that"
-- "With that being said"
-- "At the end of the day"
-- "The bottom line is"
-- "In conclusion / In summary / In essence"
-- "Let's dive in / Let's explore / Let's delve into"
-- "First and foremost"
-- "Without further ado"
-- "It goes without saying"
-- "Key takeaways"
-- "Stay ahead of the curve"
-- "Future-proof"
-- "Best-in-class"
-- "Certainly!" (as a response opener)
-- "Absolutely!" (same)
-- "Great question!"
-- "I hope this finds you well"
-
-### Overused Structural Patterns
-- Lists of three parallel items with the same structure
-- Every paragraph starting with the same pattern
-- Intro that explains what the post will cover ("In this post, I'll share...")
-- Ending that summarizes what was just said
-- "Not only X, but also Y" construction used repeatedly
-- Formal numbered structures when casual language would fit better
 
 ## Threads-Specific Voice Calibration
 
@@ -120,6 +89,5 @@ If the creator's voice on other platforms sounds professional and put-together, 
 Before delivering any content, ask:
 1. Could any other creator have written this? If yes — rewrite with more specific details
 2. Does this sound like how they speak in their raw_notes? If no — adjust vocabulary and rhythm
-3. Does any AI red-flag word appear? If yes — replace
-4. Does every sentence have a specific detail or does it stay abstract? If abstract — add specifics
-5. Read it out loud in your head. Does it flow naturally or does it feel constructed?
+3. Does every sentence have a specific detail or does it stay abstract? If abstract — add specifics
+4. Read it out loud in your head. Does it flow naturally or does it feel constructed?

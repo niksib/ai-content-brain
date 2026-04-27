@@ -109,15 +109,25 @@
         </template>
       </div>
 
-      <!-- View Content → (right side, always) -->
-      <button
-        v-if="status !== 'rejected'"
-        class="idea-card__view-btn"
-        @click.stop="emit('select', ideaId)"
-      >
-        View Content
-        <ArrowRight :size="14" />
-      </button>
+      <!-- Right side: cost + View Content -->
+      <div class="idea-card__footer-right">
+        <span
+          v-if="costLabel"
+          class="idea-card__cost"
+          :title="`LLM cost (production only): ${costLabel}`"
+        >
+          {{ costLabel }}
+        </span>
+
+        <button
+          v-if="status !== 'rejected'"
+          class="idea-card__view-btn"
+          @click.stop="emit('select', ideaId)"
+        >
+          View Content
+          <ArrowRight :size="14" />
+        </button>
+      </div>
     </div>
 
     <p v-if="errorMessage" class="idea-card__error">{{ errorMessage }}</p>
@@ -146,6 +156,10 @@ const props = defineProps<{
 
   isUpdating?: boolean;
   isUpdated?: boolean;
+
+  // LLM cost in cents attributed to this idea (production-only sum). 0 or
+  // missing when production has not run yet.
+  costCents?: number;
 
   variant: 'session' | 'library';
 
@@ -189,6 +203,13 @@ const displayUsername = computed(() => {
 });
 
 const truncatedDescription = computed(() => props.description ?? '');
+
+const costLabel = computed<string | null>(() => {
+  const cents = props.costCents ?? 0;
+  if (cents <= 0) return null;
+  if (cents < 1) return '<$0.01';
+  return `$${(cents / 100).toFixed(2)}`;
+});
 
 
 // ─── Status ───
@@ -507,6 +528,23 @@ async function schedulePost(): Promise<void> {
   display: flex;
   align-items: center;
   gap: 0.375rem;
+}
+
+.idea-card__footer-right {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.idea-card__cost {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #777587;
+  background: #f2f4f6;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 9999px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 /* ─── Buttons ─── */

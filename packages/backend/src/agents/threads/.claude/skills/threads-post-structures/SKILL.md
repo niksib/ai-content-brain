@@ -187,7 +187,6 @@ No setup. No explanation. Just the observation.
 | Something real happened | Specific Personal Story |
 | You want to hear from your audience | Conversation Starter (no question — make a statement that invites reaction) |
 | Content needs >500 chars, not a personal story | Two-Post Thread |
-| Raw personal story with emotional weight | Three-Post Thread (exception) |
 | You have one sharp observation | Quick Take |
 
 **Default direction:** When in doubt, cut. Under 50 words beats everything else on Threads.

@@ -160,13 +160,4 @@ Ask:
 
 If any answer is no — revise that part.
 
-## What Actually Makes Writing Sound Human
-
-- **Specificity**: Real details from the actual story
-- **Imperfection**: Moments of uncertainty, honest reactions, things that didn't go as planned
-- **Opinion**: A clear point of view, not neutral coverage of all angles
-- **Rhythm**: Variation in sentence length and energy
-- **Voice**: Vocabulary and phrasing that belongs to this specific person
-- **Surprise**: At least one moment that the reader didn't expect
-
 Generic writing that could have been written by anyone about anything will never sound human. Every piece of content must be grounded in the specific story and perspective of this specific creator.

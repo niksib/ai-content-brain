@@ -74,6 +74,10 @@ export interface SessionIdea {
   status: 'proposed' | 'approved' | 'rejected' | 'producing' | 'completed';
   publishStatus?: 'posted' | 'scheduled' | null;
   threadsPostId?: string | null;
+  // LLM cost in cents attributed to this idea — sum of production-time
+  // CreditTransaction.costCents. Strategist cost is session-shared and not
+  // included. 0 when production has not run yet.
+  costCents?: number;
   createdAt: string;
   updatedAt: string;
 }

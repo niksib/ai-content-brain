@@ -23,6 +23,17 @@ export const saveContentIdeaTool: Anthropic.Tool = {
       },
       angle: { type: "string", description: "The angle or hook of the content idea" },
       description: { type: "string", description: "Detailed description of the content idea" },
+      source_quote: {
+        type: "string",
+        description:
+          "Direct quote from the user — their actual words about this topic, copied as-is. Not a paraphrase. Pass empty string if the user did not say anything quote-worthy on this idea.",
+      },
+      do_not: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Short list of things the platform agent should NOT do with this material (e.g. \"don't end with a takeaway\"). Pass empty array when no specific trap applies.",
+      },
     },
     required: ["platform", "format", "angle", "description"],
   },
@@ -31,13 +42,22 @@ export const saveContentIdeaTool: Anthropic.Tool = {
 export const updateContentIdeaTool: Anthropic.Tool = {
   name: "update_content_idea",
   description:
-    "Update an existing content idea's angle or description. Use this when the user asks to refine, adjust, or improve a specific idea. You already know each idea's ID from the save_content_idea tool results.",
+    "Update an existing content idea's angle, description, source quote, or do_not list. Use this when the user asks to refine, adjust, or improve a specific idea. You already know each idea's ID from the save_content_idea tool results.",
   input_schema: {
     type: "object",
     properties: {
       ideaId: { type: "string", description: "The ID of the content idea to update" },
       angle: { type: "string", description: "Updated one-line angle/hook (omit to keep unchanged)" },
       description: { type: "string", description: "Updated description (omit to keep unchanged)" },
+      source_quote: {
+        type: "string",
+        description: "Updated direct user quote (omit to keep unchanged; pass empty string to clear)",
+      },
+      do_not: {
+        type: "array",
+        items: { type: "string" },
+        description: "Updated do_not list (omit to keep unchanged; pass empty array to clear)",
+      },
     },
     required: ["ideaId"],
   },
@@ -148,13 +168,23 @@ export async function loadStrategistSessionContext(
   ].join("\n");
 }
 
+function normalizeDoNot(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
 export function makeSaveContentIdea(userId: string, chatSessionId: string, onIdeaSaved?: (idea: ContentIdea) => void) {
   return async (input: Record<string, unknown>): Promise<string> => {
-    const { platform, format, angle, description } = input as {
+    const { platform, format, angle, description, source_quote, do_not } = input as {
       platform: string;
       format: string;
       angle: string;
       description: string;
+      source_quote?: string;
+      do_not?: unknown;
     };
 
     const contentPlan = await prisma.contentPlan.upsert({
@@ -171,6 +201,8 @@ export function makeSaveContentIdea(userId: string, chatSessionId: string, onIde
         format: format as ContentFormat,
         angle,
         description,
+        sourceQuote: typeof source_quote === "string" ? source_quote : "",
+        doNot: normalizeDoNot(do_not),
       },
     });
 
@@ -185,10 +217,12 @@ export function makeUpdateContentIdea(
   onUpdated?: (idea: ContentIdea) => void
 ) {
   return async (input: Record<string, unknown>): Promise<string> => {
-    const { ideaId, angle, description } = input as {
+    const { ideaId, angle, description, source_quote, do_not } = input as {
       ideaId: string;
       angle?: string;
       description?: string;
+      source_quote?: string;
+      do_not?: unknown;
     };
 
     const existing = await prisma.contentIdea.findUnique({ where: { id: ideaId } });
@@ -207,6 +241,8 @@ export function makeUpdateContentIdea(
       data: {
         ...(angle !== undefined && { angle }),
         ...(description !== undefined && { description }),
+        ...(source_quote !== undefined && { sourceQuote: source_quote }),
+        ...(do_not !== undefined && { doNot: normalizeDoNot(do_not) }),
       },
     });
 
