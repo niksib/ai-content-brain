@@ -23,6 +23,7 @@ export function useSSEStream() {
   const costUsd = ref<number | null>(null);
 
   let abortController: AbortController | null = null;
+  let pendingTimeouts: ReturnType<typeof setTimeout>[] = [];
 
   function reset(): void {
     tokens.value = '';
@@ -40,6 +41,11 @@ export function useSSEStream() {
       abortController.abort();
       abortController = null;
     }
+
+    for (const id of pendingTimeouts) {
+      clearTimeout(id);
+    }
+    pendingTimeouts = [];
   }
 
   function parseSSEEvents(chunk: string): Array<{ event: string; data: string }> {
@@ -163,9 +169,10 @@ export function useSSEStream() {
           ideas.value.push(parsed);
           // Delay decrement so skeleton is visible for at least one render frame
           // even if idea_pending and idea arrive in the same SSE buffer chunk
-          setTimeout(() => {
+          const timeoutId = setTimeout(() => {
             activePendingIdeas.value = Math.max(0, activePendingIdeas.value - 1);
           }, 600);
+          pendingTimeouts.push(timeoutId);
         } catch {
           console.warn('Failed to parse idea event:', data);
         }

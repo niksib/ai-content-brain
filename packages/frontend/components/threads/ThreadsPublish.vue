@@ -50,9 +50,8 @@
         </div>
 
         <!-- Schedule popover — teleported to body to escape overflow:hidden -->
-        <Teleport to="body">
+        <Teleport v-if="showSchedulePopover" to="body">
           <div
-            v-if="showSchedulePopover"
             ref="popoverEl"
             class="threads-publish__popover"
             :style="popoverStyle"

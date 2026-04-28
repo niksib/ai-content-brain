@@ -1,6 +1,6 @@
 <template>
-  <Teleport to="body">
-    <div v-if="open" class="sched-overlay" @click.self="close">
+  <Teleport v-if="open" to="body">
+    <div class="sched-overlay" @click.self="close">
       <div class="sched-modal" role="dialog" aria-modal="true">
         <header class="sched-modal__header">
           <h2 class="sched-modal__title">{{ isEditMode ? 'Edit scheduled post' : 'Schedule post' }}</h2>

@@ -29,9 +29,8 @@
             <ChevronDown :size="16" class="backlog-card__chevron" />
           </button>
 
-          <Teleport to="body">
+          <Teleport v-if="showPopover" to="body">
             <div
-              v-if="showPopover"
               ref="popoverEl"
               class="backlog-card__popover"
               :style="popoverStyle"

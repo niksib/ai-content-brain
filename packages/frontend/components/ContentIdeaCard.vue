@@ -79,9 +79,8 @@
               <ChevronDown :size="14" />
             </button>
 
-            <Teleport to="body">
+            <Teleport v-if="showPopover" to="body">
               <div
-                v-if="showPopover"
                 ref="popoverEl"
                 class="idea-card__popover"
                 :style="popoverStyle"

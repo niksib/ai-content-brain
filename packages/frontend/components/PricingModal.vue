@@ -1,6 +1,6 @@
 <template>
-  <Teleport to="body">
-    <div v-if="billing.isPricingModalOpen" class="pricing-overlay" @click.self="close">
+  <Teleport v-if="billing.isPricingModalOpen" to="body">
+    <div class="pricing-overlay" @click.self="close">
       <div class="pricing-modal" role="dialog" aria-modal="true">
         <button type="button" class="pricing-modal__close" @click="close" aria-label="Close">
           <X :size="18" />
