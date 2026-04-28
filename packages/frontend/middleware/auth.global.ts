@@ -10,6 +10,11 @@
 const AUTH_CACHE_TTL_MS = 30_000;
 
 export default defineNuxtRouteMiddleware(async (to) => {
+  // Protected pages are ssr:false — auth state is irrelevant on the server.
+  // Running auth check server-side with no cookies causes isAuthenticated=false,
+  // which differs from the client result and triggers a hydration mismatch.
+  if (import.meta.server) return;
+
   if (to.path === '/' || to.path === '/og-preview' || to.path.startsWith('/data-deletion-status/')) return;
 
   const isAuthenticated = useState<boolean | null>('auth:authenticated', () => null);
