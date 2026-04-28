@@ -91,7 +91,9 @@
         <span style="font-family:'Manrope',sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.02em;color:#111827;">HeyPostrr</span>
       </div>
 
-      <slot />
+      <ClientOnly>
+        <slot />
+      </ClientOnly>
     </main>
 
     <PricingModal />
