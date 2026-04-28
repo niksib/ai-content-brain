@@ -102,7 +102,7 @@
         <div class="cal-list-row__entries">
           <template v-if="day.entries.length > 0">
             <div
-              v-for="entry in day.entries.slice(0, 2)"
+              v-for="entry in day.entries"
               :key="entry.key"
               class="cal-list-bubble"
               :class="entry.kind === 'library' ? bubbleClass(entry.item) : [standaloneBubbleClass(entry.post), entry.post.status !== 'pending' ? 'calendar-bubble--readonly' : '']"
@@ -112,7 +112,6 @@
               <span class="cal-list-bubble__text">{{ entry.kind === 'library' ? entry.item.contentIdea.angle : (entry.post.text || '(empty)') }}</span>
               <span class="cal-list-bubble__time">{{ entryTimeLabel(entry) }}</span>
             </div>
-            <span v-if="day.entries.length > 2" class="cal-list-more">+{{ day.entries.length - 2 }} more</span>
           </template>
           <template v-else>
             <span class="cal-list-row__empty-today" v-if="day.isToday">Nothing scheduled</span>

@@ -18,7 +18,6 @@ export class ThreadsAgent extends PlatformAgent {
   private constructor(userId: string, private readonly idea: ContentIdea) {
     super("threads", userId, {
       skills: [
-        "hook-formulas",
         "tone-of-voice-matching",
         "anti-ai-writing",
       ],

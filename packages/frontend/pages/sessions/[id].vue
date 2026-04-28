@@ -835,9 +835,39 @@ onMounted(async () => {
 
 @media (max-width: 900px) {
   .chat-state {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
+  }
+
+  .transcript-panel {
+    height: auto;
+    flex-shrink: 0;
+    overflow: visible;
+    border-right: none;
+    border-bottom: 1px solid rgba(199, 196, 216, 0.3);
+  }
+
+  .transcript-messages {
+    max-height: 50vh;
+    flex: none;
+  }
+
+  .workspace-panel {
+    height: auto;
+    flex-shrink: 0;
+    overflow: visible;
+    min-height: 60vh;
+  }
+
+  .ideas-grid {
+    overflow: visible;
+    flex: none;
+  }
+
+  .workspace-detail {
+    height: auto;
+    overflow: visible;
   }
 }
 

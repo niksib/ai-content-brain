@@ -1,15 +1,13 @@
 ---
 name: content-filtering
-description: Use this skill when the Content Strategist is deciding what from the daily voice dump is worth turning into content. Apply before proposing any content ideas — not every story deserves a post.
+description: Use this skill when the Content Strategist is deciding what from the user's dump is worth turning into content. Apply after matching the dump to angles — not every angle match deserves a post.
 ---
-
-# Content Filtering
 
 ## The Core Question
 
-Not everything the creator shares is worth posting. The Content Strategist's most important job is deciding what to SKIP, not what to include.
+Not everything that fits an angle is worth posting. After you've matched the dump to one of the 10 angles, run the material through this filter.
 
-Ask one question about every story or insight from the voice dump:
+Ask one question:
 
 **"Would someone who doesn't know this person stop scrolling for this?"**
 
@@ -17,94 +15,91 @@ If the answer is no — skip it.
 
 ---
 
-## What Is Worth Posting
+## The Three Tests
 
-### 1. A Specific Insight
-Something the creator learned that changes how you think about a topic. Not "productivity is important" — but "I realized that replying to comments in the first hour matters more than anything else I do."
+For an idea to survive filtering, all three must pass:
 
-**Test:** Can you express it in one sentence that would make someone go "huh, I hadn't thought of it that way"? If yes — worth posting.
+### Test 1 — Specific over generic
 
-### 2. A Real Result or Milestone
-Something that happened with a specific outcome. Not "I've been working on my project" — but "I shipped the feature I've been building for 3 weeks. First 10 users signed up within an hour."
+The material must contain at least one detail that couldn't have been said by anyone else on any day.
 
-**Test:** Does it have a specific number, outcome, or concrete event attached? If yes — worth posting.
+- Bad: "I've been thinking about productivity."
+- Good: "I tracked every interruption for a week. 73% came from one person."
+- Bad: "I shipped something today."
+- Good: "I shipped at 2am and watched the first user sign up 14 minutes later."
 
-### 3. A Decision with Interesting Rationale
-A choice the creator made that others in a similar situation would benefit from understanding. Not "I decided to focus on one platform" — but "I stopped posting on Instagram and went all in on TikTok. Here's the reasoning."
+If the dump contains only the generic version, the filter blocks the idea — even if an angle technically matches.
 
-**Test:** Would someone facing a similar decision learn something from the rationale? If yes — worth posting.
+### Test 2 — Real reaction is plausible
 
-### 4. A Process or Workflow
-A specific way of doing something that others could adopt. Not "I have a system for content" — but "My daily content workflow takes 30 minutes. Here's the exact steps."
+You can picture a specific comment someone would actually type. Not "great post" — a real reply with content.
 
-**Test:** Could someone replicate this? If yes — potentially worth posting.
+- "actually I disagree because…"
+- "wait, what stack did you use?"
+- "same thing happened to me when…"
+- "this is wrong — here's why…"
 
-### 5. A Failure or Mistake
-Something that went wrong with a clear lesson. Not "today was rough" — but "I spent 4 hours debugging what turned out to be a typo. The real lesson was about how I was reading error messages wrong."
+If you can't picture a real reply, the angle is matching the surface but the material is too thin underneath.
 
-**Test:** Is there a specific lesson that came out of the failure? If yes — worth posting. Failures with no lesson are just complaints.
+### Test 3 — Not a recent duplicate
 
-### 6. A Contrarian Opinion
-A take that challenges common thinking, backed by the creator's specific experience. Not "I think people focus too much on vanity metrics" — but "I had 50k followers and was making less than someone I know with 3k. Here's why follower count is the wrong goal."
+Check the content history block in the system prompt. Block the idea only if the **same topic in the same angle** appeared in the last 30 days.
 
-**Test:** Would someone who holds the opposite view want to argue with this? If yes — worth posting.
+- Same topic, different angle → allowed if the new framing is genuinely different (a `hot_take` about AI replacing juniors three days ago does not block a `specific_story` about a concrete moment a client fired their team).
+- Same angle, different topic → fine. Angles are structures and should repeat.
+- Same topic and same angle within 30 days → skip.
 
----
-
-## What Is Not Worth Posting
-
-### Generic Productivity / Motivation
-"Today was really productive." / "Sometimes you just have to push through." / "Consistency is key."
-
-These could have been said by anyone on any day. Zero specificity = zero reason to stop scrolling.
-
-### Inside Information Without Context
-Information that only makes sense if you know the full backstory of a specific project or situation. If the audience needs 5 paragraphs of context to understand why something is interesting — it's not ready to be a post yet.
-
-### Vague Observations
-"I've been thinking a lot about AI lately." / "The market is changing." / "Things are evolving fast."
-
-These sound like something, but say nothing. Every statement needs a specific claim behind it.
-
-### What They've Already Posted
-Check content history. If a similar topic, angle, or insight appeared in the last 30 days — skip it or find a genuinely new angle.
-
-### "I Did X"
-Progress updates with no insight, result, or lesson attached. "I've been working on my app" is not a post. "I realized the feature I've been building for 2 weeks is the wrong solution" — that's a post.
-
-### Complaints Without Resolution
-Something frustrating happened, but there's no lesson, no resolution, no insight. Just frustration. Skip it.
+Soft balance: avoid stacking the same angle 4+ times in the last 5 ideas. If multiple angles fit equally well, prefer one used less recently.
 
 ---
 
-## The Angle Finding Process
+## What to Skip
 
-Sometimes raw material from the voice dump has a good story underneath but needs the right angle to become a post.
+### Generic productivity / motivation
+"Today was productive." "Sometimes you just have to push through." "Consistency is key."
 
-**Step 1: Find the most interesting specific detail**
-What is the ONE thing in this story that would make someone say "wait, really?" That's the center of the post.
+Could have been said by anyone on any day. Zero specificity = zero reason to stop scrolling.
 
-**Step 2: Find the universal lesson**
-Why would someone who is NOT this creator care? What does it teach them about their own situation?
+### Inside information without context
+Information that only makes sense if you know the full backstory. If the audience needs 5 paragraphs of context to understand why something is interesting, it's not ready yet.
 
-**Step 3: Match platform to angle**
-- Is it an opinion or hot take → Threads
-- Is it a visual story or process → TikTok / Reels
-- Is it a framework or step-by-step → Carousel
-- Is it a professional achievement or lesson → LinkedIn
+### Vague observations
+"I've been thinking a lot about AI lately." "The market is changing." "Things are evolving fast."
 
-**Step 4: Check if it can be summarized in one sentence**
-If you can't summarize the core angle in one sentence, the angle isn't clear enough yet. Find it.
+Sounds like something, says nothing. Every statement needs a specific claim behind it.
+
+### "I did X" with no insight, result, or lesson
+Progress updates without a sharp detail. "I've been working on my app" is not a post. "I realized the feature I've been building for 2 weeks is the wrong solution" — that's a post.
+
+### Complaints without resolution
+Frustration with no lesson, no resolution, no insight. Skip it.
+
+### Material that fits structurally but has no specifics
+Most dangerous category. The dump has the right shape for an angle (e.g., "I noticed people…") but no concrete observation behind it. This produces AI-slop. Block it.
 
 ---
 
-## Content Filtering Output
+## The Angle-First Decision
 
-For each item from the user's stream of thoughts, make a clear call:
+Always sequence:
 
-**POST** — this has a clear angle, specific detail, and obvious platform
-**SKIP** — this lacks specificity, has no lesson, or is too generic
-**HOLD** — the material is interesting but needs more context or a better angle before posting
+1. **Does the dump match an angle clearly?** If yes, proceed. If no — this isn't a filtering problem, it's an extraction problem (run Extraction Protocol).
+2. **Does the material pass the three tests above?**
+3. **Has it been covered in the last 30 days?**
 
-Only propose ideas for POST items.
-Explain in one sentence why SKIP items didn't make the cut — so the user understands the reasoning.
+If 1 fails → no idea (use Extraction Protocol).
+If 2 or 3 fails → SKIP and tell the user briefly why.
+
+---
+
+## Filtering Output
+
+For each candidate idea, classify:
+
+- **POST** — angle matches, material is specific, reaction is plausible, not covered recently. Save it.
+- **SKIP** — angle matches structurally but material is too thin, generic, or recently covered. Don't save. Briefly tell the user why.
+- **HOLD** — angle and material are interesting but need more detail before saving. Use the Extraction Protocol to ask for what's missing.
+
+Only call `save_content_idea` for POST items.
+
+For SKIP items, tell the user in one sentence what's missing — so they understand the reasoning and can decide whether to expand.
