@@ -512,9 +512,9 @@
           <div class="footer-base">
             <span class="mono-label">© 2026 HeyPostrr</span>
             <span class="footer-sep">·</span>
-            <a href="#">Privacy</a>
+            <a href="/privacy">Privacy</a>
             <span class="footer-sep">·</span>
-            <a href="#">Terms</a>
+            <a href="/terms">Terms</a>
           </div>
         </footer>
       </div>
