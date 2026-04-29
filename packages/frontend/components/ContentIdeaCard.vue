@@ -3,7 +3,7 @@
     class="idea-card"
     :class="cardClasses"
     @click="emit('select', ideaId)"
-    @mouseenter="isUpdated && emit('seen', ideaId)"
+    @mouseenter="(isUpdated || isUpdating) && emit('seen', ideaId)"
   >
     <!-- ── Header ── -->
     <div class="idea-card__header">
@@ -31,7 +31,7 @@
 
     <!-- ── Body ── -->
     <div class="idea-card__body">
-      <h3 class="idea-card__title">{{ angle }}</h3>
+      <h3 class="idea-card__title">{{ angleLabel }}</h3>
       <p v-if="description" class="idea-card__description">{{ truncatedDescription }}</p>
 
     </div>
@@ -184,6 +184,19 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   instagram: 'Instagram',
 };
 
+const ANGLE_LABELS: Record<string, string> = {
+  hot_take: 'Hot Take',
+  reframe: 'Reframe',
+  specific_story: 'Specific Story',
+  list_of_specifics: 'List of Specifics',
+  numbers: 'Numbers',
+  observation: 'Observation',
+  curiosity_gap: 'Curiosity Gap',
+  identity_snapshot: 'Identity Snapshot',
+  comparison_frame: 'Comparison Frame',
+  question_to_audience: 'Question to Audience',
+};
+
 const FORMAT_LABELS: Record<string, string> = {
   text_post: 'Post',
   text_with_image: 'Post + Image',
@@ -195,6 +208,7 @@ const FORMAT_LABELS: Record<string, string> = {
 
 const platformLabel = computed(() => PLATFORM_LABELS[props.platform] ?? props.platform);
 const formatLabel = computed(() => FORMAT_LABELS[props.format] ?? props.format);
+const angleLabel = computed(() => ANGLE_LABELS[props.angle] ?? props.angle);
 
 const displayUsername = computed(() => {
   if (props.username) return `@${props.username}`;

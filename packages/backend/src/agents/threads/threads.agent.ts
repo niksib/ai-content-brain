@@ -1,3 +1,5 @@
+import path from "path";
+import fs from "fs";
 import { BaseAgent, PlatformAgent, type AgentToolSet, type AgentToolOptions } from "../base.agent.js";
 import { buildCreatorProfile, formatCreatorProfileForPrompt } from "../adapters/profile-from-memory.js";
 import { formatStrategistHints } from "../adapters/idea-hints.js";
@@ -30,7 +32,15 @@ export class ThreadsAgent extends PlatformAgent {
 
   protected async loadContext(): Promise<string> {
     const profile = await buildCreatorProfile(this.userId);
-    return `## Creator Profile\n${formatCreatorProfileForPrompt(profile)}`;
+    const parts = [`## Creator Profile\n${formatCreatorProfileForPrompt(profile)}`];
+
+    const angleFilePath = path.join(import.meta.dirname, "docs", "angles", `${this.idea.angle}.md`);
+    if (fs.existsSync(angleFilePath)) {
+      const angleContent = fs.readFileSync(angleFilePath, "utf-8");
+      parts.push(`## Angle Template\n${angleContent}`);
+    }
+
+    return parts.join("\n\n");
   }
 
   buildProductionPrompt(): string {
@@ -49,7 +59,7 @@ The Creator Profile is already loaded in your system prompt — use it to match 
 
 ${LANGUAGE_RULE}
 
-Write the ready-to-post text AND a clear image brief. Apply skills: hook-formulas for the opening line, threads-post-structures for structure, tone-of-voice-matching to write as the creator, anti-ai-writing to sound human, cta-patterns for the closing.
+Write the ready-to-post text AND a clear image brief. Follow the Angle Template in your system prompt (## Angle Template) for structure, hook style, and banned patterns — it overrides everything else. Apply tone-of-voice-matching to write as the creator and anti-ai-writing to sound human.
 
 The image must add information the text cannot convey — proof, result, context, or visual surprise. Not decoration.
 
@@ -76,7 +86,7 @@ The Creator Profile is already loaded in your system prompt — use it to match 
 
 ${LANGUAGE_RULE}
 
-Write a hook caption AND image briefs for each slide (3–6 images). Apply skills: hook-formulas for the caption opening, threads-post-structures for narrative arc across images, tone-of-voice-matching to write as the creator, anti-ai-writing to sound human, cta-patterns for the closing.
+Write a hook caption AND image briefs for each slide (3–6 images). Follow the Angle Template in your system prompt (## Angle Template) for structure, hook style, and banned patterns — it overrides everything else. Apply tone-of-voice-matching to write as the creator and anti-ai-writing to sound human.
 
 Each image must add a new piece of information — not repeat what the previous one showed. The caption sets up the story, the images deliver it.
 
@@ -103,7 +113,7 @@ The Creator Profile is already loaded in your system prompt — use it to match 
 
 ${LANGUAGE_RULE}
 
-Write the ready-to-post text. Apply skills: hook-formulas for the opening line, threads-post-structures for structure, tone-of-voice-matching to write as the creator, anti-ai-writing to sound human, cta-patterns for the closing.
+Write the ready-to-post text. Follow the Angle Template in your system prompt (## Angle Template) for structure, hook style, and banned patterns — it overrides everything else. Apply tone-of-voice-matching to write as the creator and anti-ai-writing to sound human.
 
 **CHARACTER LIMIT — read carefully:**
 Each Threads post is limited to 500 characters (spaces, newlines, and all punctuation count).

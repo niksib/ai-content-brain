@@ -6,9 +6,6 @@ import { agentRunner } from "../services/agent-runner.service.js";
 import { maybeAttachCostsForAdmin, isAdminUser, getIdeaCostsMap } from "../services/idea-cost.service.js";
 import { createSSEStream } from "../lib/sse.js";
 import { ThreadsAgent } from "../agents/threads/threads.agent.js";
-import { LinkedInAgent } from "../agents/linkedin/linkedin.agent.js";
-import { VideoAgent } from "../agents/video/video.agent.js";
-import { InstagramAgent } from "../agents/instagram/instagram.agent.js";
 import type { AppEnv } from "../types/hono.js";
 import type { ContentIdea } from "../generated/prisma/client.js";
 import type { PlatformAgent } from "../agents/base.agent.js";
@@ -19,13 +16,6 @@ async function resolvePlatformAgent(idea: ContentIdea, userId: string): Promise<
   const { platform } = idea;
 
   if (platform === "threads") return ThreadsAgent.create(userId, idea);
-  if (platform === "linkedin") return LinkedInAgent.create(userId, idea);
-  if (platform === "tiktok") return VideoAgent.create(userId, idea);
-  if (platform === "instagram") {
-    return idea.format === "video_script"
-      ? VideoAgent.create(userId, idea)
-      : InstagramAgent.create(userId, idea);
-  }
 
   throw new Error(`No agent for platform=${platform}`);
 }
