@@ -117,6 +117,9 @@ importers:
       nuxt:
         specifier: ^3.17.0
         version: 3.21.2(@electric-sql/pglite@0.4.1)(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@parcel/watcher@2.5.6)(@types/node@22.19.17)(@vue/compiler-sfc@3.5.32)(cac@6.7.14)(db0@0.3.4(@electric-sql/pglite@0.4.1)(mysql2@3.15.3))(ioredis@5.10.1)(magicast@0.5.2)(mysql2@3.15.3)(rollup-plugin-visualizer@7.0.1(rollup@4.60.1))(rollup@4.60.1)(srvx@0.11.15)(terser@5.46.1)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.17)(jiti@1.21.7)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(yaml@2.8.3)
+      simple-analytics-vue:
+        specifier: ^3.1.0
+        version: 3.1.0(vue@3.5.32(typescript@5.9.3))
       tailwindcss:
         specifier: ^3.4.19
         version: 3.4.19(tsx@4.21.0)(yaml@2.8.3)
@@ -4213,6 +4216,11 @@ packages:
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
+
+  simple-analytics-vue@3.1.0:
+    resolution: {integrity: sha512-8Pwjbh3e0UDKwhLgDOokGOWe3Ot7bZsTbNHMaQylqFebTxoWe80gH+h1jcNbWPCBQ+/nEWHdqbRLpc/4vg2gow==}
+    peerDependencies:
+      vue: ^3.0.0
 
   simple-git@3.33.0:
     resolution: {integrity: sha512-D4V/tGC2sjsoNhoMybKyGoE+v8A60hRawKQ1iFRA1zwuDgGZCBJ4ByOzZ5J8joBbi4Oam0qiPH+GhzmSBwbJng==}
@@ -9363,6 +9371,10 @@ snapshots:
   signal-exit@3.0.7: {}
 
   signal-exit@4.1.0: {}
+
+  simple-analytics-vue@3.1.0(vue@3.5.32(typescript@5.9.3)):
+    dependencies:
+      vue: 3.5.32(typescript@5.9.3)
 
   simple-git@3.33.0:
     dependencies:
