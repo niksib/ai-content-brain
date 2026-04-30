@@ -21,8 +21,8 @@
       </div> -->
     </div>
 
-    <!-- ── Action Cards (hidden during onboarding) ── -->
-    <div v-if="!showOnboardingBlock" class="action-grid">
+    <!-- ── Action Cards (hidden during onboarding or before initial load) ── -->
+    <div v-if="showActionGrid" class="action-grid">
       <button
         class="action-card action-card--primary"
         :disabled="isStarting"
@@ -309,6 +309,8 @@ definePageMeta({
   ssr: false,
 });
 
+useHead({ title: 'Dashboard — HeyPostrr' });
+
 const dashboardStore = useDashboardStore();
 const billingStore = useBillingStore();
 const profileStore = useProfileStore();
@@ -318,9 +320,17 @@ const isStarting = ref(false);
 
 // ── Onboarding checklist state ──
 const threadsAccount = ref<ThreadsAccount | null>(null);
+const threadsAccountLoaded = ref(false);
 const apiBaseUrl = config.public.apiBaseUrl as string;
 const threadsAuthUrl = `${apiBaseUrl}/api/threads/auth`;
 let styleAnalysisPoller: ReturnType<typeof setInterval> | null = null;
+
+// Gate the action-grid / onboarding-block reveal on initial data load to
+// prevent the flicker where action-grid renders first, then swaps to the
+// onboarding-block once profile data arrives.
+const dashboardReady = computed(
+  () => profileStore.isLoaded && threadsAccountLoaded.value,
+);
 
 const hasThreadsPlatform = computed(() => true);
 
@@ -361,7 +371,13 @@ const onboardingSteps = computed(() => {
 const completedStepsCount = computed(() => onboardingSteps.value.filter(Boolean).length);
 const totalStepsCount = computed(() => onboardingSteps.value.length);
 const showOnboardingBlock = computed(
-  () => profileStore.isOnboarded && completedStepsCount.value < totalStepsCount.value
+  () =>
+    dashboardReady.value &&
+    profileStore.isOnboarded &&
+    completedStepsCount.value < totalStepsCount.value,
+);
+const showActionGrid = computed(
+  () => dashboardReady.value && !showOnboardingBlock.value,
 );
 
 async function loadThreadsAccount(): Promise<void> {
@@ -373,6 +389,8 @@ async function loadThreadsAccount(): Promise<void> {
     threadsAccount.value = response.account;
   } catch {
     threadsAccount.value = null;
+  } finally {
+    threadsAccountLoaded.value = true;
   }
 }
 

@@ -48,6 +48,8 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'blank' })
 
+useHead({ title: 'Data Deletion Status — HeyPostrr' })
+
 const route = useRoute()
 const config = useRuntimeConfig()
 const code = computed(() => String(route.params.code))

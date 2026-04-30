@@ -31,7 +31,8 @@
 
     <!-- ── Body ── -->
     <div class="idea-card__body">
-      <h3 class="idea-card__title">{{ angleLabel }}</h3>
+      <h3 class="idea-card__title">{{ displayTitle }}</h3>
+      <span class="idea-card__angle-badge">{{ angleLabel }}</span>
       <p v-if="description" class="idea-card__description">{{ truncatedDescription }}</p>
 
     </div>
@@ -145,6 +146,7 @@ const props = defineProps<{
   ideaId: string;
   platform: Platform;
   format: string;
+  title?: string;
   angle: string;
   status: string;
 
@@ -209,6 +211,11 @@ const FORMAT_LABELS: Record<string, string> = {
 const platformLabel = computed(() => PLATFORM_LABELS[props.platform] ?? props.platform);
 const formatLabel = computed(() => FORMAT_LABELS[props.format] ?? props.format);
 const angleLabel = computed(() => ANGLE_LABELS[props.angle] ?? props.angle);
+const displayTitle = computed(() => {
+  const t = (props.title ?? '').trim();
+  if (t) return t;
+  return angleLabel.value;
+});
 
 const displayUsername = computed(() => {
   if (props.username) return `@${props.username}`;
@@ -512,6 +519,19 @@ async function schedulePost(): Promise<void> {
   margin: 0 0 0.375rem;
   line-height: 1.3;
   letter-spacing: -0.01em;
+}
+
+.idea-card__angle-badge {
+  display: inline-block;
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  background: #eef0ff;
+  color: #3525cd;
+  margin-bottom: 0.5rem;
 }
 
 .idea-card__description {

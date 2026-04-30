@@ -40,11 +40,11 @@
               <span class="mono-label">AI for creators who think out loud</span>
             </div>
             <h1 class="display hero-title">
-              Don't write.<br>
-              <em>Just think.</em>
+              Voice your mess.<br>
+              <em>Get your post.</em>
             </h1>
             <p class="hero-sub">
-              HeyPostrr turns your thoughts into posts that sound exactly like <span class="underline-scribble">you</span>, on Threads, LinkedIn, Instagram, X.
+              HeyPostrr turns your messy thoughts into posts that actually sound like <span class="underline-scribble">you</span> - on Threads, LinkedIn, Instagram, X.
             </p>
             <div class="hero-ctas">
               <div class="hero-cta-col">
@@ -542,30 +542,11 @@
             Continue with Threads
           </button>
 
-          <div class="auth-divider"><span>or</span></div>
-
           <p v-if="threadsLoginError" class="auth-error-msg">{{ threadsLoginError }}</p>
 
-          <form class="auth-form" @submit.prevent="handleAuthSubmit">
-            <label v-if="authMode === 'register'" class="auth-field">
-              <span>Name</span>
-              <input v-model="authName" type="text" placeholder="Your name" required />
-            </label>
-            <label class="auth-field">
-              <span>Email</span>
-              <input v-model="authEmail" type="email" placeholder="you@example.com" required />
-            </label>
-            <label class="auth-field">
-              <span>Password</span>
-              <input v-model="authPassword" type="password" placeholder="••••••••" required minlength="8" />
-            </label>
-            <p v-if="authError" class="auth-error-msg">{{ authError }}</p>
-            <button type="submit" class="btn-primary auth-submit" :disabled="authLoading">
-              <span v-if="authLoading" class="auth-card__spinner" />
-              {{ authLoading ? 'Please wait...' : authMode === 'login' ? 'Sign in' : 'Create account' }}
-              <ArrowRight v-if="!authLoading" :size="16" />
-            </button>
-          </form>
+          <p class="auth-helper">
+            HeyPostrr only supports sign-in through Threads. We'll create or open your account based on your Threads identity.
+          </p>
         </div>
       </div>
   </div>
@@ -577,9 +558,35 @@ import { ArrowRight, Mic, Filter, SlidersHorizontal, Rocket, Sparkles, Activity,
 
 definePageMeta({ layout: false });
 
+const seoConfig = useRuntimeConfig();
+const siteUrl = (seoConfig.public.siteUrl as string).replace(/\/$/, '');
+const ogImageUrl = `${siteUrl}/heypostrr-og.png`;
+const seoTitle = 'HeyPostrr - Turn messy thoughts into posts in your voice';
+const seoDescription =
+  'AI that turns your raw thoughts into posts that actually sound like you. Speak your mind, get publish-ready posts for Threads, LinkedIn, Instagram, X.';
+
+useSeoMeta({
+  title: seoTitle,
+  description: seoDescription,
+  ogTitle: seoTitle,
+  ogDescription: seoDescription,
+  ogType: 'website',
+  ogUrl: siteUrl,
+  ogSiteName: 'HeyPostrr',
+  ogImage: ogImageUrl,
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
+  ogImageAlt: 'HeyPostrr - AI that turns messy thoughts into posts in your voice',
+  twitterCard: 'summary_large_image',
+  twitterTitle: seoTitle,
+  twitterDescription: seoDescription,
+  twitterImage: ogImageUrl,
+  twitterImageAlt: 'HeyPostrr - AI that turns messy thoughts into posts in your voice',
+});
+
 useHead({
-  title: 'HeyPostrr - Your thoughts, posted.',
   link: [
+    { rel: 'canonical', href: siteUrl },
     { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
     { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
     {
@@ -623,12 +630,6 @@ const authMode = computed<'login' | 'register'>(() =>
   route.query.mode === 'login' ? 'login' : 'register',
 );
 
-const authName = ref('');
-const authEmail = ref('');
-const authPassword = ref('');
-const authError = ref('');
-const authLoading = ref(false);
-
 function goToAuth(mode: 'login' | 'register') {
   router.push(`/?mode=${mode}`);
 }
@@ -650,37 +651,6 @@ const threadsLoginError = computed<string>(() => {
 
 function signInWithThreads() {
   window.location.href = `${baseURL}/api/threads/login`;
-}
-
-async function handleAuthSubmit() {
-  authError.value = '';
-  authLoading.value = true;
-  try {
-    if (authMode.value === 'register') {
-      await $fetch(`${baseURL}/api/auth/sign-up/email`, {
-        method: 'POST',
-        body: { name: authName.value, email: authEmail.value, password: authPassword.value },
-        credentials: 'include',
-      });
-    } else {
-      await $fetch(`${baseURL}/api/auth/sign-in/email`, {
-        method: 'POST',
-        body: { email: authEmail.value, password: authPassword.value },
-        credentials: 'include',
-      });
-    }
-    authState.value = null;
-    const data = await $fetch<{ session: { completedAt: string | null } | null }>(
-      `${baseURL}/api/onboarding/session`,
-      { credentials: 'include' },
-    );
-    router.replace(data.session?.completedAt ? '/dashboard' : '/onboarding');
-  } catch (err: unknown) {
-    const apiError = err as { data?: { message?: string } };
-    authError.value = apiError?.data?.message || 'Something went wrong. Please try again.';
-  } finally {
-    authLoading.value = false;
-  }
 }
 
 
@@ -735,8 +705,8 @@ const waveformBars = computed(() =>
 
 const loopSteps: { n: string; title: string; sub: string; icon: Component }[] = [
   { n: '01', title: 'Talk',       sub: 'Just say what\'s on your mind. Walking, driving, showering - doesn\'t matter.',   icon: Mic },
-  { n: '02', title: 'We listen',  sub: 'We find ideas. We suggest 2-3 posts worth making. You pick.',                     icon: Filter },
-  { n: '03', title: 'We write',   sub: 'Each idea becomes a post made for its platform. Long for LinkedIn. Short for X.', icon: SlidersHorizontal },
+  { n: '02', title: 'We listen',  sub: 'We pull every post-worthy idea out of your dump - could be one, could be a handful. You pick.', icon: Filter },
+  { n: '03', title: 'We write',   sub: 'Each idea becomes a post made for its platform. Long for LinkedIn. Short for Threads.', icon: SlidersHorizontal },
   { n: '04', title: 'You post',   sub: 'Tap to approve. We post it, schedule it, or save the draft for later.',           icon: Rocket },
 ];
 
@@ -1635,7 +1605,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   50%      { transform: translateY(-8px) rotate(calc(var(--tilt, 0deg) + 0.8deg)); }
 }
 
-/* Left column — stacked at varying angles */
+/* Left column - stacked at varying angles */
 .final-chip--l1 { top: 18%;  left: 4%;  --tilt: -6deg; --delay: 0s;   }
 .final-chip--l2 { top: 42%;  left: 2%;  --tilt:  4deg; --delay: 1.4s; }
 .final-chip--l3 { top: 68%;  left: 6%;  --tilt: -3deg; --delay: 2.8s; }
@@ -1777,6 +1747,13 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   font-size: 13px; color: #ba1a1a; margin: 0;
   padding: 10px 12px; background: rgba(186,26,26,0.06); border-radius: 8px;
 }
+.auth-helper {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mute);
+  text-align: center;
+}
 .auth-submit { justify-content: center; padding: 12px; font-size: 15px; margin-top: 8px; width: 100%; }
 .auth-card__spinner {
   display: inline-block; width: 16px; height: 16px;
@@ -1833,7 +1810,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   .footer-inner { grid-template-columns: 1fr; }
   .footer-cols { grid-template-columns: repeat(2, 1fr); }
   .final-cta { margin: 16px; padding: 80px 20px; }
-  /* All decorative elements hidden on mobile — too little room for them
+  /* All decorative elements hidden on mobile - too little room for them
      to breathe, and the radial glow + copy carry the section on their own. */
   .final-decor { display: none; }
   .platforms { padding: 48px 20px; }

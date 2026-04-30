@@ -17,7 +17,7 @@
 
     <!-- Idea content -->
     <div v-else-if="idea" class="idea-page__content">
-      <!-- Meta badges (platform + format + status) sit above the title now -->
+      <!-- Meta badges (platform + format + status + angle) sit above the title now -->
       <div class="idea-page__meta">
         <span class="idea-page__badge idea-page__badge--platform">
           <PlatformIcon :platform="idea.platform as 'threads' | 'linkedin' | 'tiktok' | 'instagram'" :size="14" />
@@ -31,10 +31,11 @@
           class="idea-page__badge"
           :style="{ background: statusVisual.bg, color: statusVisual.color }"
         >{{ statusVisual.label }}</span>
+        <span class="idea-page__badge idea-page__badge--angle">{{ angleLabel }}</span>
       </div>
 
       <!-- Title -->
-      <h1 class="idea-page__title">{{ idea.angle }}</h1>
+      <h1 class="idea-page__title">{{ displayTitle }}</h1>
 
       <!-- Description -->
       <div v-if="idea.description" class="idea-page__section">
@@ -463,6 +464,31 @@ const PLATFORM_LABELS: Record<string, string> = {
   tiktok: 'TikTok',
   instagram: 'Instagram',
 };
+
+const ANGLE_LABELS: Record<string, string> = {
+  hot_take: 'Hot Take',
+  reframe: 'Reframe',
+  specific_story: 'Specific Story',
+  list_of_specifics: 'List of Specifics',
+  numbers: 'Numbers',
+  observation: 'Observation',
+  curiosity_gap: 'Curiosity Gap',
+  identity_snapshot: 'Identity Snapshot',
+  comparison_frame: 'Comparison Frame',
+  question_to_audience: 'Question to Audience',
+};
+
+const angleLabel = computed(() => {
+  if (!idea.value) return '';
+  return ANGLE_LABELS[idea.value.angle] ?? idea.value.angle;
+});
+
+const displayTitle = computed(() => {
+  if (!idea.value) return '';
+  const t = (idea.value.title ?? '').trim();
+  if (t) return t;
+  return angleLabel.value;
+});
 
 const { visual: statusColor } = useStatusColors();
 const { visual: formatColor } = useFormatColors();
@@ -914,6 +940,11 @@ onMounted(async () => {
 .idea-page__badge--platform {
   background: #f3f4f6;
   color: #4b5563;
+}
+
+.idea-page__badge--angle {
+  background: #eef0ff;
+  color: #3525cd;
 }
 
 .idea-page__platform-label {

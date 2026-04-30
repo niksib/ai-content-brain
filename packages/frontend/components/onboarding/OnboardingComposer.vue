@@ -56,7 +56,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   placeholder: 'Type your answer…',
   disabled: false,
-  showMic: true,
+  showMic: false,
   showSend: true,
 });
 

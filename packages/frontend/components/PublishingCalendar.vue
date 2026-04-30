@@ -62,7 +62,7 @@
                     <span class="calendar-bubble__format">{{ formatLabel(entry.item.format) }}</span>
                     <span class="calendar-bubble__status">{{ entryTimeLabel(entry) || chipStatusLabel(entry.item) }}</span>
                   </div>
-                  <p class="calendar-bubble__title">{{ entry.item.contentIdea.angle }}</p>
+                  <p class="calendar-bubble__title">{{ ideaTitle(entry.item) }}</p>
                 </div>
                 <div
                   v-else
@@ -109,7 +109,7 @@
               @click.stop="entry.kind === 'library' ? emit('navigate', entry.item) : onStandaloneClick(entry.post)"
             >
               <PlatformIcon :platform="(entry.kind === 'library' ? entry.item.platform : entry.post.platform) as any" :size="10" />
-              <span class="cal-list-bubble__text">{{ entry.kind === 'library' ? entry.item.contentIdea.angle : (entry.post.text || '(empty)') }}</span>
+              <span class="cal-list-bubble__text">{{ entry.kind === 'library' ? ideaTitle(entry.item) : (entry.post.text || '(empty)') }}</span>
               <span class="cal-list-bubble__time">{{ entryTimeLabel(entry) }}</span>
             </div>
           </template>
@@ -241,6 +241,26 @@ const FORMAT_LABELS: Record<string, string> = {
 
 function formatLabel(format: string): string {
   return FORMAT_LABELS[format] ?? format;
+}
+
+const CALENDAR_ANGLE_LABELS: Record<string, string> = {
+  hot_take: 'Hot Take',
+  reframe: 'Reframe',
+  specific_story: 'Specific Story',
+  list_of_specifics: 'List of Specifics',
+  numbers: 'Numbers',
+  observation: 'Observation',
+  curiosity_gap: 'Curiosity Gap',
+  identity_snapshot: 'Identity Snapshot',
+  comparison_frame: 'Comparison Frame',
+  question_to_audience: 'Question to Audience',
+};
+
+function ideaTitle(item: LibraryItem): string {
+  const t = (item.contentIdea.title ?? '').trim();
+  if (t) return t;
+  const a = item.contentIdea.angle;
+  return CALENDAR_ANGLE_LABELS[a] ?? a;
 }
 
 function chipStatusLabel(item: LibraryItem): string {

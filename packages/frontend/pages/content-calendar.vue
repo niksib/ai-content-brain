@@ -35,6 +35,8 @@ import SchedulePostModal, { type SchedulePostEditData } from '~/components/Sched
 
 definePageMeta({ layout: 'default', ssr: false });
 
+useHead({ title: 'Content Calendar — HeyPostrr' });
+
 const store = useLibraryStore();
 const router = useRouter();
 const config = useRuntimeConfig();

@@ -15,6 +15,7 @@ export interface ThreadsInsightsSnapshot {
 
 export interface LibraryContentIdea {
   id: string;
+  title?: string;
   angle: string;
   description: string;
   platform: string;

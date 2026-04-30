@@ -379,6 +379,8 @@ async function onRestart() {
 }
 
 definePageMeta({ layout: false, ssr: false });
+
+useHead({ title: 'Onboarding — HeyPostrr' });
 </script>
 
 <style scoped>

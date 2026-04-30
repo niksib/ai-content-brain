@@ -172,6 +172,7 @@ model ContentIdea {
 
   platform      Platform
   format        ContentFormat
+  title         String        @default("")
   angle         String
   description   String
   // Direct quote from the user — passed to platform agent to preserve voice.

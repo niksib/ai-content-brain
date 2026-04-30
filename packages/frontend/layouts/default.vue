@@ -36,7 +36,7 @@
           >
             <span v-if="isStarting" class="btn-spinner"></span>
             <Plus v-else :size="16" />
-            {{ isStarting ? 'Starting...' : 'Create New Post' }}
+            {{ isStarting ? 'Starting...' : 'Start New Session' }}
           </button>
         </div>
 

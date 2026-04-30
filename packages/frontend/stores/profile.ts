@@ -36,6 +36,7 @@ export const useProfileStore = defineStore('profile', () => {
   const canonicalKeys = ref<CanonicalKey[]>([]);
   const isLoading = ref(false);
   const isSaving = ref(false);
+  const isLoaded = ref(false);
 
   const isOnboarded = computed(() => memoryBlocks.value.length > 0);
 
@@ -51,6 +52,7 @@ export const useProfileStore = defineStore('profile', () => {
       isAdmin.value = profile.isAdmin ?? false;
       memoryBlocks.value = memory.blocks;
       canonicalKeys.value = memory.canonicalKeys;
+      isLoaded.value = true;
     } finally {
       isLoading.value = false;
     }
@@ -88,6 +90,7 @@ export const useProfileStore = defineStore('profile', () => {
     memoryBlocks,
     canonicalKeys,
     isLoading,
+    isLoaded,
     isSaving,
     isOnboarded,
     loadProfile,

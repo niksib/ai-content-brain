@@ -68,6 +68,7 @@ export interface SessionIdea {
   sessionId: string;
   platform: string;
   format: string;
+  title?: string;
   angle: string;
   description?: string;
   producedContent?: ProducedContent | null;
@@ -262,6 +263,7 @@ export const useSessionStore = defineStore('session', () => {
               sessionId: session.value!.id,
               platform: raw.platform as string,
               format: raw.format as string,
+              title: raw.title as string | undefined,
               angle: raw.angle as string,
               description: raw.description as string | undefined,
               status: (raw.status as SessionIdea['status']) ?? 'proposed',
@@ -283,6 +285,7 @@ export const useSessionStore = defineStore('session', () => {
           if (idx !== -1) {
             ideas.value[idx] = {
               ...ideas.value[idx],
+              title: (raw.title as string | undefined) ?? ideas.value[idx].title,
               angle: (raw.angle as string) ?? ideas.value[idx].angle,
               description: (raw.description as string | undefined) ?? ideas.value[idx].description,
             };

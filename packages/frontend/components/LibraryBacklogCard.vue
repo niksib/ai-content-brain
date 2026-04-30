@@ -5,7 +5,8 @@
       <span class="backlog-card__format">{{ formatLabel }}</span>
     </div>
 
-    <p class="backlog-card__angle">{{ item.contentIdea.angle }}</p>
+    <p class="backlog-card__title">{{ displayTitle }}</p>
+    <span class="backlog-card__angle-badge">{{ angleLabel }}</span>
     <p v-if="preview" class="backlog-card__preview">{{ preview }}</p>
 
     <div class="backlog-card__actions">
@@ -114,6 +115,30 @@ const formatLabels: Record<string, string> = {
 };
 
 const formatLabel = computed(() => formatLabels[props.item.format] ?? props.item.format);
+
+const ANGLE_LABELS: Record<string, string> = {
+  hot_take: 'Hot Take',
+  reframe: 'Reframe',
+  specific_story: 'Specific Story',
+  list_of_specifics: 'List of Specifics',
+  numbers: 'Numbers',
+  observation: 'Observation',
+  curiosity_gap: 'Curiosity Gap',
+  identity_snapshot: 'Identity Snapshot',
+  comparison_frame: 'Comparison Frame',
+  question_to_audience: 'Question to Audience',
+};
+
+const angleLabel = computed(() => {
+  const a = props.item.contentIdea.angle;
+  return ANGLE_LABELS[a] ?? a;
+});
+
+const displayTitle = computed(() => {
+  const t = (props.item.contentIdea.title ?? '').trim();
+  if (t) return t;
+  return angleLabel.value;
+});
 
 const preview = computed(() => {
   const body = props.item.body;
@@ -238,16 +263,28 @@ async function schedulePost(): Promise<void> {
   border-radius: 4px;
 }
 
-.backlog-card__angle {
+.backlog-card__title {
   margin: 0;
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #111827;
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.backlog-card__angle-badge {
+  align-self: flex-start;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: #eef0ff;
+  color: #3525cd;
 }
 
 .backlog-card__preview {

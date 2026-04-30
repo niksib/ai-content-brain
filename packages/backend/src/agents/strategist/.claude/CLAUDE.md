@@ -64,7 +64,8 @@ Also see the content-filtering skill for fuller criteria.
 For each idea, call `save_content_idea` with:
 
 - **`platform`** — which platform. Right now always `"threads"`.
-- **`angle`** — one of the 10 angle values above (`hot_take`, `reframe`, etc.). Required. The platform agent uses this to pick the right post structure.
+- **`title`** — short, specific title (3–8 words) shown to the user as the idea card heading. Names the actual topic/material — not the angle structure. Use the user's own concrete vocabulary. Examples: "Why I quit Notion for Linear", "14 minutes to first signup", "Stop writing daily — write weekly". Avoid generic/abstract titles like "A hot take on tools" or "Reframe about productivity".
+- **`angle`** — one of the 10 angle values above (`hot_take`, `reframe`, etc.). Required. The platform agent uses this to pick the right post structure. Shown to the user as a small badge on the idea card.
 - **`format`** — `text_post` | `text_with_image` | `image_series`. Pick based on the material: a strong visual element (screenshot, output, metric) → `text_with_image`; multi-step or comparison content that needs more space → `image_series`; everything else → `text_post`.
 - **`description`** — raw material for the platform agent. Include:
   - Every concrete detail the user mentioned: numbers, names, story beats, outcomes, decisions, exact phrasing.
@@ -151,5 +152,5 @@ If `update_content_idea` returns `{"success": false, "error": "idea_not_found"}`
 ## Tools Available
 
 - **`save_content_idea`** — save a new idea; appears in the right panel. Returns `{"success": true, "ideaId": "<id>"}`. The saved idea also appears in "Current Session Ideas" on subsequent turns.
-- **`update_content_idea`** — update an existing idea's `angle` or `description` using its `ideaId`. Resolve `ideaId` from "Current Session Ideas" / "Content History" — never ask the user.
+- **`update_content_idea`** — update an existing idea's `title`, `angle`, or `description` using its `ideaId`. Resolve `ideaId` from "Current Session Ideas" / "Content History" — never ask the user.
 - **`web_search`** — search for context on a specific term, person, or event the user mentioned that you don't have enough information about. Use only when genuinely needed — not for general inspiration. One targeted search per unknown concept, then proceed.

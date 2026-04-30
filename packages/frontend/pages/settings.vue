@@ -46,79 +46,8 @@
     <section class="card settings-section">
       <h2 class="section-title">Account</h2>
 
-      <div class="info-row">
-        <span class="info-label">Email</span>
-        <span class="info-value">{{ profileStore.userEmail || '---' }}</span>
-      </div>
-
-      <!-- Change Password -->
-      <div class="account-action">
-        <div class="account-action__header">
-          <div>
-            <p class="account-action__title">Password</p>
-            <p class="account-action__desc">Update your account password</p>
-          </div>
-          <button
-            type="button"
-            class="btn btn--secondary"
-            @click="showPasswordForm = !showPasswordForm"
-          >
-            {{ showPasswordForm ? 'Cancel' : 'Change Password' }}
-          </button>
-        </div>
-
-        <form v-if="showPasswordForm" class="account-subform" @submit.prevent="handleChangePassword">
-          <div class="form-group">
-            <label class="form-label" for="currentPassword">Current Password</label>
-            <input
-              id="currentPassword"
-              v-model="passwordForm.current"
-              type="password"
-              class="form-input"
-              autocomplete="current-password"
-              placeholder="Enter current password"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="newPassword">New Password</label>
-            <input
-              id="newPassword"
-              v-model="passwordForm.next"
-              type="password"
-              class="form-input"
-              autocomplete="new-password"
-              placeholder="At least 8 characters"
-              minlength="8"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="confirmPassword">Confirm New Password</label>
-            <input
-              id="confirmPassword"
-              v-model="passwordForm.confirm"
-              type="password"
-              class="form-input"
-              autocomplete="new-password"
-              placeholder="Repeat new password"
-              required
-            />
-          </div>
-          <p v-if="passwordError" class="save-message save-message--error">{{ passwordError }}</p>
-          <p v-if="passwordSuccess" class="save-message">{{ passwordSuccess }}</p>
-          <button
-            type="submit"
-            class="btn btn--primary"
-            :disabled="isChangingPassword"
-          >
-            {{ isChangingPassword ? 'Saving...' : 'Save New Password' }}
-          </button>
-        </form>
-      </div>
-
       <!-- Delete Account -->
-      <div class="account-action account-action--danger">
+      <div class="account-action account-action--danger account-action--first">
         <div class="account-action__header">
           <div>
             <p class="account-action__title account-action__title--danger">Delete Account</p>
@@ -141,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useProfileStore } from '~/stores/profile';
 import { useBillingStore } from '~/stores/billing';
 
@@ -149,6 +78,8 @@ definePageMeta({
   layout: 'default',
   ssr: false,
 });
+
+useHead({ title: 'Settings — HeyPostrr' });
 
 const config = useRuntimeConfig();
 const router = useRouter();
@@ -204,55 +135,9 @@ async function openPortal() {
 
 const billingStatus = computed(() => route.query.billing as string | undefined);
 
-// ── Change Password ──
-const showPasswordForm = ref(false);
-const isChangingPassword = ref(false);
-const passwordError = ref('');
-const passwordSuccess = ref('');
-const passwordForm = reactive({ current: '', next: '', confirm: '' });
-
 // ── Delete Account ──
 const isDeletingAccount = ref(false);
 const deleteError = ref('');
-
-async function handleChangePassword() {
-  passwordError.value = '';
-  passwordSuccess.value = '';
-
-  if (passwordForm.next !== passwordForm.confirm) {
-    passwordError.value = 'New passwords do not match.';
-    return;
-  }
-  if (passwordForm.next.length < 8) {
-    passwordError.value = 'New password must be at least 8 characters.';
-    return;
-  }
-
-  isChangingPassword.value = true;
-  try {
-    await $fetch(`${config.public.apiBaseUrl}/api/auth/change-password`, {
-      method: 'POST',
-      credentials: 'include',
-      body: {
-        currentPassword: passwordForm.current,
-        newPassword: passwordForm.next,
-      },
-    });
-    passwordSuccess.value = 'Password updated successfully.';
-    passwordForm.current = '';
-    passwordForm.next = '';
-    passwordForm.confirm = '';
-    setTimeout(() => {
-      showPasswordForm.value = false;
-      passwordSuccess.value = '';
-    }, 2000);
-  } catch (error: unknown) {
-    const apiError = error as { data?: { message?: string } };
-    passwordError.value = apiError?.data?.message ?? 'Failed to change password. Check your current password and try again.';
-  } finally {
-    isChangingPassword.value = false;
-  }
-}
 
 async function handleDeleteAccount() {
   const confirmed = confirm(
@@ -461,6 +346,12 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.account-action--first {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
 }
 
 .account-action--danger {

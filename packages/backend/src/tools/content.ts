@@ -21,6 +21,11 @@ export const saveContentIdeaTool: Anthropic.Tool = {
         enum: ["text_post", "text_with_image", "image_series", "video_script", "carousel", "stories"],
         description: "Content format",
       },
+      title: {
+        type: "string",
+        description:
+          "Short, specific title for the idea (3–8 words). Names the actual topic/material — not the angle structure. Shown to the user as the idea card title. Examples: \"Why I quit using Notion\", \"14 minutes to first signup\", \"Stop writing daily\".",
+      },
       angle: { type: "string", description: "The angle or hook of the content idea" },
       description: { type: "string", description: "Detailed description of the content idea" },
       source_quote: {
@@ -35,18 +40,19 @@ export const saveContentIdeaTool: Anthropic.Tool = {
           "Short list of things the platform agent should NOT do with this material (e.g. \"don't end with a takeaway\"). Pass empty array when no specific trap applies.",
       },
     },
-    required: ["platform", "format", "angle", "description"],
+    required: ["platform", "format", "title", "angle", "description"],
   },
 };
 
 export const updateContentIdeaTool: Anthropic.Tool = {
   name: "update_content_idea",
   description:
-    "Update an existing content idea's angle, description, source quote, or do_not list. Use this when the user asks to refine, adjust, or improve a specific idea. You already know each idea's ID from the save_content_idea tool results.",
+    "Update an existing content idea's title, angle, description, source quote, or do_not list. Use this when the user asks to refine, adjust, or improve a specific idea. You already know each idea's ID from the save_content_idea tool results.",
   input_schema: {
     type: "object",
     properties: {
       ideaId: { type: "string", description: "The ID of the content idea to update" },
+      title: { type: "string", description: "Updated short title (omit to keep unchanged)" },
       angle: { type: "string", description: "Updated one-line angle/hook (omit to keep unchanged)" },
       description: { type: "string", description: "Updated description (omit to keep unchanged)" },
       source_quote: {
@@ -139,7 +145,7 @@ export async function loadStrategistSessionContext(
       : sessionIdeas
           .map(
             (idea) =>
-              `- ideaId=${idea.id} | [${idea.platform}/${idea.format}] ${idea.angle} — status: ${idea.status}`
+              `- ideaId=${idea.id} | [${idea.platform}/${idea.format}/${idea.angle}] ${idea.title || idea.description.slice(0, 60)} — status: ${idea.status}`
           )
           .join("\n");
 
@@ -149,7 +155,7 @@ export async function loadStrategistSessionContext(
       : historyIdeas
           .map(
             (idea) =>
-              `- ideaId=${idea.id} | [${idea.platform}/${idea.format}] ${idea.angle} — status: ${idea.status}`
+              `- ideaId=${idea.id} | [${idea.platform}/${idea.format}/${idea.angle}] ${idea.title || idea.description.slice(0, 60)} — status: ${idea.status}`
           )
           .join("\n");
 
@@ -178,9 +184,10 @@ function normalizeDoNot(input: unknown): string[] {
 
 export function makeSaveContentIdea(userId: string, chatSessionId: string, onIdeaSaved?: (idea: ContentIdea) => void) {
   return async (input: Record<string, unknown>): Promise<string> => {
-    const { platform, format, angle, description, source_quote, do_not } = input as {
+    const { platform, format, title, angle, description, source_quote, do_not } = input as {
       platform: string;
       format: string;
+      title: string;
       angle: string;
       description: string;
       source_quote?: string;
@@ -199,6 +206,7 @@ export function makeSaveContentIdea(userId: string, chatSessionId: string, onIde
         contentPlanId: contentPlan.id,
         platform: platform as Platform,
         format: format as ContentFormat,
+        title: typeof title === "string" ? title : "",
         angle,
         description,
         sourceQuote: typeof source_quote === "string" ? source_quote : "",
@@ -217,8 +225,9 @@ export function makeUpdateContentIdea(
   onUpdated?: (idea: ContentIdea) => void
 ) {
   return async (input: Record<string, unknown>): Promise<string> => {
-    const { ideaId, angle, description, source_quote, do_not } = input as {
+    const { ideaId, title, angle, description, source_quote, do_not } = input as {
       ideaId: string;
+      title?: string;
       angle?: string;
       description?: string;
       source_quote?: string;
@@ -239,6 +248,7 @@ export function makeUpdateContentIdea(
     const idea = await prisma.contentIdea.update({
       where: { id: ideaId },
       data: {
+        ...(title !== undefined && { title }),
         ...(angle !== undefined && { angle }),
         ...(description !== undefined && { description }),
         ...(source_quote !== undefined && { sourceQuote: source_quote }),

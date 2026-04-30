@@ -29,6 +29,7 @@ libraryRoutes.get("/library", requireAuth, async (context) => {
         contentIdea: {
           select: {
             id: true,
+            title: true,
             angle: true,
             description: true,
             platform: true,

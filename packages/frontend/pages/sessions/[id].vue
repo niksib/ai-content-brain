@@ -236,6 +236,7 @@
               :idea-id="idea.id"
               :platform="(idea.platform as any)"
               :format="idea.format"
+              :title="idea.title"
               :angle="idea.angle"
               :description="idea.description"
               :status="idea.status"
@@ -299,6 +300,8 @@ definePageMeta({
   layout: 'default',
   ssr: false,
 });
+
+useHead({ title: 'Session — HeyPostrr' });
 
 const route = useRoute();
 const router = useRouter();
@@ -396,7 +399,10 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 // ─── Idea context helpers ───
 function ideaAngle(ideaId: string): string {
-  return store.ideas.find((i) => i.id === ideaId)?.angle ?? '';
+  const idea = store.ideas.find((i) => i.id === ideaId);
+  if (!idea) return '';
+  const t = (idea.title ?? '').trim();
+  return t || idea.angle;
 }
 function ideaPlatform(ideaId: string): AgentInfo['platform'] {
   const idea = store.ideas.find((i) => i.id === ideaId);

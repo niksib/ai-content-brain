@@ -8,7 +8,8 @@
       <span class="content-card__date">{{ formattedDate }}</span>
     </div>
 
-    <p class="content-card__angle">{{ item.contentIdea.angle }}</p>
+    <p class="content-card__title">{{ displayTitle }}</p>
+    <span class="content-card__angle-badge">{{ angleLabel }}</span>
 
     <p v-if="preview" class="content-card__preview">{{ preview }}</p>
 
@@ -109,6 +110,30 @@ const formatLabels: Record<string, string> = {
   carousel: 'Carousel',
   stories: 'Stories',
 };
+
+const ANGLE_LABELS: Record<string, string> = {
+  hot_take: 'Hot Take',
+  reframe: 'Reframe',
+  specific_story: 'Specific Story',
+  list_of_specifics: 'List of Specifics',
+  numbers: 'Numbers',
+  observation: 'Observation',
+  curiosity_gap: 'Curiosity Gap',
+  identity_snapshot: 'Identity Snapshot',
+  comparison_frame: 'Comparison Frame',
+  question_to_audience: 'Question to Audience',
+};
+
+const angleLabel = computed(() => {
+  const a = props.item.contentIdea.angle;
+  return ANGLE_LABELS[a] ?? a;
+});
+
+const displayTitle = computed(() => {
+  const t = (props.item.contentIdea.title ?? '').trim();
+  if (t) return t;
+  return angleLabel.value;
+});
 
 const platformEmoji = computed(() => {
   const key = props.item.platform.toLowerCase();
@@ -229,16 +254,29 @@ async function refreshInsights(): Promise<void> {
   color: #9ca3af;
 }
 
-.content-card__angle {
+.content-card__title {
   margin: 0 0 0.25rem;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.4;
   color: #1f2937;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.content-card__angle-badge {
+  display: inline-block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: #eef0ff;
+  color: #3525cd;
+  margin-bottom: 0.375rem;
 }
 
 .content-card__preview {

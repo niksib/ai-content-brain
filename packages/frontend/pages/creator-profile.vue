@@ -146,6 +146,8 @@ import ThreadsConnect from '~/components/threads/ThreadsConnect.vue';
 
 definePageMeta({ layout: 'default', ssr: false });
 
+useHead({ title: 'Creator Profile — HeyPostrr' });
+
 const profileStore = useProfileStore();
 
 const ALL_PLATFORMS = ['threads', 'linkedin', 'tiktok', 'instagram'] as const;
