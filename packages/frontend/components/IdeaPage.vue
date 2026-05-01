@@ -1630,4 +1630,10 @@ onMounted(async () => {
   line-height: 1.5;
   margin: 0;
 }
+
+@media (max-width: 1024px) {
+  .idea-page {
+    padding: 0;
+  }
+}
 </style>

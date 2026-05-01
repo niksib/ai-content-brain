@@ -359,6 +359,11 @@ model ThreadsAccount {
   styleAnalyzed     Boolean  @default(false)
   styleAnalyzedAt   DateTime?
 
+  // Cursor for incremental post-count sync. Snapshot job paginates
+  // /me/threads only until it hits this ID, then adds the new posts found
+  // above to the previous snapshot's count. Null = first sync (full walk).
+  lastSeenThreadsPostId String?
+
   // Random per-user secret used to drive better-auth signIn on Threads OAuth
   // callback. Never exposed to clients. Nullable for backward compat with
   // rows created before the migration — those users go through the one-time
@@ -369,6 +374,8 @@ model ThreadsAccount {
   updatedAt         DateTime @updatedAt
 
   scheduledPosts    ScheduledPost[]
+  insightsSnapshots ThreadsAccountSnapshot[]
+  postInsights      ThreadsPostInsight[]
 }
 
 model ScheduledPost {
@@ -414,6 +421,63 @@ model ThreadsInsightsSnapshot {
   fetchedAt     DateTime    @default(now())
 
   @@index([contentIdeaId, fetchedAt(sort: Desc)])
+}
+
+// Per-post lifetime insights. Snapshot service refreshes posts < 30 days old
+// (engagement still moving) and reads cached values for older ones. Account
+// totals (likes/views/replies/etc) are derived by SUM-ing this table — that
+// way we count metrics from the user's *own posts only*, excluding likes the
+// user accumulated by replying on other people's threads.
+model ThreadsPostInsight {
+  id               String         @id @default(cuid())
+  threadsAccountId String
+  threadsAccount   ThreadsAccount @relation(fields: [threadsAccountId], references: [id], onDelete: Cascade)
+  userId           String
+  threadsPostId    String
+  publishedAt      DateTime
+  preview          String         @default("")
+
+  views            Int            @default(0)
+  likes            Int            @default(0)
+  replies          Int            @default(0)
+  reposts          Int            @default(0)
+  quotes           Int            @default(0)
+  shares           Int            @default(0)
+
+  fetchedAt        DateTime       @default(now())
+
+  @@unique([threadsAccountId, threadsPostId])
+  @@index([userId, publishedAt(sort: Desc)])
+}
+
+// Daily snapshot of account-level metrics. Used to compute deltas
+// (followers/likes/etc gained over day/week/month) since Threads API does not
+// support since/until for `followers_count` and only returns period-aggregated
+// totals for the rest. One row per account per UTC day.
+model ThreadsAccountSnapshot {
+  id               String         @id @default(cuid())
+  threadsAccountId String
+  threadsAccount   ThreadsAccount @relation(fields: [threadsAccountId], references: [id], onDelete: Cascade)
+  userId           String
+  capturedDate     DateTime       @db.Date
+  capturedAt       DateTime       @default(now())
+
+  followersCount   Int
+
+  // Cumulative-since-2024-04-13 totals. Daily delta = today.total - yesterday.total.
+  likesTotal       Int
+  repliesTotal     Int
+  repostsTotal     Int
+  quotesTotal      Int
+  viewsTotal       Int
+  clicksTotal      Int
+
+  postsCount       Int
+  partial          Boolean        @default(false)
+
+  @@unique([threadsAccountId, capturedDate])
+  @@index([threadsAccountId, capturedDate(sort: Desc)])
+  @@index([userId])
 }
 
 enum ScheduledPostMediaType {

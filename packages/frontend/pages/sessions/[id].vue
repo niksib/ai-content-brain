@@ -38,16 +38,41 @@
       <!-- ══════════════════════════════════════════
            STATE 2 — Chat + Workspace (results / ideas)
       ══════════════════════════════════════════ -->
-      <div v-else key="chat" class="chat-state">
+      <div
+        v-else
+        key="chat"
+        class="chat-state"
+        :class="{ 'chat-state--chat-open': isChatOpen }"
+      >
 
-        <!-- Left: Transcript panel -->
-        <aside class="transcript-panel">
+        <!-- Mobile-only backdrop: tap to close chat overlay -->
+        <div
+          class="chat-mobile-backdrop"
+          aria-hidden="true"
+          @click="closeChat"
+        ></div>
+
+        <!-- Left: Transcript panel (becomes mobile overlay via CSS) -->
+        <aside
+          class="transcript-panel"
+          role="dialog"
+          aria-label="Chat with AI"
+        >
           <div class="transcript-panel__header">
             <h2 class="transcript-panel__title">
               <FileText :size="20" />
               Session Transcript
             </h2>
             <span class="transcript-panel__badge">Live Session</span>
+            <!-- Mobile-only close button -->
+            <button
+              class="transcript-panel__close"
+              type="button"
+              aria-label="Close chat"
+              @click="closeChat"
+            >
+              <X :size="18" />
+            </button>
           </div>
 
           <div ref="messagesContainerRef" class="transcript-messages">
@@ -277,6 +302,17 @@
 
           </template>
         </section>
+
+        <!-- Mobile-only floating "Chat with AI" button -->
+        <button
+          class="chat-fab"
+          type="button"
+          aria-label="Chat with AI"
+          @click="openChat"
+        >
+          <Sparkles :size="18" />
+          Chat with AI
+        </button>
       </div>
 
     </Transition>
@@ -286,7 +322,7 @@
 
 <script setup lang="ts">
 import { computed, ref, nextTick, onMounted, onUnmounted, watch, type Component } from 'vue';
-import { Brain, User, Reply, FileText, Mic, StopCircle, Send, Lightbulb, Trash2, Sparkles } from 'lucide-vue-next';
+import { Brain, User, Reply, FileText, Mic, StopCircle, Send, Lightbulb, Trash2, Sparkles, X } from 'lucide-vue-next';
 import { useSessionStore } from '~/stores/session';
 import { useProfileStore } from '~/stores/profile';
 import OrbRecorder from '~/components/OrbRecorder.vue';
@@ -358,7 +394,12 @@ watch(
     }
   },
 );
-onUnmounted(() => { if (thinkingTimer) clearInterval(thinkingTimer); transcriptionAbort?.abort(); });
+onUnmounted(() => {
+  if (thinkingTimer) clearInterval(thinkingTimer);
+  transcriptionAbort?.abort();
+  window.removeEventListener('keydown', onEscapeKey);
+  mobileMediaQuery?.removeEventListener('change', syncIsMobile);
+});
 
 // ─── Active agent ───
 interface AgentInfo {
@@ -419,6 +460,58 @@ const messagesContainerRef = ref<HTMLElement | null>(null);
 const isUserRecording = ref(false);
 const chatInputText = ref('');
 const chatInputEl = ref<HTMLTextAreaElement | null>(null);
+
+// Mobile-only chat overlay state. Desktop keeps the original split layout
+// where the chat panel is always visible alongside the idea grid.
+const MOBILE_BREAKPOINT_PX = 1024;
+const isMobile = ref(false);
+const isChatOpen = ref(false);
+let mobileMediaQuery: MediaQueryList | null = null;
+
+function syncIsMobile(): void {
+  isMobile.value = !!mobileMediaQuery?.matches;
+  if (!isMobile.value) {
+    // On desktop the chat is always inline — collapse mobile-only overlay state.
+    isChatOpen.value = false;
+  }
+}
+
+function openChat(): void {
+  if (!isMobile.value) return;
+  isChatOpen.value = true;
+  nextTick(() => {
+    scrollToBottom();
+    chatInputEl.value?.focus();
+  });
+}
+
+function closeChat(): void {
+  if (!isChatOpen.value) return;
+  isChatOpen.value = false;
+  if (isMicRecording.value) stopMicRecording();
+}
+
+function onEscapeKey(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && isChatOpen.value) closeChat();
+}
+
+// Auto-close chat when the agent produces a new idea so the user sees the
+// fresh result. Re-opening is one tap via the FAB. Mobile only.
+watch(
+  () => store.ideas.length,
+  (next, prev) => {
+    if (next > prev && isChatOpen.value) closeChat();
+  },
+);
+
+// When the orb-recorder hands off to the chat workspace (first message sent),
+// open the chat on mobile so the user can keep talking while ideas stream in.
+watch(
+  () => store.pageState,
+  (next, prev) => {
+    if (prev === 'recording' && next === 'chat') openChat();
+  },
+);
 
 const CHAT_INPUT_MAX_HEIGHT = 180;
 
@@ -529,6 +622,10 @@ watch(messagesContainerRef, (el) => {
 watch(() => store.messages.length, scrollToBottom);
 
 onMounted(async () => {
+  mobileMediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`);
+  syncIsMobile();
+  mobileMediaQuery.addEventListener('change', syncIsMobile);
+  window.addEventListener('keydown', onEscapeKey);
   try {
     await Promise.all([
       store.createOrLoadSession(sessionId.value),
@@ -543,6 +640,17 @@ onMounted(async () => {
     const ideaParam = route.query.idea as string | undefined;
     if (ideaParam && store.ideas.some((i) => i.id === ideaParam)) {
       store.selectedIdeaId = ideaParam;
+    }
+
+    // Mobile only: auto-open chat when the user lands on the workspace with
+    // no ideas yet so the first action is obvious instead of an empty list.
+    if (
+      isMobile.value &&
+      store.pageState !== 'recording' &&
+      store.ideas.length === 0 &&
+      !store.selectedIdeaId
+    ) {
+      openChat();
     }
   } catch (error) {
     console.error('Session initialization failed:', error);
@@ -839,43 +947,10 @@ onMounted(async () => {
   background: #f7f9fb;
 }
 
-@media (max-width: 900px) {
-  .chat-state {
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-  }
-
-  .transcript-panel {
-    height: auto;
-    flex-shrink: 0;
-    overflow: visible;
-    border-right: none;
-    border-bottom: 1px solid rgba(199, 196, 216, 0.3);
-  }
-
-  .transcript-messages {
-    max-height: 50vh;
-    flex: none;
-  }
-
-  .workspace-panel {
-    height: auto;
-    flex-shrink: 0;
-    overflow: visible;
-    min-height: 60vh;
-  }
-
-  .ideas-grid {
-    overflow: visible;
-    flex: none;
-  }
-
-  .workspace-detail {
-    height: auto;
-    overflow: visible;
-  }
-}
+/* Desktop: hide mobile-only chrome (FAB, backdrop, panel close) */
+.chat-fab,
+.chat-mobile-backdrop,
+.transcript-panel__close { display: none; }
 
 /* ─── Transcript panel ─── */
 .transcript-panel {
@@ -1725,5 +1800,132 @@ onMounted(async () => {
 
 .status-bar__action-btn:hover {
   color: #3525cd;
+}
+
+/* ══════════════════════════════════════════
+   Mobile overrides (≤1024px) — placed last so they win the cascade
+══════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .chat-state {
+    display: block;
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* Workspace fills the screen, ideas stack in a single column */
+  .workspace-panel {
+    height: 100%;
+    overflow-y: auto;
+    padding: 1.25rem 1.25rem 6.5rem;
+  }
+
+  .ideas-grid {
+    grid-template-columns: 1fr;
+    overflow: visible;
+    flex: none;
+  }
+
+  .workspace-detail {
+    height: auto;
+    overflow: visible;
+  }
+
+  /* Transcript panel becomes a bottom-sheet overlay */
+  .transcript-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    height: min(85vh, 680px);
+    z-index: 110;
+    border-right: none;
+    border-top: 1px solid rgba(199, 196, 216, 0.3);
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -24px 60px rgba(25, 28, 30, 0.18);
+    transform: translateY(100%);
+    transition: transform 0.28s ease;
+    pointer-events: auto;
+  }
+
+  .chat-state--chat-open .transcript-panel {
+    transform: translateY(0);
+  }
+
+  .transcript-panel__header {
+    padding: 1rem 1.25rem 0.75rem;
+    gap: 0.75rem;
+  }
+
+  .transcript-panel__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-left: auto;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #464555;
+    cursor: pointer;
+  }
+  .transcript-panel__close:hover {
+    background: rgba(53, 37, 205, 0.08);
+    color: #3525cd;
+  }
+
+  /* Backdrop dims the workspace and closes chat on tap */
+  .chat-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 105;
+    background: rgba(25, 28, 30, 0.35);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+  .chat-state--chat-open .chat-mobile-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Floating Chat with AI button */
+  .chat-fab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: fixed;
+    left: 50%;
+    bottom: 1.5rem;
+    transform: translateX(-50%);
+    z-index: 60;
+    padding: 0.875rem 1.5rem;
+    border: none;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #3525cd, #4f46e5);
+    color: #fff;
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    box-shadow: 0 16px 32px rgba(53, 37, 205, 0.32);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .chat-fab:active {
+    transform: translateX(-50%) scale(0.97);
+  }
+
+  /* Hide FAB while chat is open */
+  .chat-state--chat-open .chat-fab {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(8px);
+  }
 }
 </style>

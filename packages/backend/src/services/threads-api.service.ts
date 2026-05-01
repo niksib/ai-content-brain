@@ -6,6 +6,13 @@ const THREADS_TOKEN_URL = "https://graph.threads.net/oauth/access_token";
 const THREADS_LONG_LIVED_URL = "https://graph.threads.net/access_token";
 const THREADS_REFRESH_URL = "https://graph.threads.net/refresh_access_token";
 
+// Threads Insights enforces a rolling 2-year window for time-bound queries:
+// "since param is not valid. Metrics data is available for the last 2 years".
+// Cumulative totals here are therefore "totals over the last ~2 years". For
+// our deltas (day / week / month) the absolute value doesn't matter — only the
+// difference between two recent snapshots — so clamping at 2 years is safe.
+const THREADS_INSIGHTS_WINDOW_SECONDS = 2 * 365 * 24 * 60 * 60;
+
 export interface ThreadsTokenResponse {
   accessToken: string;
   tokenType: string;
@@ -28,6 +35,33 @@ export interface ThreadsInsights {
   quotes: number;
   followersCount: number;
   views: number;
+}
+
+export interface ThreadsAccountSnapshotData {
+  followersCount: number;
+  likesTotal: number;
+  repliesTotal: number;
+  repostsTotal: number;
+  quotesTotal: number;
+  viewsTotal: number;
+  clicksTotal: number;
+  partial: boolean;
+}
+
+export interface ThreadsPostInsights {
+  views: number;
+  likes: number;
+  replies: number;
+  reposts: number;
+  quotes: number;
+  shares: number;
+}
+
+export interface ThreadsUserPost {
+  id: string;
+  text: string;
+  timestamp: string;
+  permalink?: string;
 }
 
 export interface ThreadsPublishResult {
@@ -532,6 +566,218 @@ export class ThreadsApiService {
     if (insights.followersCount === 0) return 0;
     const interactions = insights.likes + insights.replies + insights.reposts + insights.quotes;
     return (interactions / insights.followersCount) * 100;
+  }
+
+  // Fetches a full account snapshot: cumulative totals since 2024-04-13 plus
+  // current followers count. Two requests because `followers_count` ignores
+  // since/until while the time-bound metrics require it. Marks partial=true
+  // when any metric fetch fails so callers can flag the snapshot in the UI.
+  async fetchAccountSnapshot(
+    threadsUserId: string,
+    accessToken: string
+  ): Promise<ThreadsAccountSnapshotData> {
+    const untilTimestamp = Math.floor(Date.now() / 1000);
+    // 60s buffer so we don't end up just past the API's 2-year boundary.
+    const sinceTimestamp = untilTimestamp - THREADS_INSIGHTS_WINDOW_SECONDS + 60;
+    let partial = false;
+
+    const totals = {
+      likes: 0,
+      replies: 0,
+      reposts: 0,
+      quotes: 0,
+      views: 0,
+      clicks: 0,
+    };
+
+    try {
+      const cumulativeParams = new URLSearchParams({
+        metric: "likes,replies,reposts,quotes,views,clicks",
+        since: String(sinceTimestamp),
+        until: String(untilTimestamp),
+        access_token: accessToken,
+      });
+
+      const cumulativeResponse = await fetch(
+        `${THREADS_BASE_URL}/${threadsUserId}/threads_insights?${cumulativeParams.toString()}`
+      );
+
+      if (!cumulativeResponse.ok) {
+        const errorBody = redactSecrets(await cumulativeResponse.text().catch(() => "(unreadable)"));
+        throw new Error(`status ${cumulativeResponse.status} — ${errorBody}`);
+      }
+
+      const cumulativeData = await cumulativeResponse.json() as {
+        data: Array<{
+          name: string;
+          total_value?: { value: number };
+          values?: Array<{ value: number }>;
+          link_total_values?: Array<{ value: number }>;
+        }>;
+      };
+
+      for (const metric of cumulativeData.data ?? []) {
+        const value = this.extractMetricValue(metric);
+        if (metric.name in totals) {
+          (totals as Record<string, number>)[metric.name] = value;
+        }
+      }
+    } catch (cumulativeError) {
+      console.error(
+        "[ThreadsApi] Cumulative totals fetch failed:",
+        redactSecrets(cumulativeError)
+      );
+      partial = true;
+    }
+
+    let followersCount = 0;
+    try {
+      const followersParams = new URLSearchParams({
+        metric: "followers_count",
+        access_token: accessToken,
+      });
+
+      const followersResponse = await fetch(
+        `${THREADS_BASE_URL}/${threadsUserId}/threads_insights?${followersParams.toString()}`
+      );
+
+      if (!followersResponse.ok) {
+        const errorBody = redactSecrets(await followersResponse.text().catch(() => "(unreadable)"));
+        throw new Error(`status ${followersResponse.status} — ${errorBody}`);
+      }
+
+      const followersData = await followersResponse.json() as {
+        data: Array<{ name: string; total_value?: { value: number } }>;
+      };
+      followersCount = followersData.data?.[0]?.total_value?.value ?? 0;
+    } catch (followersError) {
+      console.error(
+        "[ThreadsApi] Followers count fetch failed:",
+        redactSecrets(followersError)
+      );
+      partial = true;
+    }
+
+    return {
+      followersCount,
+      likesTotal: totals.likes,
+      repliesTotal: totals.replies,
+      repostsTotal: totals.reposts,
+      quotesTotal: totals.quotes,
+      viewsTotal: totals.views,
+      clicksTotal: totals.clicks,
+      partial,
+    };
+  }
+
+  // Walks /me/threads pagination either fully (cursor=null) or until it hits
+  // the previously-stored latest post ID. Returns the new posts (above the
+  // cursor) along with the new latest ID. Replies are returned with isReply=
+  // true so callers can decide whether to skip them — most should. When the
+  // cap is hit without finding the cursor we signal cursorStale=true so the
+  // caller can reset and do a full re-sync next tick.
+  async fetchUserPostsSince(
+    threadsUserId: string,
+    accessToken: string,
+    cursorPostId: string | null,
+    maxPages: number = 20
+  ): Promise<{
+    newPosts: Array<{ id: string; isReply: boolean; publishedAt: Date; text: string }>;
+    latestPostId: string | null;
+    cursorStale: boolean;
+  }> {
+    const initialUrl = new URL(`${THREADS_BASE_URL}/${threadsUserId}/threads`);
+    initialUrl.searchParams.set("fields", "id,text,timestamp,is_reply");
+    initialUrl.searchParams.set("limit", "100");
+    initialUrl.searchParams.set("access_token", accessToken);
+
+    let nextUrl: string | null = initialUrl.toString();
+    const newPosts: Array<{ id: string; isReply: boolean; publishedAt: Date; text: string }> = [];
+    let latestPostId: string | null = null;
+    let cursorFound = false;
+
+    for (let page = 0; page < maxPages && nextUrl; page++) {
+      const response = await fetch(nextUrl);
+      if (!response.ok) {
+        const errorBody = redactSecrets(await response.text().catch(() => "(unreadable)"));
+        throw new Error(`Threads /me/threads page ${page + 1} failed: ${response.status} — ${errorBody}`);
+      }
+
+      const data = await response.json() as {
+        data: Array<{ id: string; text?: string; timestamp: string; is_reply?: boolean }>;
+        paging?: { next?: string };
+      };
+
+      for (const post of data.data ?? []) {
+        if (latestPostId === null) latestPostId = post.id;
+
+        if (cursorPostId !== null && post.id === cursorPostId) {
+          cursorFound = true;
+          break;
+        }
+
+        newPosts.push({
+          id: post.id,
+          isReply: post.is_reply === true,
+          publishedAt: new Date(post.timestamp),
+          text: post.text ?? "",
+        });
+      }
+
+      if (cursorFound) break;
+      nextUrl = data.paging?.next ?? null;
+    }
+
+    return {
+      newPosts,
+      latestPostId,
+      cursorStale: cursorPostId !== null && !cursorFound,
+    };
+  }
+
+  async fetchPostInsights(
+    threadsPostId: string,
+    accessToken: string
+  ): Promise<ThreadsPostInsights> {
+    const url = new URL(`${THREADS_BASE_URL}/${threadsPostId}/insights`);
+    url.searchParams.set("metric", "views,likes,replies,reposts,quotes,shares");
+    url.searchParams.set("access_token", accessToken);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`Threads post insights fetch failed: ${response.status}`);
+    }
+
+    const data = await response.json() as {
+      data: Array<{ name: string; values?: Array<{ value: number }> }>;
+    };
+
+    const metrics: Record<string, number> = {};
+    for (const metric of data.data ?? []) {
+      metrics[metric.name] = metric.values?.[0]?.value ?? 0;
+    }
+
+    return {
+      views: metrics.views ?? 0,
+      likes: metrics.likes ?? 0,
+      replies: metrics.replies ?? 0,
+      reposts: metrics.reposts ?? 0,
+      quotes: metrics.quotes ?? 0,
+      shares: metrics.shares ?? 0,
+    };
+  }
+
+  private extractMetricValue(metric: {
+    total_value?: { value: number };
+    values?: Array<{ value: number }>;
+    link_total_values?: Array<{ value: number }>;
+  }): number {
+    if (metric.total_value) return metric.total_value.value;
+    if (metric.values) return metric.values.reduce((sum, entry) => sum + entry.value, 0);
+    if (metric.link_total_values) {
+      return metric.link_total_values.reduce((sum, entry) => sum + entry.value, 0);
+    }
+    return 0;
   }
 }
 

@@ -3,6 +3,8 @@ import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { threadsApiService, THREADS_BASE_URL } from "../services/threads-api.service.js";
+import { threadsInsightsSnapshotService } from "../services/threads-insights-snapshot.service.js";
+import { isAdminUser } from "../services/idea-cost.service.js";
 import { auth } from "../lib/auth.js";
 import { redactSecrets } from "../lib/redact.js";
 import { parseSignedRequest } from "../lib/meta-signed-request.js";
@@ -163,7 +165,7 @@ async function handleConnectCallback(
     const userInfo = await threadsApiService.getUserInfo(tokenData.accessToken);
     const tokenExpiresAt = new Date(Date.now() + tokenData.expiresInSeconds * 1000);
 
-    await prisma.threadsAccount.upsert({
+    const threadsAccountRecord = await prisma.threadsAccount.upsert({
       where: { userId: verifiedUserId },
       create: {
         userId: verifiedUserId,
@@ -185,6 +187,17 @@ async function handleConnectCallback(
         accessToken: tokenData.accessToken,
         tokenExpiresAt,
       },
+    });
+
+    // Capture an initial snapshot so the user has a baseline for delta math
+    // immediately on first dashboard load. Fire-and-forget — the redirect
+    // shouldn't block on a Threads API round-trip.
+    void threadsInsightsSnapshotService.snapshotAccount({
+      id: threadsAccountRecord.id,
+      userId: verifiedUserId,
+      threadsUserId: userInfo.id,
+      accessToken: tokenData.accessToken,
+      tokenExpiresAt,
     });
 
     const onboardingSession = await prisma.onboardingSession.findUnique({
@@ -274,7 +287,7 @@ async function handleLoginCallback(
 
     const userId = authResult.response.user.id;
 
-    await prisma.threadsAccount.upsert({
+    const threadsAccountRecord = await prisma.threadsAccount.upsert({
       where: { userId },
       create: {
         userId,
@@ -298,6 +311,14 @@ async function handleLoginCallback(
         tokenExpiresAt,
         ...(loginSecretToPersist ? { loginSecret: loginSecretToPersist } : {}),
       },
+    });
+
+    void threadsInsightsSnapshotService.snapshotAccount({
+      id: threadsAccountRecord.id,
+      userId,
+      threadsUserId: userInfo.id,
+      accessToken: tokenData.accessToken,
+      tokenExpiresAt,
     });
 
     const onboardingSession = await prisma.onboardingSession.findUnique({
@@ -934,6 +955,338 @@ threadsRoutes.get("/threads/insights", requireAuth, async (context) => {
     return context.json({ error: "Failed to fetch insights. Please try again." }, 500);
   }
 });
+
+// GET /threads/insights/timeline?period=day|week|month
+// Returns latest snapshot values + delta vs the snapshot one period ago.
+// `previousAvailable=false` flag means the user just connected and we don't
+// yet have a baseline — UI hides delta arrows in that case.
+threadsRoutes.get("/threads/insights/timeline", requireAuth, async (context) => {
+  const user = context.get("user");
+  const periodDays = parsePeriodDays(context.req.query("period"));
+
+  const account = await prisma.threadsAccount.findUnique({
+    where: { userId: user.id },
+    select: { id: true, postsCount: true },
+  });
+  if (!account) {
+    return context.json({ error: "Threads account not connected" }, 400);
+  }
+
+  const latest = await prisma.threadsAccountSnapshot.findFirst({
+    where: { threadsAccountId: account.id },
+    orderBy: { capturedDate: "desc" },
+  });
+
+  if (!latest) {
+    return context.json({
+      snapshot: null,
+      delta: null,
+      previousAvailable: false,
+      period: { days: periodDays },
+    });
+  }
+
+  const previousCutoff = new Date(latest.capturedDate);
+  previousCutoff.setUTCDate(previousCutoff.getUTCDate() - periodDays);
+
+  const previous = await prisma.threadsAccountSnapshot.findFirst({
+    where: {
+      threadsAccountId: account.id,
+      capturedDate: { lte: previousCutoff },
+    },
+    orderBy: { capturedDate: "desc" },
+  });
+
+  if (!previous) {
+    return context.json({
+      snapshot: serializeSnapshot(latest),
+      delta: null,
+      previousAvailable: false,
+      period: { days: periodDays },
+    });
+  }
+
+  return context.json({
+    snapshot: serializeSnapshot(latest),
+    delta: {
+      followers: latest.followersCount - previous.followersCount,
+      views: latest.viewsTotal - previous.viewsTotal,
+      likes: latest.likesTotal - previous.likesTotal,
+      replies: latest.repliesTotal - previous.repliesTotal,
+      reposts: latest.repostsTotal - previous.repostsTotal,
+      quotes: latest.quotesTotal - previous.quotesTotal,
+      clicks: latest.clicksTotal - previous.clicksTotal,
+      posts: latest.postsCount - previous.postsCount,
+    },
+    previousAvailable: true,
+    period: {
+      days: periodDays,
+      capturedFrom: previous.capturedDate.toISOString(),
+      capturedTo: latest.capturedDate.toISOString(),
+    },
+  });
+});
+
+// GET /threads/insights/series?metric=followers|views|likes|engagementRate&days=30
+// Time-series for sparkline / line charts. Returns one point per snapshot day.
+threadsRoutes.get("/threads/insights/series", requireAuth, async (context) => {
+  const user = context.get("user");
+  const metric = context.req.query("metric") ?? "followers";
+  const days = clampSeriesDays(parseInt(context.req.query("days") ?? "30", 10));
+
+  const account = await prisma.threadsAccount.findUnique({
+    where: { userId: user.id },
+    select: { id: true },
+  });
+  if (!account) {
+    return context.json({ error: "Threads account not connected" }, 400);
+  }
+
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - days);
+
+  const snapshots = await prisma.threadsAccountSnapshot.findMany({
+    where: {
+      threadsAccountId: account.id,
+      capturedDate: { gte: cutoff },
+    },
+    orderBy: { capturedDate: "asc" },
+  });
+
+  const points = snapshots.map((snapshot) => ({
+    date: snapshot.capturedDate.toISOString().slice(0, 10),
+    value: extractSeriesValue(snapshot, metric),
+  }));
+
+  return context.json({ metric, days, points });
+});
+
+// POST /threads/insights/refresh — admin-only force re-run of the snapshot
+// service for the caller's account. Bypasses the 03:00 UTC cron so admins can
+// validate changes immediately. Same upsert path as the nightly job.
+threadsRoutes.post("/threads/insights/refresh", requireAuth, async (context) => {
+  const user = context.get("user");
+  if (!(await isAdminUser(user.id))) {
+    return context.json({ error: "Forbidden" }, 403);
+  }
+
+  const account = await prisma.threadsAccount.findUnique({
+    where: { userId: user.id },
+    select: {
+      id: true,
+      userId: true,
+      threadsUserId: true,
+      accessToken: true,
+      tokenExpiresAt: true,
+      lastSeenThreadsPostId: true,
+    },
+  });
+  if (!account) {
+    return context.json({ error: "Threads account not connected" }, 400);
+  }
+
+  await threadsInsightsSnapshotService.snapshotAccount(account);
+  return context.json({ success: true });
+});
+
+// GET /threads/insights/top-posts?period=day|week|month&limit=3
+// Top posts (own posts, not replies) by views, scoped to the period window.
+// Reads from ThreadsPostInsight which is post-aggregated and excludes the
+// user's replies on other people's threads.
+threadsRoutes.get("/threads/insights/top-posts", requireAuth, async (context) => {
+  const user = context.get("user");
+  const periodDays = parsePeriodDays(context.req.query("period"));
+  const limit = Math.min(Math.max(parseInt(context.req.query("limit") ?? "3", 10) || 3, 1), 10);
+
+  const account = await prisma.threadsAccount.findUnique({
+    where: { userId: user.id },
+    select: { id: true },
+  });
+  if (!account) {
+    return context.json({ error: "Threads account not connected" }, 400);
+  }
+
+  const cutoff = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
+
+  const posts = await prisma.threadsPostInsight.findMany({
+    where: {
+      threadsAccountId: account.id,
+      publishedAt: { gte: cutoff },
+    },
+    orderBy: [{ views: "desc" }, { publishedAt: "desc" }],
+    take: limit,
+  });
+
+  return context.json({
+    posts: posts.map((post) => ({
+      threadsPostId: post.threadsPostId,
+      preview: post.preview,
+      publishedAt: post.publishedAt.toISOString(),
+      metrics: {
+        views: post.views,
+        likes: post.likes,
+        replies: post.replies,
+        reposts: post.reposts,
+        quotes: post.quotes,
+        shares: post.shares,
+      },
+      metricsCapturedAt: post.fetchedAt.toISOString(),
+    })),
+    period: { days: periodDays },
+  });
+});
+
+// GET /threads/insights/streak — consecutive days backward from today (or
+// yesterday if today has no post yet) where the user published at least one
+// non-reply post. Resets on the first 0-post day in the chain.
+threadsRoutes.get("/threads/insights/streak", requireAuth, async (context) => {
+  const user = context.get("user");
+
+  const account = await prisma.threadsAccount.findUnique({
+    where: { userId: user.id },
+    select: { id: true },
+  });
+  if (!account) {
+    return context.json({ error: "Threads account not connected" }, 400);
+  }
+
+  // Pull at most ~1 year of history — anything beyond that is irrelevant for
+  // a "current streak" UI and bounds query cost.
+  const horizon = new Date();
+  horizon.setUTCDate(horizon.getUTCDate() - 365);
+
+  const posts = await prisma.threadsPostInsight.findMany({
+    where: {
+      threadsAccountId: account.id,
+      publishedAt: { gte: horizon },
+    },
+    select: { publishedAt: true },
+  });
+
+  const publishDays = new Set(posts.map((post) => toUtcDayKey(post.publishedAt)));
+
+  let streak = 0;
+  const today = new Date();
+  let cursor = startOfUtcDay(today);
+  if (!publishDays.has(toUtcDayKey(cursor))) {
+    // Today has nothing yet — start counting from yesterday so the streak
+    // doesn't read 0 the moment the clock ticks past midnight.
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+
+  while (publishDays.has(toUtcDayKey(cursor))) {
+    streak += 1;
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+
+  return context.json({
+    streak,
+    todayPosted: publishDays.has(toUtcDayKey(startOfUtcDay(today))),
+  });
+});
+
+// GET /threads/pipeline-counts — counts for the dashboard pipeline widget:
+//   ideasToReview = ContentIdeas waiting for the user to approve/reject
+//   readyToPublish = posts with content produced but not scheduled or posted
+threadsRoutes.get("/threads/pipeline-counts", requireAuth, async (context) => {
+  const user = context.get("user");
+
+  const [ideasToReview, readyToPublish] = await Promise.all([
+    prisma.contentIdea.count({
+      where: { userId: user.id, status: "proposed" },
+    }),
+    prisma.contentIdea.count({
+      where: {
+        userId: user.id,
+        status: "completed",
+        publishStatus: null,
+      },
+    }),
+  ]);
+
+  return context.json({ ideasToReview, readyToPublish });
+});
+
+function startOfUtcDay(date: Date): Date {
+  return new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate()
+  ));
+}
+
+function toUtcDayKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function parsePeriodDays(period: string | undefined): 1 | 7 | 30 {
+  if (period === "day") return 1;
+  if (period === "month") return 30;
+  return 7;
+}
+
+function clampSeriesDays(days: number): number {
+  if (!Number.isFinite(days) || days < 7) return 7;
+  if (days > 90) return 90;
+  return days;
+}
+
+function serializeSnapshot(snapshot: {
+  capturedDate: Date;
+  capturedAt: Date;
+  followersCount: number;
+  likesTotal: number;
+  repliesTotal: number;
+  repostsTotal: number;
+  quotesTotal: number;
+  viewsTotal: number;
+  clicksTotal: number;
+  postsCount: number;
+  partial: boolean;
+}) {
+  return {
+    capturedDate: snapshot.capturedDate.toISOString(),
+    capturedAt: snapshot.capturedAt.toISOString(),
+    followersCount: snapshot.followersCount,
+    likesTotal: snapshot.likesTotal,
+    repliesTotal: snapshot.repliesTotal,
+    repostsTotal: snapshot.repostsTotal,
+    quotesTotal: snapshot.quotesTotal,
+    viewsTotal: snapshot.viewsTotal,
+    clicksTotal: snapshot.clicksTotal,
+    postsCount: snapshot.postsCount,
+    partial: snapshot.partial,
+  };
+}
+
+function extractSeriesValue(
+  snapshot: {
+    followersCount: number;
+    viewsTotal: number;
+    likesTotal: number;
+    repliesTotal: number;
+    repostsTotal: number;
+    quotesTotal: number;
+    clicksTotal: number;
+  },
+  metric: string
+): number {
+  // Cumulative metrics are exposed as their stored value. Engagement-rate
+  // series is intentionally not supported here — ER is period-relative
+  // (interactions delta / followers), so each point would need pairing with
+  // the previous snapshot. Build that in a dedicated endpoint when needed.
+  switch (metric) {
+    case "followers": return snapshot.followersCount;
+    case "views": return snapshot.viewsTotal;
+    case "likes": return snapshot.likesTotal;
+    case "replies": return snapshot.repliesTotal;
+    case "reposts": return snapshot.repostsTotal;
+    case "quotes": return snapshot.quotesTotal;
+    case "clicks": return snapshot.clicksTotal;
+    default: return snapshot.followersCount;
+  }
+}
+
 
 // POST /threads/insights/:contentIdeaId/refresh — fetch and store a new insights snapshot
 threadsRoutes.post("/threads/insights/:contentIdeaId/refresh", requireAuth, async (context) => {

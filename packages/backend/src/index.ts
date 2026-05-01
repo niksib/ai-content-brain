@@ -16,7 +16,9 @@ import { libraryRoutes } from "./routes/library.js";
 import { billingRoutes } from "./routes/billing.js";
 import { threadsRoutes } from "./routes/threads.js";
 import { mediaRoutes } from "./routes/media.js";
+import { devRoutes } from "./routes/dev.js";
 import { threadsSchedulerService } from "./services/threads-scheduler.service.js";
+import { threadsInsightsSnapshotService } from "./services/threads-insights-snapshot.service.js";
 import { rateLimit } from "./middleware/rate-limit.middleware.js";
 
 const app = new Hono();
@@ -57,6 +59,10 @@ app.route("/api", billingRoutes);
 app.route("/api", threadsRoutes);
 app.route("/api", mediaRoutes);
 
+if (process.env.NODE_ENV !== "production") {
+  app.route("/api", devRoutes);
+}
+
 const port = 3001;
 
 console.log(`Server running on http://localhost:${port}`);
@@ -67,5 +73,6 @@ serve({
 });
 
 threadsSchedulerService.start();
+threadsInsightsSnapshotService.start();
 
 export { app };

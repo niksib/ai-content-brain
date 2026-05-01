@@ -612,4 +612,10 @@ onMounted(async () => {
 .btn--primary:hover:not(:disabled) {
   background: #4f46e5;
 }
+
+@media (max-width: 1024px) {
+  .creator-profile-page {
+    padding: 1rem 0.875rem 3rem;
+  }
+}
 </style>
