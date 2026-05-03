@@ -13,7 +13,9 @@ export interface ThreadsInsightsSnapshot {
   fetchedAt: string;
 }
 
-export interface LibraryContentIdea {
+// LibraryItem is now a flat ContentIdea (ProducedContent was merged into it).
+// Kept the name to limit the blast radius across callers.
+export interface LibraryItem {
   id: string;
   title?: string;
   angle: string;
@@ -25,18 +27,13 @@ export interface LibraryContentIdea {
   scheduledAt?: string | null;
   publishedAt?: string | null;
   threadsPostId?: string | null;
-  contentPlan?: { chatSessionId: string };
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  body?: Record<string, unknown> | null;
+  imageSuggestion?: Record<string, unknown> | null;
+  contentPlan?: { chatSessionId: string } | null;
   insightsSnapshots?: ThreadsInsightsSnapshot[];
-}
-
-export interface LibraryItem {
-  id: string;
-  contentIdeaId: string;
-  platform: string;
-  format: string;
-  body: Record<string, unknown>;
   createdAt: string;
-  contentIdea: LibraryContentIdea;
 }
 
 interface LibraryResponse {
@@ -112,20 +109,20 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   function markPublished(contentIdeaId: string, threadsPostId: string): void {
-    const item = items.value.find((i) => i.contentIdeaId === contentIdeaId);
+    const item = items.value.find((i) => i.id === contentIdeaId);
     if (item) {
-      item.contentIdea.publishStatus = 'posted';
-      item.contentIdea.threadsPostId = threadsPostId;
-      item.contentIdea.scheduledAt = null;
-      item.contentIdea.publishedAt = new Date().toISOString();
+      item.publishStatus = 'posted';
+      item.threadsPostId = threadsPostId;
+      item.scheduledAt = null;
+      item.publishedAt = new Date().toISOString();
     }
   }
 
   function markScheduled(contentIdeaId: string, scheduledAt: string): void {
-    const item = items.value.find((i) => i.contentIdeaId === contentIdeaId);
+    const item = items.value.find((i) => i.id === contentIdeaId);
     if (item) {
-      item.contentIdea.publishStatus = 'scheduled';
-      item.contentIdea.scheduledAt = scheduledAt;
+      item.publishStatus = 'scheduled';
+      item.scheduledAt = scheduledAt;
     }
   }
 

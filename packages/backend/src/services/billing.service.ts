@@ -280,7 +280,19 @@ export class BillingService {
 
   private async ensureStripeCustomer(userId: string): Promise<string> {
     const existing = await prisma.subscription.findUnique({ where: { userId } });
-    if (existing?.stripeCustomerId) return existing.stripeCustomerId;
+
+    if (existing?.stripeCustomerId) {
+      // Verify the customer still exists in Stripe (catches stale IDs from
+      // wiped test environments or accidental deletions).
+      try {
+        const customer = await stripe.customers.retrieve(existing.stripeCustomerId);
+        if (!("deleted" in customer) || !customer.deleted) {
+          return existing.stripeCustomerId;
+        }
+      } catch {
+        // StripeInvalidRequestError "No such customer" — fall through to create a new one.
+      }
+    }
 
     const user = await prisma.user.findUniqueOrThrow({
       where: { id: userId },

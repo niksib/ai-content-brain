@@ -66,7 +66,7 @@
         <h2 v-if="!isThreadsTextPost" class="idea-page__section-title">Produced Content</h2>
 
         <!-- Show produced content when completed -->
-        <div v-if="idea.status === 'completed' && idea.producedContent" class="idea-page__produced">
+        <div v-if="idea.status === 'completed' && idea.body" class="idea-page__produced">
 
           <!-- Image recommendation -->
           <div v-if="imageSuggestion" class="idea-page__image-suggestion">
@@ -231,6 +231,7 @@
                       :scheduled-at="scheduledAt"
                       @published="onPublished"
                       @scheduled="onScheduled"
+                      @unscheduled="onUnscheduled"
                     />
                   </div>
                 </div>
@@ -376,7 +377,7 @@
 
           <!-- Fallback for unknown formats -->
           <template v-else>
-            <pre class="idea-page__produced-content">{{ idea.producedContent.body }}</pre>
+            <pre class="idea-page__produced-content">{{ idea.body }}</pre>
           </template>
 
         </div>
@@ -513,15 +514,15 @@ const isThreadsTextPost = computed(
 );
 
 const threadsPublishPosts = computed((): string[] | null => {
-  if (!idea.value?.producedContent) return null;
-  const body = idea.value.producedContent.body as Record<string, unknown>;
+  if (!idea.value?.body) return null;
+  const body = idea.value.body as Record<string, unknown>;
   if (Array.isArray(body.posts) && body.posts.length > 1) return body.posts as string[];
   return null;
 });
 
 const threadsPublishText = computed((): string => {
-  if (!idea.value?.producedContent) return '';
-  const body = idea.value.producedContent.body as Record<string, unknown>;
+  if (!idea.value?.body) return '';
+  const body = idea.value.body as Record<string, unknown>;
   if (Array.isArray(body.posts)) return (body.posts as string[])[0] ?? '';
   if (typeof body.text === 'string') return body.text;
   return '';
@@ -607,14 +608,14 @@ const IMAGE_TYPE_LABELS: Record<string, string> = {
 };
 
 const imageSuggestion = computed<ImageSuggestion | null>(() => {
-  const s = idea.value?.producedContent?.imageSuggestion;
+  const s = idea.value?.imageSuggestion;
   if (!s || typeof s !== 'object') return null;
   return s as ImageSuggestion;
 });
 
 const contentBody = computed<ProducedContentBody | null>(() => {
-  if (!idea.value?.producedContent?.body) return null;
-  const body = idea.value.producedContent.body;
+  if (!idea.value?.body) return null;
+  const body = idea.value.body;
   // Body may be a string (JSON) or already parsed object
   if (typeof body === 'string') {
     try {
@@ -637,7 +638,7 @@ const threadPosts = computed<string[]>(() => {
 
 // True when idea is marked completed but the agent saved empty content
 const hasEmptyContent = computed(() => {
-  if (!idea.value?.producedContent) return true;
+  if (!idea.value?.body) return true;
   const body = contentBody.value;
   if (!body) return true;
   if (body.posts?.length) return false;
@@ -708,7 +709,7 @@ function flushSave(persistFn: () => Promise<void>): void {
 }
 
 async function persistThreadEdits(): Promise<void> {
-  if (!idea.value?.producedContent) return;
+  if (!idea.value?.body) return;
   // Build posts from current editableThreadPosts merged with any in-progress drafts.
   // Do NOT mutate editableThreadPosts.value — that would change v-for keys and
   // cause Vue to destroy/recreate the contenteditable elements (wiping their innerText).
@@ -720,16 +721,16 @@ async function persistThreadEdits(): Promise<void> {
     posts: posts.length > 1 ? [...posts] : undefined,
     text: posts.length === 1 ? posts[0] : undefined,
   };
-  idea.value.producedContent.body = updatedBody;
+  idea.value.body = updatedBody;
   store.markContentUpdatedByUser(updatedBody);
   await apiClient.patch(`/api/ideas/${props.ideaId}/content`, updatedBody).catch(() => {});
 }
 
 async function persistTextBodyEdit(): Promise<void> {
-  if (!idea.value?.producedContent) return;
+  if (!idea.value?.body) return;
   if (draftTextBody) editableTextBody.value = draftTextBody;
   const updatedBody: ProducedContentBody = { ...contentBody.value, text: editableTextBody.value };
-  idea.value.producedContent.body = updatedBody;
+  idea.value.body = updatedBody;
   store.markContentUpdatedByUser(updatedBody);
   await apiClient.patch(`/api/ideas/${props.ideaId}/content`, updatedBody).catch(() => {});
 }
@@ -822,22 +823,34 @@ function onScheduled(isoDate: string): void {
   }
 }
 
+function onUnscheduled(): void {
+  scheduledAt.value = null;
+  if (idea.value) {
+    idea.value.publishStatus = null;
+  }
+  const idx = store.ideas.findIndex((i) => i.id === props.ideaId);
+  if (idx !== -1) {
+    store.ideas[idx] = { ...store.ideas[idx], publishStatus: null };
+  }
+}
+
 // Sync with store when idea status or content changes (e.g. producing → completed, agent edit)
-// Note: store.ideas is populated from the list endpoint which does not include producedContent.
-// Preserve the locally-loaded producedContent so the content view doesn't disappear after
-// a publish/schedule action updates the store.
+// Note: store.ideas is populated from the list endpoint which may not include
+// body/imageSuggestion. Preserve the locally-loaded body so the content view
+// doesn't disappear after a publish/schedule action updates the store.
 watch(
   () => store.ideas.find((item) => item.id === props.ideaId),
   (storeIdea) => {
     if (storeIdea && idea.value) {
-      const merged = {
+      const merged: SessionIdea = {
         ...storeIdea,
-        producedContent: storeIdea.producedContent ?? idea.value.producedContent,
+        body: storeIdea.body ?? idea.value.body,
+        imageSuggestion: storeIdea.imageSuggestion ?? idea.value.imageSuggestion,
       };
-      const bodyChanged = JSON.stringify(merged.producedContent?.body) !==
-                          JSON.stringify(idea.value.producedContent?.body);
+      const bodyChanged = JSON.stringify(merged.body) !==
+                          JSON.stringify(idea.value.body);
       idea.value = merged;
-      if (bodyChanged && merged.producedContent) {
+      if (bodyChanged && merged.body) {
         // Reset editable state so the threadPosts/contentBody watchers re-initialize with new content
         editableThreadPosts.value = [];
         editableTextBody.value = '';
@@ -847,22 +860,57 @@ watch(
   { deep: true },
 );
 
+function restoreIdeaMedia(mediaUrl: string, mediaType: string): void {
+  if (!mediaUrl || mediaType === 'TEXT') return;
+  const mimeType = mediaType === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
+  const restoredFile: UploadedMediaFile = {
+    id: mediaUrl,
+    url: mediaUrl,
+    mimeType,
+    size: 0,
+    width: null,
+    height: null,
+    duration: null,
+  };
+  ensureMediaSlots(Math.max(1, editableThreadPosts.value.length));
+  postsMedia.value[0] = [restoredFile];
+}
+
 onMounted(async () => {
   isLoading.value = true;
   // Load Threads account in parallel (for avatar/username in post card)
   $fetch<{ account: ThreadsAccount | null }>(`${apiBaseUrl}/api/threads/account`, { credentials: 'include' })
     .then((r) => { threadsAccount.value = r.account; })
     .catch(() => {});
+  let pendingMediaUrl: string | null = null;
+  let pendingMediaType: string | null = null;
   try {
     const freshIdea = await store.loadIdea(props.ideaId);
     if (freshIdea) {
       idea.value = freshIdea;
+      if (freshIdea.scheduledAt) {
+        scheduledAt.value = freshIdea.scheduledAt;
+      }
+      if (freshIdea.mediaUrl && freshIdea.mediaType) {
+        pendingMediaUrl = freshIdea.mediaUrl;
+        pendingMediaType = freshIdea.mediaType;
+      }
     }
   } catch (error) {
     loadError.value = 'Failed to load idea details';
     console.error('Failed to load idea:', error);
   } finally {
     isLoading.value = false;
+  }
+
+  // Restore saved media AFTER isLoading = false so the thread card is in the
+  // DOM. Two ticks: the first lets the threadPosts watcher run and render the
+  // DOM; the second lets the watcher's inner nextTick fire so el.innerText is
+  // set before postsMedia mutates.
+  if (pendingMediaUrl && pendingMediaType) {
+    await nextTick();
+    await nextTick();
+    restoreIdeaMedia(pendingMediaUrl, pendingMediaType);
   }
 });
 </script>

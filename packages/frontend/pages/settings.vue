@@ -90,8 +90,8 @@ const billingStore = useBillingStore();
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
-  creator: 'Creator',
-  pro: 'Pro',
+  creator: 'Voice',
+  pro: 'Chorus',
 };
 
 const planLabel = computed(() => {

@@ -3,8 +3,8 @@
     <div class="content-card__header">
       <span class="content-card__platform">{{ platformEmoji }}</span>
       <span class="content-card__format">{{ formatLabel }}</span>
-      <span v-if="item.contentIdea.publishStatus === 'posted'" class="content-card__posted-badge">Posted</span>
-      <span v-else-if="item.contentIdea.publishStatus === 'scheduled'" class="content-card__scheduled-badge">Scheduled</span>
+      <span v-if="item.publishStatus === 'posted'" class="content-card__posted-badge">Posted</span>
+      <span v-else-if="item.publishStatus === 'scheduled'" class="content-card__scheduled-badge">Scheduled</span>
       <span class="content-card__date">{{ formattedDate }}</span>
     </div>
 
@@ -15,7 +15,7 @@
 
     <!-- Post analytics (only for posted Threads posts) -->
     <div
-      v-if="item.contentIdea.publishStatus === 'posted' && item.contentIdea.threadsPostId && item.platform === 'threads'"
+      v-if="item.publishStatus === 'posted' && item.threadsPostId && item.platform === 'threads'"
       class="content-card__insights"
       @click.stop
     >
@@ -85,7 +85,7 @@ const localSnapshot = ref<ThreadsInsightsSnapshot | null>(null);
 
 const latestSnapshot = computed<ThreadsInsightsSnapshot | null>(() => {
   if (localSnapshot.value) return localSnapshot.value;
-  const snapshots = props.item.contentIdea.insightsSnapshots;
+  const snapshots = props.item.insightsSnapshots;
   return snapshots && snapshots.length > 0 ? snapshots[0] : null;
 });
 
@@ -125,12 +125,12 @@ const ANGLE_LABELS: Record<string, string> = {
 };
 
 const angleLabel = computed(() => {
-  const a = props.item.contentIdea.angle;
+  const a = props.item.angle;
   return ANGLE_LABELS[a] ?? a;
 });
 
 const displayTitle = computed(() => {
-  const t = (props.item.contentIdea.title ?? '').trim();
+  const t = (props.item.title ?? '').trim();
   if (t) return t;
   return angleLabel.value;
 });
@@ -180,7 +180,7 @@ async function refreshInsights(): Promise<void> {
   refreshError.value = false;
   try {
     const result = await $fetch<{ snapshot: ThreadsInsightsSnapshot }>(
-      `${apiBaseUrl}/api/threads/insights/${props.item.contentIdea.id}/refresh`,
+      `${apiBaseUrl}/api/threads/insights/${props.item.id}/refresh`,
       { method: 'POST', credentials: 'include' },
     );
     localSnapshot.value = result.snapshot;

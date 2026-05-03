@@ -186,11 +186,17 @@ const canonicalMap = computed<Record<string, CanonicalKey>>(() => {
   return map;
 });
 
+// Internal-only memory blocks that should not be surfaced on the UI. The
+// onboarding transcript is the verbatim raw signal we feed into agents — it's
+// noisy, not user-curated content, and editing it would corrupt the prompt.
+const HIDDEN_BLOCK_KEYS = new Set<string>(['onboarding_transcript']);
+
 const displayBlocks = computed<DisplayBlock[]>(() => {
   const seen = new Set<string>();
   const result: DisplayBlock[] = [];
 
   for (const canonical of profileStore.canonicalKeys) {
+    if (HIDDEN_BLOCK_KEYS.has(canonical.key)) continue;
     const block = blockMap.value[canonical.key];
     result.push({
       key: canonical.key,
@@ -202,7 +208,7 @@ const displayBlocks = computed<DisplayBlock[]>(() => {
   }
 
   for (const block of profileStore.memoryBlocks) {
-    if (seen.has(block.key)) continue;
+    if (seen.has(block.key) || HIDDEN_BLOCK_KEYS.has(block.key)) continue;
     result.push({
       key: block.key,
       title: block.title,

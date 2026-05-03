@@ -1,7 +1,7 @@
 <template>
   <div class="backlog-card">
     <div class="backlog-card__meta">
-      <PlatformIcon :platform="item.platform" :size="16" />
+      <PlatformIcon :platform="(item.platform as 'threads' | 'linkedin' | 'tiktok' | 'instagram')" :size="16" />
       <span class="backlog-card__format">{{ formatLabel }}</span>
     </div>
 
@@ -130,18 +130,18 @@ const ANGLE_LABELS: Record<string, string> = {
 };
 
 const angleLabel = computed(() => {
-  const a = props.item.contentIdea.angle;
+  const a = props.item.angle;
   return ANGLE_LABELS[a] ?? a;
 });
 
 const displayTitle = computed(() => {
-  const t = (props.item.contentIdea.title ?? '').trim();
+  const t = (props.item.title ?? '').trim();
   if (t) return t;
   return angleLabel.value;
 });
 
 const preview = computed(() => {
-  const body = props.item.body;
+  const body = props.item.body ?? {};
   let text = '';
   if (typeof body.text === 'string') text = body.text;
   else if (Array.isArray(body.posts) && body.posts.length > 0) text = body.posts[0] as string;
@@ -151,7 +151,7 @@ const preview = computed(() => {
 });
 
 const publishText = computed((): string => {
-  const body = props.item.body;
+  const body = props.item.body ?? {};
   if (Array.isArray(body.posts)) return (body.posts as string[]).join('\n\n');
   if (typeof body.text === 'string') return body.text;
   return '';
@@ -196,9 +196,9 @@ async function publishNow(): Promise<void> {
     const result = await $fetch<{ postId: string }>(`${apiBaseUrl}/api/threads/publish`, {
       method: 'POST',
       credentials: 'include',
-      body: { text: publishText.value, contentIdeaId: props.item.contentIdeaId },
+      body: { text: publishText.value, contentIdeaId: props.item.id },
     });
-    emit('published', props.item.contentIdeaId, result.postId);
+    emit('published', props.item.id, result.postId);
   } catch (error: unknown) {
     const apiError = (error as { data?: { error?: string } })?.data?.error;
     errorMessage.value = apiError ?? 'Failed to publish. Please try again.';
@@ -219,13 +219,13 @@ async function schedulePost(): Promise<void> {
     await $fetch(`${apiBaseUrl}/api/threads/schedule`, {
       method: 'POST',
       credentials: 'include',
-      body: { text: publishText.value, scheduledAt: isoString, contentIdeaId: props.item.contentIdeaId },
+      body: { text: publishText.value, scheduledAt: isoString, contentIdeaId: props.item.id },
     });
 
     showPopover.value = false;
     scheduleDateInput.value = '';
     scheduleTimeInput.value = '';
-    emit('scheduled', props.item.contentIdeaId, isoString);
+    emit('scheduled', props.item.id, isoString);
   } catch (error: unknown) {
     const apiError = (error as { data?: { error?: string } })?.data?.error;
     errorMessage.value = apiError ?? 'Failed to schedule. Please try again.';

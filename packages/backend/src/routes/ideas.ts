@@ -38,7 +38,6 @@ ideaRoutes.get("/sessions/:id/ideas", requireAuth, async (context) => {
     include: {
       ideas: {
         orderBy: { createdAt: "asc" },
-        include: { producedContent: true },
       },
     },
   });
@@ -151,13 +150,12 @@ ideaRoutes.post(
     const idea = await prisma.contentIdea.findUnique({
       where: { id: ideaId, userId: user.id },
       include: {
-        producedContent: true,
         contentPlan: { include: { chatSession: true } },
       },
     });
 
     if (!idea) return context.json({ error: "Idea not found" }, 404);
-    if (!idea.producedContent) return context.json({ error: "Idea has no produced content yet" }, 400);
+    if (!idea.body) return context.json({ error: "Idea has no produced content yet" }, 400);
 
     const chatSession = idea.contentPlan.chatSession;
 
@@ -178,7 +176,7 @@ ideaRoutes.post(
       { role: "user" as const, content: agent.buildProductionPrompt() },
       {
         role: "assistant" as const,
-        content: `I've produced and saved the content:\n\n${JSON.stringify(idea.producedContent.body, null, 2)}`,
+        content: `I've produced and saved the content:\n\n${JSON.stringify(idea.body, null, 2)}`,
       },
     ];
 
@@ -213,9 +211,8 @@ ideaRoutes.post(
     const onContentSaved = async () => {
       const updatedIdea = await prisma.contentIdea.findUnique({
         where: { id: ideaId },
-        include: { producedContent: true },
       });
-      if (updatedIdea?.producedContent) {
+      if (updatedIdea?.body) {
         send("idea_updated", updatedIdea);
       }
     };
@@ -262,30 +259,28 @@ ideaRoutes.patch("/ideas/:id/content", requireAuth, async (context) => {
 
   const idea = await prisma.contentIdea.findUnique({
     where: { id: ideaId, userId: user.id },
-    include: { producedContent: true },
+    select: { id: true, body: true },
   });
 
   if (!idea) return context.json({ error: "Idea not found" }, 404);
-  if (!idea.producedContent) return context.json({ error: "No produced content yet" }, 400);
+  if (!idea.body) return context.json({ error: "No produced content yet" }, 400);
 
-  const updated = await prisma.producedContent.update({
-    where: { id: idea.producedContent.id },
+  const updated = await prisma.contentIdea.update({
+    where: { id: ideaId },
     data: { body },
+    select: { id: true, body: true, imageSuggestion: true },
   });
 
   return context.json({ content: updated });
 });
 
-// Get idea detail with produced content
+// Get idea detail
 ideaRoutes.get("/ideas/:id", requireAuth, async (context) => {
   const user = context.get("user");
   const ideaId = context.req.param("id");
 
   const idea = await prisma.contentIdea.findUnique({
     where: { id: ideaId, userId: user.id },
-    include: {
-      producedContent: true,
-    },
   });
 
   if (!idea) {

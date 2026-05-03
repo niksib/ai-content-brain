@@ -22,6 +22,16 @@
           <span v-else>Publish now</span>
         </button>
 
+        <button
+          v-if="publishStatus === 'scheduled'"
+          class="threads-publish__btn threads-publish__btn--secondary"
+          :disabled="isSaving || !text"
+          @click="saveScheduledChanges"
+        >
+          <span v-if="isSaving">Saving...</span>
+          <span v-else>Save changes</span>
+        </button>
+
         <!-- Schedule button or scheduled state -->
         <div ref="scheduleWrapEl" class="threads-publish__schedule-wrap">
           <!-- Not yet scheduled: Schedule button -->
@@ -35,7 +45,7 @@
             <ChevronDown :size="16" class="threads-publish__chevron" />
           </button>
 
-          <!-- Scheduled: display date + Change button -->
+          <!-- Scheduled: display date + Change / Remove buttons -->
           <div v-else class="threads-publish__scheduled-state">
             <Clock :size="14" style="color:#6366f1;flex-shrink:0;" />
             <span class="threads-publish__scheduled-date">{{ scheduledDisplayText }}</span>
@@ -45,6 +55,14 @@
               @click.stop="togglePopover"
             >
               Change
+            </button>
+            <span class="threads-publish__scheduled-sep">·</span>
+            <button
+              class="threads-publish__remove-btn"
+              :disabled="isUnscheduling"
+              @click.stop="unschedulePost"
+            >
+              {{ isUnscheduling ? 'Removing…' : 'Remove' }}
             </button>
           </div>
         </div>
@@ -115,6 +133,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   published: [threadsPostId: string];
   scheduled: [scheduledAt: string];
+  unscheduled: [];
 }>();
 
 const isMultiThread = computed(() => Array.isArray(props.posts) && props.posts.length > 1);
@@ -122,6 +141,8 @@ const isMultiThread = computed(() => Array.isArray(props.posts) && props.posts.l
 const accountConnected = ref(false);
 const isPublishing = ref(false);
 const isScheduling = ref(false);
+const isUnscheduling = ref(false);
+const isSaving = ref(false);
 const showSchedulePopover = ref(false);
 const scheduleDateInput = ref('');
 const scheduleTimeInput = ref('');
@@ -169,6 +190,13 @@ function togglePopover(): void {
       left: `${rect.left}px`,
       zIndex: '9999',
     };
+    // Pre-fill inputs with the existing scheduled date when changing.
+    if (props.scheduledAt && !scheduleDateInput.value) {
+      const date = new Date(props.scheduledAt);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      scheduleDateInput.value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+      scheduleTimeInput.value = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
   }
 }
 
@@ -210,12 +238,58 @@ function buildThreadPayload() {
   });
 }
 
+async function findPendingScheduledPostId(): Promise<string | null> {
+  if (!props.contentIdeaId) return null;
+  try {
+    const resp = await $fetch<{ scheduledPosts: Array<{ id: string; contentIdeaId: string | null; status: string }> }>(
+      `${apiBaseUrl}/api/threads/scheduled?status=all`,
+      { credentials: 'include' },
+    );
+    return resp.scheduledPosts.find(
+      (p) => p.contentIdeaId === props.contentIdeaId && p.status === 'pending',
+    )?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function unschedulePost(): Promise<void> {
+  isUnscheduling.value = true;
+  errorMessage.value = '';
+  try {
+    const existingId = await findPendingScheduledPostId();
+    if (existingId) {
+      await $fetch(`${apiBaseUrl}/api/threads/scheduled/${existingId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+    }
+    emit('unscheduled');
+  } catch (error: unknown) {
+    const apiError = (error as { data?: { error?: string } })?.data?.error;
+    errorMessage.value = apiError ?? 'Failed to remove schedule. Please try again.';
+  } finally {
+    isUnscheduling.value = false;
+  }
+}
+
 async function publishNow(): Promise<void> {
   isPublishing.value = true;
   errorMessage.value = '';
   publishNoticeMessage.value = '';
 
   try {
+    // If there's already a pending scheduled post, delete it first to avoid duplicates.
+    if (props.publishStatus === 'scheduled') {
+      const existingId = await findPendingScheduledPostId();
+      if (existingId) {
+        await $fetch(`${apiBaseUrl}/api/threads/scheduled/${existingId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+      }
+    }
+
     const scheduledAt = new Date(Date.now() + PUBLISH_DELAY_MS).toISOString();
     const scheduleBody: Record<string, unknown> = {
       scheduledAt,
@@ -249,6 +323,48 @@ async function publishNow(): Promise<void> {
   }
 }
 
+async function saveScheduledChanges(): Promise<void> {
+  isSaving.value = true;
+  errorMessage.value = '';
+  publishNoticeMessage.value = '';
+
+  try {
+    const existingId = await findPendingScheduledPostId();
+    if (!existingId) {
+      errorMessage.value = 'No pending scheduled post found.';
+      return;
+    }
+
+    const saveBody: Record<string, unknown> = {};
+    if (isMultiThread.value) {
+      saveBody.posts = buildThreadPayload();
+    } else {
+      saveBody.text = props.text;
+      const singleMedia = props.postsMedia?.[0];
+      if (singleMedia && 'mediaType' in singleMedia) {
+        saveBody.mediaUrl = singleMedia.mediaUrl;
+        saveBody.mediaType = singleMedia.mediaType;
+      } else {
+        saveBody.mediaType = 'TEXT';
+        saveBody.mediaUrl = null;
+      }
+    }
+
+    await $fetch(`${apiBaseUrl}/api/threads/scheduled/${existingId}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      body: saveBody,
+    });
+
+    publishNoticeMessage.value = 'Changes saved.';
+  } catch (error: unknown) {
+    const apiError = (error as { data?: { error?: string } })?.data?.error;
+    errorMessage.value = apiError ?? 'Failed to save changes. Please try again.';
+  } finally {
+    isSaving.value = false;
+  }
+}
+
 async function schedulePost(): Promise<void> {
   if (!scheduleDateInput.value || !scheduleTimeInput.value) return;
 
@@ -269,6 +385,33 @@ async function schedulePost(): Promise<void> {
       scheduleBody.posts = buildThreadPayload();
     } else {
       scheduleBody.text = props.text;
+      const singleMedia = props.postsMedia?.[0];
+      if (singleMedia && 'mediaType' in singleMedia) {
+        scheduleBody.mediaUrl = singleMedia.mediaUrl;
+        scheduleBody.mediaType = singleMedia.mediaType;
+      } else {
+        scheduleBody.mediaType = 'TEXT';
+        scheduleBody.mediaUrl = null;
+      }
+    }
+
+    // If already scheduled, find the existing pending record and patch it instead
+    // of creating a duplicate.
+    if (props.publishStatus === 'scheduled') {
+      const existingId = await findPendingScheduledPostId();
+
+      if (existingId) {
+        await $fetch(`${apiBaseUrl}/api/threads/scheduled/${existingId}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          body: scheduleBody,
+        });
+        showSchedulePopover.value = false;
+        scheduleDateInput.value = '';
+        scheduleTimeInput.value = '';
+        emit('scheduled', isoString);
+        return;
+      }
     }
 
     await $fetch(`${apiBaseUrl}/api/threads/schedule`, {
@@ -356,6 +499,33 @@ async function schedulePost(): Promise<void> {
 
 .threads-publish__change-btn:hover {
   color: #4f46e5;
+}
+
+.threads-publish__scheduled-sep {
+  color: #c7d2fe;
+  font-size: 0.75rem;
+  user-select: none;
+}
+
+.threads-publish__remove-btn {
+  border: none;
+  background: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
+.threads-publish__remove-btn:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.threads-publish__remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .threads-publish__popover {

@@ -198,7 +198,7 @@ const daysInMonth = computed(() => {
 
     const libraryEntries: DayEntry[] = props.items
       .filter((item) => {
-        const { publishStatus, scheduledAt, publishedAt } = item.contentIdea;
+        const { publishStatus, scheduledAt, publishedAt } = item;
         let iso = item.createdAt;
         if (publishStatus === 'posted' && publishedAt) {
           iso = publishedAt;
@@ -257,21 +257,21 @@ const CALENDAR_ANGLE_LABELS: Record<string, string> = {
 };
 
 function ideaTitle(item: LibraryItem): string {
-  const t = (item.contentIdea.title ?? '').trim();
+  const t = (item.title ?? '').trim();
   if (t) return t;
-  const a = item.contentIdea.angle;
+  const a = item.angle;
   return CALENDAR_ANGLE_LABELS[a] ?? a;
 }
 
 function chipStatusLabel(item: LibraryItem): string {
-  if (item.contentIdea.publishStatus === 'posted') return 'Posted';
-  if (item.contentIdea.publishStatus === 'scheduled') return 'Sched';
+  if (item.publishStatus === 'posted') return 'Posted';
+  if (item.publishStatus === 'scheduled') return 'Sched';
   return 'Ready';
 }
 
 function bubbleClass(item: LibraryItem): string {
-  if (item.contentIdea.publishStatus === 'posted') return 'calendar-bubble--posted';
-  if (item.contentIdea.publishStatus === 'scheduled') return 'calendar-bubble--scheduled';
+  if (item.publishStatus === 'posted') return 'calendar-bubble--posted';
+  if (item.publishStatus === 'scheduled') return 'calendar-bubble--scheduled';
   return 'calendar-bubble--ready';
 }
 
@@ -291,13 +291,12 @@ function standaloneStatusLabel(post: StandalonePost): string {
 function entryTimeLabel(entry: DayEntry): string {
   let iso: string | null = null;
   if (entry.kind === 'library') {
-    const { publishStatus, scheduledAt, publishedAt } = entry.item.contentIdea;
-    if (publishStatus === 'posted' && publishedAt) iso = publishedAt;
-    else if (publishStatus === 'scheduled' && scheduledAt) iso = scheduledAt;
+    const { publishStatus, scheduledAt } = entry.item;
+    // Posted items show the "Posted" status label, not the publication time.
+    if (publishStatus === 'scheduled' && scheduledAt) iso = scheduledAt;
   } else {
-    iso = entry.post.status === 'published' && entry.post.publishedAt
-      ? entry.post.publishedAt
-      : entry.post.scheduledAt;
+    // Published items show the "Posted" status label, not the publication time.
+    if (entry.post.status !== 'published') iso = entry.post.scheduledAt;
   }
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -313,7 +312,7 @@ function standaloneFormatLabel(post: StandalonePost): string {
 function sessionIdForDay(day: { entries: DayEntry[] }): string | null {
   for (const entry of day.entries) {
     if (entry.kind !== 'library') continue;
-    const sessionId = entry.item.contentIdea.contentPlan?.chatSessionId;
+    const sessionId = entry.item.contentPlan?.chatSessionId;
     if (sessionId) return sessionId;
   }
   return null;

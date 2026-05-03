@@ -79,12 +79,12 @@ import { ref, computed, watch } from 'vue';
 import { X, CheckCircle } from 'lucide-vue-next';
 import { useBillingStore, type PlanId } from '~/stores/billing';
 
-// Plain-language volume labels so we never expose raw credit numbers to users.
-// Tune copy here — no other place in the UI references the underlying credit budget.
+// Plan volume labels: raw AI-credit budget plus a rough post estimate so users
+// can map abstract credits to a concrete output. Numbers tuned per product copy.
 const PLAN_VOLUME_LABEL: Record<PlanId, string> = {
-  free: 'Casual usage',
-  creator: 'Daily posting',
-  pro: 'Multiple posts per day',
+  free: '100 AI-credits, about 5 posts',
+  creator: '1,000 AI-credits, about 60 posts',
+  pro: '2,000 AI-credits, about 120 posts',
 };
 
 const billing = useBillingStore();

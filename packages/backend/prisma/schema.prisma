@@ -189,9 +189,19 @@ model ContentIdea {
   publishedAt   DateTime? // set when post is actually published
   threadsPostId String?   // Threads media ID after publishing
 
-  producedContent   ProducedContent?
+  // Produced post content (was a separate ProducedContent table; collapsed
+  // here since the relation was always 1:1 and consumers fetched both rows
+  // together). Body shape depends on platform/format — see content tools.
+  body            Json?
+  imageSuggestion Json?
+  // Last media attached to the post. Survives ScheduledPost deletion so
+  // unscheduling preserves the user's uploaded image.
+  mediaUrl        String?
+  mediaType       String?  // "IMAGE" | "VIDEO"
+
   chatMessages      ChatMessage[]
   insightsSnapshots ThreadsInsightsSnapshot[]
+  scheduledPosts    ScheduledPost[]
 
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -219,23 +229,6 @@ enum IdeaStatus {
   rejected
   producing
   completed
-}
-
-// ==================== PRODUCED CONTENT ====================
-
-model ProducedContent {
-  id            String      @id @default(cuid())
-  contentIdeaId String      @unique
-  contentIdea   ContentIdea @relation(fields: [contentIdeaId], references: [id])
-  userId        String
-
-  platform      Platform
-  format        ContentFormat
-
-  body            Json
-  imageSuggestion Json?
-
-  createdAt     DateTime    @default(now())
 }
 
 // ==================== CREDITS ====================
@@ -378,22 +371,29 @@ model ThreadsAccount {
   postInsights      ThreadsPostInsight[]
 }
 
+// Job-queue row. For idea-linked posts (contentIdeaId set), text/media are
+// read from the linked ContentIdea at publish time so user edits flow through.
+// For standalone posts (contentIdeaId null) — composed directly via the
+// calendar's SchedulePostModal — the snapshot lives on these columns.
 model ScheduledPost {
-  id               String                 @id @default(cuid())
+  id               String              @id @default(cuid())
   userId           String
   threadsAccountId String
-  threadsAccount   ThreadsAccount         @relation(fields: [threadsAccountId], references: [id])
+  threadsAccount   ThreadsAccount      @relation(fields: [threadsAccountId], references: [id])
 
   contentIdeaId    String?
-  text             String
-  posts            Json?                  // populated for multi-post threads instead of text
-  mediaType        ScheduledPostMediaType @default(TEXT)
+  contentIdea      ContentIdea?        @relation(fields: [contentIdeaId], references: [id])
+
+  // Standalone-only snapshot. Null when contentIdeaId is set.
+  text             String?
+  posts            Json?               // multi-post threads
+  mediaType        String?             // "IMAGE" | "VIDEO"
   mediaUrl         String?
 
   scheduledAt      DateTime
-  publishingAt     DateTime?              // set when worker picks up the post; null otherwise
-  attempts         Int                    @default(0)
-  status           ScheduledPostStatus    @default(pending)
+  publishingAt     DateTime?           // set when worker picks up the post; null otherwise
+  attempts         Int                 @default(0)
+  status           ScheduledPostStatus @default(pending)
   threadsPostId    String?
   errorMessage     String?
 
@@ -478,12 +478,6 @@ model ThreadsAccountSnapshot {
   @@unique([threadsAccountId, capturedDate])
   @@index([threadsAccountId, capturedDate(sort: Desc)])
   @@index([userId])
-}
-
-enum ScheduledPostMediaType {
-  TEXT
-  IMAGE
-  VIDEO
 }
 
 // ==================== META PLATFORM CALLBACKS ====================

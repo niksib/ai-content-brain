@@ -303,11 +303,9 @@ function normalizeThreadsBody(parsedBody: unknown): unknown {
 }
 
 export async function executeSaveProducedContent(input: Record<string, unknown>): Promise<string> {
-  const { contentIdeaId, userId, platform, format, body, imageSuggestion } = input as {
+  const { contentIdeaId, platform, body, imageSuggestion } = input as {
     contentIdeaId: string;
-    userId: string;
     platform: string;
-    format: string;
     body: string;
     imageSuggestion?: { type: string; brief: string };
   };
@@ -318,29 +316,14 @@ export async function executeSaveProducedContent(input: Record<string, unknown>)
     parsedBody = normalizeThreadsBody(parsedBody);
   }
 
-  await prisma.$transaction([
-    prisma.producedContent.upsert({
-      where: { contentIdeaId },
-      create: {
-        contentIdeaId,
-        userId,
-        platform: platform as Platform,
-        format: format as ContentFormat,
-        body: parsedBody,
-        ...(imageSuggestion !== undefined && { imageSuggestion }),
-      },
-      update: {
-        platform: platform as Platform,
-        format: format as ContentFormat,
-        body: parsedBody,
-        ...(imageSuggestion !== undefined && { imageSuggestion }),
-      },
-    }),
-    prisma.contentIdea.update({
-      where: { id: contentIdeaId },
-      data: { status: "completed" },
-    }),
-  ]);
+  await prisma.contentIdea.update({
+    where: { id: contentIdeaId },
+    data: {
+      status: "completed",
+      body: parsedBody,
+      ...(imageSuggestion !== undefined && { imageSuggestion }),
+    },
+  });
 
   return JSON.stringify({ success: true, message: "Produced content saved and idea marked as completed." });
 }

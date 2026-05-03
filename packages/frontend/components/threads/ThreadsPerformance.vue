@@ -113,6 +113,7 @@
                 <ul class="top-post-item__metrics">
                   <li><span>{{ formatNumber(post.metrics.views) }}</span> views</li>
                   <li><span>{{ formatNumber(post.metrics.likes) }}</span> likes</li>
+                  <li><span>{{ formatNumber(post.metrics.replies) }}</span> {{ post.metrics.replies === 1 ? 'comment' : 'comments' }}</li>
                   <li><span>{{ formatNumber(post.metrics.reposts + post.metrics.quotes) }}</span> reposts</li>
                 </ul>
               </div>
@@ -123,26 +124,18 @@
           </p>
         </section>
 
-        <section class="streak-card">
-          <header class="lower-grid__header">
-            <h4 class="lower-grid__title">Posting streak</h4>
-            <span class="lower-grid__hint">Consecutive days with a post</span>
+        <section class="streak-card" :class="`streak-card--${streakTier}`">
+          <Flame :size="120" class="streak-card__flame-bg" :stroke-width="1.2" />
+          <header class="streak-card__head">
+            <span class="streak-card__eyebrow">Posting streak</span>
+            <Flame :size="22" class="streak-card__flame-icon" />
           </header>
           <div class="streak-card__body">
             <span class="streak-card__value">{{ streak }}</span>
             <span class="streak-card__unit">{{ streak === 1 ? 'day' : 'days' }}</span>
           </div>
-          <p class="streak-card__caption" :class="{ 'streak-card__caption--alert': streak === 0 }">
-            <template v-if="streak === 0">
-              No streak yet. Post today to start one.
-            </template>
-            <template v-else-if="todayPosted">
-              You posted today — keep it going.
-            </template>
-            <template v-else>
-              Today is open. Post to extend your streak.
-            </template>
-          </p>
+          <p class="streak-card__hype">{{ streakHeadline }}</p>
+          <p class="streak-card__caption">{{ streakSubline }}</p>
         </section>
       </div>
     </template>
@@ -154,7 +147,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref, computed, watch } from 'vue';
+import { Flame } from 'lucide-vue-next';
 import DeltaBadge from './DeltaBadge.vue';
 import { useProfileStore } from '~/stores/profile';
 
@@ -230,6 +224,46 @@ const previousAvailable = ref(false);
 const topPosts = ref<TopPost[]>([]);
 const streak = ref(0);
 const todayPosted = ref(false);
+
+// Streak tier drives both the visual treatment (color, glow) and the copy.
+// Tier names mirror temperature: cold (no streak) -> spark -> warm -> hot ->
+// blazing -> legendary. Boundaries chosen to celebrate common milestones
+// (week, two weeks, month, hundred).
+type StreakTier = 'cold' | 'spark' | 'warm' | 'hot' | 'blazing' | 'legendary';
+const streakTier = computed<StreakTier>(() => {
+  const days = streak.value;
+  if (days === 0) return 'cold';
+  if (days < 3) return 'spark';
+  if (days < 7) return 'warm';
+  if (days < 14) return 'hot';
+  if (days < 30) return 'blazing';
+  return 'legendary';
+});
+
+const streakHeadline = computed<string>(() => {
+  const days = streak.value;
+  if (days === 0) return "Light it up.";
+  if (days === 1) return "First spark!";
+  if (days < 7) return "You're heating up!";
+  if (days < 14) return "On fire!";
+  if (days === 14) return "Two weeks unstoppable!";
+  if (days < 30) return "Absolutely blazing!";
+  if (days === 30) return "30 days. Legend status.";
+  if (days < 100) return "Pure dedication.";
+  if (days === 100) return "100 days. Iconic.";
+  return "Untouchable streak.";
+});
+
+const streakSubline = computed<string>(() => {
+  const days = streak.value;
+  if (days === 0) return "Post today to start your streak.";
+  if (todayPosted.value) {
+    if (days < 7) return "Today is locked in. Same time tomorrow?";
+    if (days < 30) return `${days} days strong. Stay relentless.`;
+    return "Today's done. You're built different.";
+  }
+  return `Post today to make it ${days + 1} days.`;
+});
 
 const isLoading = ref(true);
 const isRefreshing = ref(false);
@@ -603,48 +637,149 @@ function percentChange(current: number, deltaValue: number): number | null {
   margin-right: 3px;
 }
 
-/* Streak */
+/* ─── Streak ─── */
 .streak-card {
-  background: linear-gradient(135deg, rgba(53, 37, 205, 0.08), rgba(0, 106, 97, 0.05));
-  border: 1px solid rgba(53, 37, 205, 0.12);
-  border-radius: 16px;
-  padding: 1rem 1.125rem;
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 1.125rem 1.25rem 1.25rem;
   display: flex;
   flex-direction: column;
+  gap: 0.375rem;
+  color: #fff;
+  isolation: isolate;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.streak-card:hover {
+  transform: translateY(-1px);
+}
+
+/* Tiers — gradient + glow ramp from cool to legendary */
+.streak-card--cold {
+  background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
+  box-shadow: 0 8px 24px rgba(107, 114, 128, 0.18);
+  color: #fff;
+}
+.streak-card--spark {
+  background: linear-gradient(135deg, #fb923c 0%, #f59e0b 100%);
+  box-shadow: 0 10px 28px rgba(251, 146, 60, 0.3);
+}
+.streak-card--warm {
+  background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
+  box-shadow: 0 12px 30px rgba(249, 115, 22, 0.35);
+}
+.streak-card--hot {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
+  box-shadow: 0 14px 32px rgba(239, 68, 68, 0.4);
+}
+.streak-card--blazing {
+  background: linear-gradient(135deg, #dc2626 0%, #ea580c 50%, #f59e0b 100%);
+  box-shadow: 0 16px 36px rgba(234, 88, 12, 0.45);
+}
+.streak-card--legendary {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 30%, #f97316 70%, #dc2626 100%);
+  box-shadow: 0 18px 40px rgba(245, 158, 11, 0.5);
+}
+
+/* Big background flame */
+.streak-card__flame-bg {
+  position: absolute;
+  right: -28px;
+  bottom: -28px;
+  color: rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+  z-index: 0;
+  transition: transform 0.4s ease, color 0.3s;
+}
+.streak-card:hover .streak-card__flame-bg {
+  transform: scale(1.08) rotate(-4deg);
+  color: rgba(255, 255, 255, 0.22);
+}
+.streak-card--cold .streak-card__flame-bg {
+  color: rgba(255, 255, 255, 0.1);
+}
+.streak-card--legendary .streak-card__flame-bg {
+  color: rgba(255, 255, 255, 0.22);
+  animation: streak-flicker 2.5s ease-in-out infinite;
+}
+
+@keyframes streak-flicker {
+  0%, 100% { transform: scale(1) rotate(0); opacity: 1; }
+  50% { transform: scale(1.04) rotate(-2deg); opacity: 0.85; }
+}
+
+.streak-card__head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
 }
 
+.streak-card__eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.streak-card__flame-icon {
+  color: rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.15));
+}
+
+.streak-card--cold .streak-card__flame-icon {
+  color: rgba(255, 255, 255, 0.6);
+}
+
 .streak-card__body {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
+  margin-top: 0.25rem;
 }
 
 .streak-card__value {
   font-family: 'Manrope', sans-serif;
-  font-size: 3rem;
+  font-size: 3.5rem;
   font-weight: 800;
   letter-spacing: -0.04em;
-  color: #3525cd;
+  color: #fff;
   line-height: 1;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
 }
 
 .streak-card__unit {
   font-size: 0.875rem;
-  font-weight: 600;
-  color: #6b7280;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+}
+
+.streak-card__hype {
+  position: relative;
+  z-index: 1;
+  margin: 0.375rem 0 0;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.12);
 }
 
 .streak-card__caption {
+  position: relative;
+  z-index: 1;
   margin: 0;
   font-size: 0.8125rem;
-  color: #4b5563;
-}
-
-.streak-card__caption--alert {
-  color: #b45309;
   font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
 }
 </style>

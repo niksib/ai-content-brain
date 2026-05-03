@@ -63,7 +63,8 @@ export class ThreadsSchedulerService {
     });
 
     // Load the posts we just claimed. `publishingAt` was just set to `now`,
-    // so we filter tightly to avoid racing a concurrent tick.
+    // so we filter tightly to avoid racing a concurrent tick. Text/media live
+    // on the linked ContentIdea — JOIN to read the latest snapshot.
     const duePosts = await prisma.scheduledPost.findMany({
       where: {
         status: "publishing",
@@ -71,6 +72,9 @@ export class ThreadsSchedulerService {
       },
       include: {
         threadsAccount: true,
+        contentIdea: {
+          select: { body: true, mediaUrl: true, mediaType: true },
+        },
       },
     });
 
@@ -84,26 +88,52 @@ export class ThreadsSchedulerService {
       id: string;
       threadsAccountId: string;
       contentIdeaId: string | null;
-      text: string;
+      text: string | null;
       posts: unknown;
-      mediaType: "TEXT" | "IMAGE" | "VIDEO";
+      mediaType: string | null;
       mediaUrl: string | null;
       threadsAccount: { threadsUserId: string; accessToken: string };
+      contentIdea: { body: unknown; mediaUrl: string | null; mediaType: string | null } | null;
     }
   ): Promise<void> {
-    const { id: postId, threadsAccountId, contentIdeaId, text, posts, mediaType, mediaUrl, threadsAccount } = scheduledPost;
+    const { id: postId, threadsAccountId, contentIdeaId, threadsAccount, contentIdea } = scheduledPost;
     const { threadsUserId, accessToken } = threadsAccount;
 
     try {
-      const postsArray = Array.isArray(posts)
-        ? (posts as Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>)
-        : null;
-      const isThread = postsArray !== null && postsArray.length > 1;
+      // Idea-linked: read snapshot from ContentIdea (autosaved edits flow through).
+      // Standalone: snapshot lives on ScheduledPost itself.
+      let text = "";
+      let postsField: Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }> | null = null;
+      let mediaUrl: string | null = null;
+      let mediaType: string | null = null;
+
+      if (contentIdeaId) {
+        if (!contentIdea || !contentIdea.body) {
+          throw new Error("Scheduled post has no linked ContentIdea body");
+        }
+        const ideaBody = contentIdea.body as { text?: string; posts?: string[] };
+        const ideaPosts = Array.isArray(ideaBody.posts) ? ideaBody.posts : null;
+        postsField = ideaPosts ? ideaPosts.map((entryText) => ({ text: entryText })) : null;
+        text = ideaPosts && ideaPosts.length > 1
+          ? ""
+          : (typeof ideaBody.text === "string" ? ideaBody.text : (ideaPosts?.[0] ?? ""));
+        mediaUrl = contentIdea.mediaUrl;
+        mediaType = contentIdea.mediaType;
+      } else {
+        postsField = Array.isArray(scheduledPost.posts)
+          ? (scheduledPost.posts as Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>)
+          : null;
+        text = scheduledPost.text ?? "";
+        mediaUrl = scheduledPost.mediaUrl;
+        mediaType = scheduledPost.mediaType;
+      }
+
+      const isThread = postsField !== null && postsField.length > 1;
 
       let firstPostId: string;
 
       if (isThread) {
-        const normalized = postsArray.map((entry) =>
+        const normalized = postsField!.map((entry) =>
           typeof entry === "string" ? { text: entry } : entry
         );
         const result = await threadsApiService.publishThreadChain(threadsUserId, accessToken, normalized);

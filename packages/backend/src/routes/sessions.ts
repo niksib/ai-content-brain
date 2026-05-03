@@ -128,8 +128,8 @@ sessionRoutes.delete("/sessions/:id", requireAuth, async (context) => {
     });
     const ideaIds = ideas.map((idea) => idea.id);
 
-    await prisma.producedContent.deleteMany({ where: { contentIdeaId: { in: ideaIds } } });
     await prisma.threadsInsightsSnapshot.deleteMany({ where: { contentIdeaId: { in: ideaIds } } });
+    await prisma.scheduledPost.deleteMany({ where: { contentIdeaId: { in: ideaIds } } });
     await prisma.contentIdea.deleteMany({ where: { contentPlanId: plan.id } });
     await prisma.contentPlan.delete({ where: { id: plan.id } });
   }

@@ -32,32 +32,40 @@
           <PlusCircle :size="28" style="color:#fff;" />
         </div>
         <div>
-          <h4 class="action-card__title action-card__title--white">Start New Session</h4>
+          <h4 class="action-card__title action-card__title--white">
+            {{ hasTodaySession ? 'Pick up where you left off' : "What's on your mind?" }}
+          </h4>
           <p class="action-card__desc action-card__desc--white">
             <span v-if="isStarting" class="btn-spinner btn-spinner--white"></span>
-            {{ isStarting ? 'Starting...' : 'Capture fresh ideas instantly' }}
+            <template v-if="isStarting">{{ hasTodaySession ? 'Opening...' : 'Starting...' }}</template>
+            <template v-else-if="hasTodaySession">
+              {{ todaySessionIdeaCount > 0 ? `Continue working on your posts (${todaySessionIdeaCount} ${todaySessionIdeaCount === 1 ? 'idea' : 'ideas'} so far)` : 'Continue working on your post' }}
+            </template>
+            <template v-else>Tap and tell us - we'll turn it into posts</template>
           </p>
         </div>
         <Mic :size="120" class="action-card__bg-icon" />
       </button>
 
-      <button class="action-card action-card--light">
+      <button class="action-card action-card--light action-card--disabled" disabled>
+        <span class="action-card__soon">Coming soon</span>
         <div class="action-card__icon-wrap action-card__icon-wrap--indigo">
           <Lightbulb :size="28" style="color:#3525cd;" />
         </div>
         <div>
-          <h4 class="action-card__title">Quick Idea</h4>
-          <p class="action-card__desc">Save a snippet to the library</p>
+          <h4 class="action-card__title">Brainstorm a post</h4>
+          <p class="action-card__desc">Got an idea? Talk it through with AI and shape one post</p>
         </div>
       </button>
 
-      <button class="action-card action-card--light">
+      <button class="action-card action-card--light action-card--disabled" disabled>
+        <span class="action-card__soon">Coming soon</span>
         <div class="action-card__icon-wrap action-card__icon-wrap--teal">
           <TrendingUp :size="28" style="color:#006a61;" />
         </div>
         <div>
-          <h4 class="action-card__title">View Analytics</h4>
-          <p class="action-card__desc">Check your reach and growth</p>
+          <h4 class="action-card__title">Analytics</h4>
+          <p class="action-card__desc">Deep dive into your account, posts and growth</p>
         </div>
       </button>
     </div>
@@ -113,7 +121,7 @@
           <div class="checklist-step__content">
             <p class="checklist-step__title">Start your first session</p>
             <p class="checklist-step__desc">
-              {{ hasAnySessions ? 'You\'ve already started creating' : 'Talk freely — AI turns it into ready-to-post content' }}
+              {{ hasAnySessions ? 'You\'ve already started creating' : 'Talk freely, AI turns it into ready-to-post content' }}
             </p>
           </div>
           <button v-if="!hasAnySessions && !sessionStepLocked" class="checklist-step__btn" :disabled="isStarting" @click="handleStartSession">
@@ -147,11 +155,7 @@
     </section>
 
     <!-- ── Posts Pipeline (ideas to review + ready to publish) ── -->
-    <PostsPipeline
-      v-if="threadsConnected"
-      @open-ideas="goToLatestSession"
-      @open-ready="goToLatestSession"
-    />
+    <PostsPipeline v-if="threadsConnected" />
 
     <!-- ── Threads Performance ── -->
     <ThreadsPerformance v-if="threadsConnected" />
@@ -188,7 +192,7 @@ definePageMeta({
   ssr: false,
 });
 
-useHead({ title: 'Dashboard — HeyPostrr' });
+useHead({ title: 'Dashboard - HeyPostrr' });
 
 const dashboardStore = useDashboardStore();
 const billingStore = useBillingStore();
@@ -235,6 +239,20 @@ const latestSessionId = computed(() => {
   return [...dashboardStore.sessions]
     .sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime())[0].id;
 });
+
+// Backend stores sessionDate as UTC midnight, so we match the same
+// representation here. Today's session is the row whose sessionDate ISO date
+// (YYYY-MM-DD) equals today's UTC date.
+const todaySession = computed(() => {
+  const now = new Date();
+  const todayKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+  return dashboardStore.sessions.find(
+    (session) => session.sessionDate.slice(0, 10) === todayKey,
+  ) ?? null;
+});
+
+const hasTodaySession = computed(() => todaySession.value !== null);
+const todaySessionIdeaCount = computed(() => todaySession.value?.ideaCount ?? 0);
 
 const onboardingSteps = computed(() => {
   const steps: boolean[] = [];
@@ -310,16 +328,16 @@ function computeGreeting(): void {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) {
     greetingPhrase.value = 'Good Morning';
-    greetingLabel.value = 'Morning session';
+    greetingLabel.value = 'Morning';
   } else if (hour >= 12 && hour < 17) {
     greetingPhrase.value = 'Good Afternoon';
-    greetingLabel.value = 'Afternoon session';
+    greetingLabel.value = 'Afternoon';
   } else if (hour >= 17 && hour < 22) {
     greetingPhrase.value = 'Good Evening';
-    greetingLabel.value = 'Evening session';
+    greetingLabel.value = 'Evening';
   } else {
     greetingPhrase.value = 'Good Night';
-    greetingLabel.value = 'Late night session';
+    greetingLabel.value = 'Late night';
   }
 }
 
@@ -334,6 +352,11 @@ onMounted(async () => {
 });
 
 async function handleStartSession(): Promise<void> {
+  // Continuing today's existing session - no credit check needed, just navigate.
+  if (todaySession.value) {
+    router.push(`/sessions/${todaySession.value.id}`);
+    return;
+  }
   if (billingStore.balance < 2) {
     billingStore.openPricingModal();
     return;
@@ -347,16 +370,6 @@ async function handleStartSession(): Promise<void> {
   }
 }
 
-function goToLatestSession(): void {
-  // PostsPipeline cards land the user in the most recent session, where
-  // proposed and ready-to-publish ideas live. If they have no sessions yet,
-  // start a new one.
-  if (latestSessionId.value) {
-    router.push(`/sessions/${latestSessionId.value}`);
-  } else {
-    handleStartSession();
-  }
-}
 
 </script>
 
@@ -510,6 +523,30 @@ function goToLatestSession(): void {
 
 .action-card--light:hover {
   box-shadow: 0 12px 32px rgba(25, 28, 30, 0.1);
+}
+
+.action-card--disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.action-card--disabled:hover {
+  transform: none;
+  box-shadow: 0 4px 16px rgba(25, 28, 30, 0.05);
+}
+
+.action-card__soon {
+  position: absolute;
+  top: 0.875rem;
+  right: 0.875rem;
+  padding: 0.2rem 0.55rem;
+  background: rgba(53, 37, 205, 0.09);
+  color: #3525cd;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 9999px;
 }
 
 .action-card__icon-wrap {

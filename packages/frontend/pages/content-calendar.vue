@@ -50,9 +50,9 @@ const standalonePosts = ref<StandalonePost[]>([]);
 interface ScheduledPostDto {
   id: string;
   contentIdeaId: string | null;
-  text: string;
+  text: string | null;
   posts: unknown;
-  mediaType: 'TEXT' | 'IMAGE' | 'VIDEO';
+  mediaType: 'IMAGE' | 'VIDEO' | null;
   mediaUrl: string | null;
   scheduledAt: string;
   status: 'pending' | 'publishing' | 'published' | 'failed';
@@ -86,9 +86,9 @@ async function loadStandalonePosts(): Promise<void> {
           id: post.id,
           platform: 'threads',
           status: post.status,
-          text: post.text,
+          text: post.text ?? '',
           isThread: threadEntries !== null && threadEntries.length > 1,
-          mediaType: post.mediaType,
+          mediaType: (post.mediaType ?? 'TEXT') as 'TEXT' | 'IMAGE' | 'VIDEO',
           mediaUrl: post.mediaUrl,
           posts: threadEntries,
           scheduledAt: post.scheduledAt,
@@ -106,9 +106,9 @@ function onMonthChange(year: number, month: number): void {
 }
 
 function navigateToIdea(item: LibraryItem): void {
-  const sessionId = item.contentIdea.contentPlan?.chatSessionId;
+  const sessionId = item.contentPlan?.chatSessionId;
   if (sessionId) {
-    router.push(`/sessions/${sessionId}?idea=${item.contentIdeaId}`);
+    router.push(`/sessions/${sessionId}?idea=${item.id}`);
   }
 }
 

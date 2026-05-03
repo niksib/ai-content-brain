@@ -5,7 +5,7 @@ import type { AppEnv } from "../types/hono.js";
 
 export const libraryRoutes = new Hono<AppEnv>();
 
-// List all produced content for user with pagination and filters
+// List all completed ideas (= produced posts) for user with pagination and filters
 libraryRoutes.get("/library", requireAuth, async (context) => {
   const user = context.get("user");
 
@@ -14,7 +14,10 @@ libraryRoutes.get("/library", requireAuth, async (context) => {
   const platform = context.req.query("platform") || undefined;
   const format = context.req.query("format") || undefined;
 
-  const where: Record<string, unknown> = { userId: user.id };
+  const where: Record<string, unknown> = {
+    userId: user.id,
+    body: { not: null as unknown as undefined },
+  };
   if (platform) {
     where.platform = platform;
   }
@@ -23,39 +26,24 @@ libraryRoutes.get("/library", requireAuth, async (context) => {
   }
 
   const [items, total] = await Promise.all([
-    prisma.producedContent.findMany({
+    prisma.contentIdea.findMany({
       where,
       include: {
-        contentIdea: {
+        contentPlan: {
+          select: { chatSessionId: true },
+        },
+        insightsSnapshots: {
+          orderBy: { fetchedAt: 'desc' },
+          take: 1,
           select: {
             id: true,
-            title: true,
-            angle: true,
-            description: true,
-            platform: true,
-            format: true,
-            status: true,
-            publishStatus: true,
-            scheduledAt: true,
-            publishedAt: true,
-            threadsPostId: true,
-            contentPlan: {
-              select: { chatSessionId: true },
-            },
-            insightsSnapshots: {
-              orderBy: { fetchedAt: 'desc' },
-              take: 1,
-              select: {
-                id: true,
-                views: true,
-                likes: true,
-                replies: true,
-                reposts: true,
-                quotes: true,
-                shares: true,
-                fetchedAt: true,
-              },
-            },
+            views: true,
+            likes: true,
+            replies: true,
+            reposts: true,
+            quotes: true,
+            shares: true,
+            fetchedAt: true,
           },
         },
       },
@@ -63,7 +51,7 @@ libraryRoutes.get("/library", requireAuth, async (context) => {
       skip: (page - 1) * limit,
       take: limit,
     }),
-    prisma.producedContent.count({ where }),
+    prisma.contentIdea.count({ where }),
   ]);
 
   const totalPages = Math.ceil(total / limit);
@@ -71,21 +59,21 @@ libraryRoutes.get("/library", requireAuth, async (context) => {
   return context.json({ items, total, page, limit, totalPages });
 });
 
-// Get specific produced content by ID
+// Get specific idea by ID (used by library detail view)
 libraryRoutes.get("/library/:id", requireAuth, async (context) => {
   const user = context.get("user");
-  const contentId = context.req.param("id");
+  const ideaId = context.req.param("id");
 
-  const content = await prisma.producedContent.findUnique({
-    where: { id: contentId, userId: user.id },
+  const item = await prisma.contentIdea.findUnique({
+    where: { id: ideaId, userId: user.id },
     include: {
-      contentIdea: true,
+      contentPlan: { select: { chatSessionId: true } },
     },
   });
 
-  if (!content) {
+  if (!item) {
     return context.json({ error: "Content not found" }, 404);
   }
 
-  return context.json({ content });
+  return context.json({ content: item });
 });

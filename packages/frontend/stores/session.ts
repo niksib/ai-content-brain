@@ -53,16 +53,6 @@ export interface ProducedContentBody {
   notes?: string;
 }
 
-export interface ProducedContent {
-  id: string;
-  contentIdeaId: string;
-  platform: string;
-  format: string;
-  body: ProducedContentBody;
-  imageSuggestion?: ImageSuggestion | null;
-  createdAt: string;
-}
-
 export interface SessionIdea {
   id: string;
   sessionId: string;
@@ -71,10 +61,14 @@ export interface SessionIdea {
   title?: string;
   angle: string;
   description?: string;
-  producedContent?: ProducedContent | null;
+  body?: ProducedContentBody | null;
+  imageSuggestion?: ImageSuggestion | null;
   status: 'proposed' | 'approved' | 'rejected' | 'producing' | 'completed';
   publishStatus?: 'posted' | 'scheduled' | null;
+  scheduledAt?: string | null;
   threadsPostId?: string | null;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
   // LLM cost in cents attributed to this idea — sum of production-time
   // CreditTransaction.costCents. Strategist cost is session-shared and not
   // included. 0 when production has not run yet.
@@ -177,7 +171,7 @@ export const useSessionStore = defineStore('session', () => {
         for (const raw of updatedList) {
           if ((raw.id as string) === ideaId) {
             const idx = ideas.value.findIndex((i) => i.id === ideaId);
-            if (idx !== -1) ideas.value[idx] = raw as SessionIdea;
+            if (idx !== -1) ideas.value[idx] = raw as unknown as SessionIdea;
           }
         }
       },

@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smooth in-page scrolling for anchor links (landing nav, etc.).
+   scroll-padding-top offsets the sticky header so the target heading
+   isn't hidden underneath it. */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 @layer components {
   .card {
     background: #ffffff;
