@@ -16,6 +16,7 @@ import { libraryRoutes } from "./routes/library.js";
 import { billingRoutes } from "./routes/billing.js";
 import { threadsRoutes } from "./routes/threads.js";
 import { mediaRoutes } from "./routes/media.js";
+import { adminRoutes } from "./routes/admin.js";
 import { devRoutes } from "./routes/dev.js";
 import { threadsSchedulerService } from "./services/threads-scheduler.service.js";
 import { threadsInsightsSnapshotService } from "./services/threads-insights-snapshot.service.js";
@@ -58,6 +59,7 @@ app.route("/api", libraryRoutes);
 app.route("/api", billingRoutes);
 app.route("/api", threadsRoutes);
 app.route("/api", mediaRoutes);
+app.route("/api", adminRoutes);
 
 if (process.env.NODE_ENV !== "production") {
   app.route("/api", devRoutes);

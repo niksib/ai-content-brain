@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { OnboardingAgent } from "../agents/onboarding/onboarding.agent.js";
 import { StyleAnalysisAgent } from "../agents/style-analysis/style-analysis.agent.js";
 import { threadsApiService } from "./threads-api.service.js";
+import { threadsInsightsSnapshotService } from "./threads-insights-snapshot.service.js";
 import { CANONICAL_KEYS } from "../memory/canonical-keys.js";
 import { memoryService } from "./memory.service.js";
 import {
@@ -469,11 +470,34 @@ class OnboardingService {
       })
     );
 
-    if (analysis.source !== "fallback") {
-      await prisma.threadsAccount.updateMany({
+    // Mark the analysis step as done regardless of source. For fallback users
+    // (no Threads account, or fewer than 3 usable posts) there is no real
+    // style to learn — but the onboarding dashboard checklist polls this flag
+    // and would otherwise spin forever. The signal here is "onboarding
+    // analysis attempted and completed", not "AI literally read your posts".
+    const threadsAccount = await prisma.threadsAccount.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        threadsUserId: true,
+        accessToken: true,
+        tokenExpiresAt: true,
+        lastSeenThreadsPostId: true,
+      },
+    });
+
+    if (threadsAccount) {
+      await prisma.threadsAccount.update({
         where: { userId },
         data: { styleAnalyzed: true, styleAnalyzedAt: new Date() },
       });
+
+      // Fire-and-forget: collect a fresh insights snapshot so the dashboard
+      // analytics widgets have data on first load instead of waiting until
+      // the 03:00 UTC cron run. Errors are caught and logged inside the
+      // service — never blocks onboarding completion.
+      void threadsInsightsSnapshotService.snapshotAccount(threadsAccount);
     }
 
     // Clear the heavy JSON payloads now that they're redundant.

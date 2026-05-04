@@ -51,6 +51,17 @@
           <component :is="link.icon" :size="18" />
           <span class="font-medium">{{ link.label }}</span>
         </NuxtLink>
+
+        <NuxtLink
+          v-if="profileStore.isAdmin"
+          to="/admin/users"
+          class="flex items-center gap-3 py-2.5 px-4 rounded-lg mx-2 transition-all no-underline"
+          :class="isActive('/admin') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-200/50'"
+          @click="sidebarOpen = false"
+        >
+          <Shield :size="18" />
+          <span class="font-medium">Admin</span>
+        </NuxtLink>
       </nav>
 
       <div class="mt-auto px-2 space-y-1">
@@ -102,7 +113,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, type Component } from 'vue';
-import { Plus, LogOut, LayoutGrid, CalendarDays, User, Menu } from 'lucide-vue-next';
+import { Plus, LogOut, LayoutGrid, CalendarDays, User, Menu, Shield } from 'lucide-vue-next';
 import { useDashboardStore } from '~/stores/dashboard';
 import { useBillingStore } from '~/stores/billing';
 import { useProfileStore } from '~/stores/profile';

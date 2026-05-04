@@ -5,6 +5,13 @@ import { redactSecrets } from "../lib/redact.js";
 
 const MAX_ATTEMPTS = 3;
 const STUCK_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes — long enough for slow video uploads to Threads
+const POST_PREVIEW_MAX_CHARS = 200;
+
+function buildPostPreview(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= POST_PREVIEW_MAX_CHARS) return trimmed;
+  return trimmed.slice(0, POST_PREVIEW_MAX_CHARS - 1) + "…";
+}
 
 export class ThreadsSchedulerService {
   start(): void {
@@ -86,6 +93,7 @@ export class ThreadsSchedulerService {
   private async publishScheduledPost(
     scheduledPost: {
       id: string;
+      userId: string;
       threadsAccountId: string;
       contentIdeaId: string | null;
       text: string | null;
@@ -96,7 +104,7 @@ export class ThreadsSchedulerService {
       contentIdea: { body: unknown; mediaUrl: string | null; mediaType: string | null } | null;
     }
   ): Promise<void> {
-    const { id: postId, threadsAccountId, contentIdeaId, threadsAccount, contentIdea } = scheduledPost;
+    const { id: postId, userId, threadsAccountId, contentIdeaId, threadsAccount, contentIdea } = scheduledPost;
     const { threadsUserId, accessToken } = threadsAccount;
 
     try {
@@ -164,6 +172,47 @@ export class ThreadsSchedulerService {
           where: { id: contentIdeaId },
           data: { publishStatus: "posted", threadsPostId: firstPostId, publishedAt: new Date() },
         });
+      }
+
+      // Seed a ThreadsPostInsight row immediately so the streak endpoint and
+      // dashboard totals reflect today's post without waiting for the 03:00
+      // UTC snapshot cron. Metrics start at 0 — actual engagement numbers
+      // backfill on the next snapshot run. Wrapped in try/catch because the
+      // post is already live; an insight-write failure must not fail the
+      // publish.
+      try {
+        const previewSourceRaw = postsField && postsField.length > 0 ? postsField[0] : null;
+        const previewSource =
+          typeof previewSourceRaw === "string"
+            ? previewSourceRaw
+            : previewSourceRaw?.text ?? text;
+        const preview = buildPostPreview(previewSource);
+        const publishedAt = new Date();
+
+        await prisma.threadsPostInsight.upsert({
+          where: {
+            threadsAccountId_threadsPostId: {
+              threadsAccountId,
+              threadsPostId: firstPostId,
+            },
+          },
+          create: {
+            threadsAccountId,
+            userId,
+            threadsPostId: firstPostId,
+            publishedAt,
+            preview,
+          },
+          update: {
+            publishedAt,
+            preview,
+          },
+        });
+      } catch (insightError) {
+        console.error(
+          `[ThreadsScheduler] Failed to seed ThreadsPostInsight for ${firstPostId}:`,
+          redactSecrets(insightError),
+        );
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
