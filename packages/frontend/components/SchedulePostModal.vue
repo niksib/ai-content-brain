@@ -148,7 +148,7 @@ const isSubmitting = ref(false);
 const isDeleting = ref(false);
 const showDeleteConfirm = ref(false);
 
-const threadsPosts = ref<ThreadsSchedulePost[]>([{ text: '', media: null }]);
+const threadsPosts = ref<ThreadsSchedulePost[]>([{ text: '', mediaItems: [] }]);
 
 const userTimezone = computed(() => {
   try {
@@ -212,15 +212,15 @@ watch(() => props.open, (isOpen) => {
     scheduleDate.value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
     scheduleTime.value = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
     threadsPosts.value = props.edit.posts.length > 0
-      ? props.edit.posts.map((post) => ({ text: post.text, media: post.media }))
-      : [{ text: '', media: null }];
+      ? props.edit.posts.map((post) => ({ text: post.text, mediaItems: post.mediaItems.slice() }))
+      : [{ text: '', mediaItems: [] }];
     return;
   }
 
   selectedPlatform.value = 'threads';
   scheduleDate.value = '';
   scheduleTime.value = '';
-  threadsPosts.value = [{ text: '', media: null }];
+  threadsPosts.value = [{ text: '', mediaItems: [] }];
 });
 
 function buildThreadsBody(): Record<string, unknown> {
@@ -228,13 +228,12 @@ function buildThreadsBody(): Record<string, unknown> {
   if (threadsPosts.value.length > 1) {
     body.posts = threadsPosts.value.map((post) => ({
       text: post.text.trim(),
-      ...(post.media ? { mediaType: post.media.mediaType, mediaUrl: post.media.mediaUrl } : {}),
+      ...(post.mediaItems.length > 0 ? { mediaItems: post.mediaItems } : {}),
     }));
   } else {
     const single = threadsPosts.value[0];
     body.text = single.text.trim();
-    body.mediaType = single.media?.mediaType ?? 'TEXT';
-    body.mediaUrl = single.media?.mediaUrl ?? null;
+    body.mediaItems = single.mediaItems;
   }
   return body;
 }

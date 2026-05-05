@@ -53,6 +53,18 @@ export interface ProducedContentBody {
   notes?: string;
 }
 
+export interface SessionPostDto {
+  id: string;
+  text: string | null;
+  posts: unknown;
+  mediaItems?: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string }> | null;
+  imageSuggestion?: ImageSuggestion | null;
+  status: 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed';
+  scheduledAt?: string | null;
+  publishedAt?: string | null;
+  threadsPostId?: string | null;
+}
+
 export interface SessionIdea {
   id: string;
   sessionId: string;
@@ -61,14 +73,8 @@ export interface SessionIdea {
   title?: string;
   angle: string;
   description?: string;
-  body?: ProducedContentBody | null;
-  imageSuggestion?: ImageSuggestion | null;
   status: 'proposed' | 'approved' | 'rejected' | 'producing' | 'completed';
-  publishStatus?: 'posted' | 'scheduled' | null;
-  scheduledAt?: string | null;
-  threadsPostId?: string | null;
-  mediaUrl?: string | null;
-  mediaType?: string | null;
+  post?: SessionPostDto | null;
   // LLM cost in cents attributed to this idea — sum of production-time
   // CreditTransaction.costCents. Strategist cost is session-shared and not
   // included. 0 when production has not run yet.

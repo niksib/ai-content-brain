@@ -66,7 +66,7 @@
         <h2 v-if="!isThreadsTextPost" class="idea-page__section-title">Produced Content</h2>
 
         <!-- Show produced content when completed -->
-        <div v-if="idea.status === 'completed' && idea.body" class="idea-page__produced">
+        <div v-if="idea.status === 'completed' && idea.post" class="idea-page__produced">
 
           <!-- Image recommendation -->
           <div v-if="imageSuggestion" class="idea-page__image-suggestion">
@@ -227,7 +227,7 @@
                       :posts="threadsPublishPosts"
                       :posts-media="threadsPublishPostsMedia"
                       :content-idea-id="idea.id"
-                      :publish-status="idea.publishStatus"
+                      :publish-status="publishStatus"
                       :scheduled-at="scheduledAt"
                       @published="onPublished"
                       @scheduled="onScheduled"
@@ -377,7 +377,7 @@
 
           <!-- Fallback for unknown formats -->
           <template v-else>
-            <pre class="idea-page__produced-content">{{ idea.body }}</pre>
+            <pre class="idea-page__produced-content">{{ contentBody }}</pre>
           </template>
 
         </div>
@@ -504,25 +504,55 @@ const formatVisual = computed(() => {
   return formatColor(idea.value.format);
 });
 
+const publishStatus = computed<'posted' | 'scheduled' | null>(() => {
+  const status = idea.value?.post?.status;
+  if (status === 'published') return 'posted';
+  if (status === 'scheduled' || status === 'publishing') return 'scheduled';
+  return null;
+});
+
 const statusVisual = computed(() => {
   if (!idea.value) return statusColor('proposed');
-  return statusColor(resolveStatusKey(idea.value.status, idea.value.publishStatus));
+  return statusColor(resolveStatusKey(idea.value.status, publishStatus.value));
 });
 
 const isThreadsTextPost = computed(
   () => idea.value?.platform === 'threads' && idea.value?.format === 'text_post',
 );
 
+// Reconstruct the legacy `{ text, posts: string[] }` body shape from the new
+// Post columns so downstream computeds (contentBody, threadPosts, …) stay
+// untouched.
+const producedBody = computed<Record<string, unknown> | null>(() => {
+  const post = idea.value?.post;
+  if (!post) return null;
+  const postsArray = Array.isArray(post.posts) ? post.posts : null;
+  if (postsArray && postsArray.length > 0) {
+    const texts = postsArray.map((entry) => {
+      if (typeof entry === 'string') return entry;
+      if (entry && typeof entry === 'object' && typeof (entry as { text?: unknown }).text === 'string') {
+        return (entry as { text: string }).text;
+      }
+      return '';
+    });
+    return { posts: texts };
+  }
+  if (typeof post.text === 'string' && post.text.length > 0) {
+    return { text: post.text };
+  }
+  return null;
+});
+
 const threadsPublishPosts = computed((): string[] | null => {
-  if (!idea.value?.body) return null;
-  const body = idea.value.body as Record<string, unknown>;
-  if (Array.isArray(body.posts) && body.posts.length > 1) return body.posts as string[];
+  const body = producedBody.value;
+  if (!body) return null;
+  if (Array.isArray(body.posts) && (body.posts as string[]).length > 1) return body.posts as string[];
   return null;
 });
 
 const threadsPublishText = computed((): string => {
-  if (!idea.value?.body) return '';
-  const body = idea.value.body as Record<string, unknown>;
+  const body = producedBody.value;
+  if (!body) return '';
   if (Array.isArray(body.posts)) return (body.posts as string[])[0] ?? '';
   if (typeof body.text === 'string') return body.text;
   return '';
@@ -583,18 +613,10 @@ const threadsPublishPostsMedia = computed(() => {
   const result = Array.from({ length: count }, (_, index) => {
     const files = postsMedia.value[index];
     if (!files || files.length === 0) return null;
-    if (files.length === 1) {
-      return {
-        mediaType: files[0].mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE',
-        mediaUrl: files[0].url,
-      } as { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string };
-    }
-    return {
-      carouselItems: files.map(f => ({
-        mediaType: (f.mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE') as 'IMAGE' | 'VIDEO',
-        mediaUrl: f.url,
-      })),
-    };
+    return files.map((f) => ({
+      mediaType: (f.mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE') as 'IMAGE' | 'VIDEO',
+      mediaUrl: f.url,
+    }));
   });
   if (result.every(item => item === null)) return null;
   return result;
@@ -608,23 +630,13 @@ const IMAGE_TYPE_LABELS: Record<string, string> = {
 };
 
 const imageSuggestion = computed<ImageSuggestion | null>(() => {
-  const s = idea.value?.imageSuggestion;
+  const s = idea.value?.post?.imageSuggestion;
   if (!s || typeof s !== 'object') return null;
   return s as ImageSuggestion;
 });
 
 const contentBody = computed<ProducedContentBody | null>(() => {
-  if (!idea.value?.body) return null;
-  const body = idea.value.body;
-  // Body may be a string (JSON) or already parsed object
-  if (typeof body === 'string') {
-    try {
-      return JSON.parse(body) as ProducedContentBody;
-    } catch {
-      return null;
-    }
-  }
-  return body as ProducedContentBody;
+  return (producedBody.value as ProducedContentBody | null) ?? null;
 });
 
 // Unified array: either multi-post thread or single post wrapped in array
@@ -638,7 +650,7 @@ const threadPosts = computed<string[]>(() => {
 
 // True when idea is marked completed but the agent saved empty content
 const hasEmptyContent = computed(() => {
-  if (!idea.value?.body) return true;
+  if (!idea.value?.post) return true;
   const body = contentBody.value;
   if (!body) return true;
   if (body.posts?.length) return false;
@@ -708,11 +720,21 @@ function flushSave(persistFn: () => Promise<void>): void {
   savedTimer.value = setTimeout(() => { saveStatus.value = 'idle'; }, 2000);
 }
 
+function applyBodyToIdea(body: ProducedContentBody): void {
+  if (!idea.value?.post) return;
+  const posts = Array.isArray(body.posts) && body.posts.length > 0
+    ? body.posts.map((entry) => ({ text: entry }))
+    : null;
+  const text = typeof body.text === 'string' && body.text.length > 0 ? body.text : null;
+  idea.value.post = {
+    ...idea.value.post,
+    text,
+    posts,
+  };
+}
+
 async function persistThreadEdits(): Promise<void> {
-  if (!idea.value?.body) return;
-  // Build posts from current editableThreadPosts merged with any in-progress drafts.
-  // Do NOT mutate editableThreadPosts.value — that would change v-for keys and
-  // cause Vue to destroy/recreate the contenteditable elements (wiping their innerText).
+  if (!idea.value?.post) return;
   const posts = editableThreadPosts.value.map((existing, i) =>
     draftPosts[i] !== undefined ? draftPosts[i] : existing,
   );
@@ -721,16 +743,16 @@ async function persistThreadEdits(): Promise<void> {
     posts: posts.length > 1 ? [...posts] : undefined,
     text: posts.length === 1 ? posts[0] : undefined,
   };
-  idea.value.body = updatedBody;
+  applyBodyToIdea(updatedBody);
   store.markContentUpdatedByUser(updatedBody);
   await apiClient.patch(`/api/ideas/${props.ideaId}/content`, updatedBody).catch(() => {});
 }
 
 async function persistTextBodyEdit(): Promise<void> {
-  if (!idea.value?.body) return;
+  if (!idea.value?.post) return;
   if (draftTextBody) editableTextBody.value = draftTextBody;
   const updatedBody: ProducedContentBody = { ...contentBody.value, text: editableTextBody.value };
-  idea.value.body = updatedBody;
+  applyBodyToIdea(updatedBody);
   store.markContentUpdatedByUser(updatedBody);
   await apiClient.patch(`/api/ideas/${props.ideaId}/content`, updatedBody).catch(() => {});
 }
@@ -800,43 +822,46 @@ function handleReject() {
   }
 }
 
-function onPublished(threadsPostId: string): void {
+function patchLocalPost(patch: Partial<NonNullable<SessionIdea['post']>>): void {
+  // First-publish path: idea may not yet have a Post locally — synthesize an
+  // empty one from the patch so UI badges (Posted/Scheduled) reflect the
+  // server state without waiting for a refetch.
+  const empty: NonNullable<SessionIdea['post']> = {
+    id: '',
+    text: null,
+    posts: null,
+    status: 'draft',
+  };
   if (idea.value) {
-    idea.value.publishStatus = 'posted';
-    idea.value.threadsPostId = threadsPostId;
+    idea.value.post = { ...(idea.value.post ?? empty), ...patch };
   }
-  // Sync to store
   const idx = store.ideas.findIndex((i) => i.id === props.ideaId);
   if (idx !== -1) {
-    store.ideas[idx] = { ...store.ideas[idx], publishStatus: 'posted', threadsPostId };
+    const existing = store.ideas[idx];
+    store.ideas[idx] = {
+      ...existing,
+      post: { ...(existing.post ?? empty), ...patch },
+    };
   }
+}
+
+function onPublished(threadsPostId: string): void {
+  patchLocalPost({ status: 'published', threadsPostId, publishedAt: new Date().toISOString() });
 }
 
 function onScheduled(isoDate: string): void {
   scheduledAt.value = isoDate;
-  if (idea.value) {
-    idea.value.publishStatus = 'scheduled';
-  }
-  const idx = store.ideas.findIndex((i) => i.id === props.ideaId);
-  if (idx !== -1) {
-    store.ideas[idx] = { ...store.ideas[idx], publishStatus: 'scheduled' };
-  }
+  patchLocalPost({ status: 'scheduled', scheduledAt: isoDate });
 }
 
 function onUnscheduled(): void {
   scheduledAt.value = null;
-  if (idea.value) {
-    idea.value.publishStatus = null;
-  }
-  const idx = store.ideas.findIndex((i) => i.id === props.ideaId);
-  if (idx !== -1) {
-    store.ideas[idx] = { ...store.ideas[idx], publishStatus: null };
-  }
+  patchLocalPost({ status: 'draft', scheduledAt: null });
 }
 
 // Sync with store when idea status or content changes (e.g. producing → completed, agent edit)
-// Note: store.ideas is populated from the list endpoint which may not include
-// body/imageSuggestion. Preserve the locally-loaded body so the content view
+// Note: store.ideas may not include the produced post (list endpoint omits it
+// for unproduced ideas). Preserve the locally-loaded post so the content view
 // doesn't disappear after a publish/schedule action updates the store.
 watch(
   () => store.ideas.find((item) => item.id === props.ideaId),
@@ -844,13 +869,12 @@ watch(
     if (storeIdea && idea.value) {
       const merged: SessionIdea = {
         ...storeIdea,
-        body: storeIdea.body ?? idea.value.body,
-        imageSuggestion: storeIdea.imageSuggestion ?? idea.value.imageSuggestion,
+        post: storeIdea.post ?? idea.value.post,
       };
-      const bodyChanged = JSON.stringify(merged.body) !==
-                          JSON.stringify(idea.value.body);
+      const postChanged = JSON.stringify(merged.post) !==
+                          JSON.stringify(idea.value.post);
       idea.value = merged;
-      if (bodyChanged && merged.body) {
+      if (postChanged && merged.post) {
         // Reset editable state so the threadPosts/contentBody watchers re-initialize with new content
         editableThreadPosts.value = [];
         editableTextBody.value = '';
@@ -860,20 +884,19 @@ watch(
   { deep: true },
 );
 
-function restoreIdeaMedia(mediaUrl: string, mediaType: string): void {
-  if (!mediaUrl || mediaType === 'TEXT') return;
-  const mimeType = mediaType === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
-  const restoredFile: UploadedMediaFile = {
-    id: mediaUrl,
-    url: mediaUrl,
-    mimeType,
+function restoreIdeaMedia(items: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string }>): void {
+  if (items.length === 0) return;
+  const restoredFiles: UploadedMediaFile[] = items.map((item) => ({
+    id: item.mediaUrl,
+    url: item.mediaUrl,
+    mimeType: item.mediaType === 'VIDEO' ? 'video/mp4' : 'image/jpeg',
     size: 0,
     width: null,
     height: null,
     duration: null,
-  };
+  }));
   ensureMediaSlots(Math.max(1, editableThreadPosts.value.length));
-  postsMedia.value[0] = [restoredFile];
+  postsMedia.value[0] = restoredFiles;
 }
 
 onMounted(async () => {
@@ -882,18 +905,19 @@ onMounted(async () => {
   $fetch<{ account: ThreadsAccount | null }>(`${apiBaseUrl}/api/threads/account`, { credentials: 'include' })
     .then((r) => { threadsAccount.value = r.account; })
     .catch(() => {});
-  let pendingMediaUrl: string | null = null;
-  let pendingMediaType: string | null = null;
+  let pendingMediaItems: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string }> = [];
   try {
     const freshIdea = await store.loadIdea(props.ideaId);
     if (freshIdea) {
       idea.value = freshIdea;
-      if (freshIdea.scheduledAt) {
-        scheduledAt.value = freshIdea.scheduledAt;
+      if (freshIdea.post?.scheduledAt) {
+        scheduledAt.value = freshIdea.post.scheduledAt;
       }
-      if (freshIdea.mediaUrl && freshIdea.mediaType) {
-        pendingMediaUrl = freshIdea.mediaUrl;
-        pendingMediaType = freshIdea.mediaType;
+      if (Array.isArray(freshIdea.post?.mediaItems)) {
+        pendingMediaItems = freshIdea.post!.mediaItems!.filter(
+          (item): item is { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string } =>
+            !!item && (item.mediaType === 'IMAGE' || item.mediaType === 'VIDEO') && typeof item.mediaUrl === 'string'
+        );
       }
     }
   } catch (error) {
@@ -907,10 +931,10 @@ onMounted(async () => {
   // DOM. Two ticks: the first lets the threadPosts watcher run and render the
   // DOM; the second lets the watcher's inner nextTick fire so el.innerText is
   // set before postsMedia mutates.
-  if (pendingMediaUrl && pendingMediaType) {
+  if (pendingMediaItems.length > 0) {
     await nextTick();
     await nextTick();
-    restoreIdeaMedia(pendingMediaUrl, pendingMediaType);
+    restoreIdeaMedia(pendingMediaItems);
   }
 });
 </script>

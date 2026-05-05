@@ -10,14 +10,14 @@ datasource db {
 // ==================== BETTER AUTH TABLES ====================
 
 model User {
-  id            String    @id
+  id            String   @id
   name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String   @unique
+  emailVerified Boolean  @default(false)
   image         String?
-  isAdmin       Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  isAdmin       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   sessions          Session[]
   accounts          Account[]
@@ -101,19 +101,19 @@ model OnboardingSession {
 // ==================== CHAT SESSION ====================
 
 model ChatSession {
-  id              String        @id @default(cuid())
-  userId          String
-  type            SessionType
-  status          SessionStatus @default(active)
-  sessionDate     DateTime      @db.Date
+  id          String        @id @default(cuid())
+  userId      String
+  type        SessionType
+  status      SessionStatus @default(active)
+  sessionDate DateTime      @db.Date
 
-  sdkSessionId    String?       @unique
+  sdkSessionId String? @unique
 
-  messages        ChatMessage[]
-  contentPlan     ContentPlan?
+  messages    ChatMessage[]
+  contentPlan ContentPlan?
 
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, sessionDate])
 }
@@ -133,15 +133,15 @@ model ChatMessage {
   chatSessionId String
   chatSession   ChatSession @relation(fields: [chatSessionId], references: [id])
 
-  role          MessageRole
-  content       String
-  audioUrl      String?
-  costUsd       Float?
+  role     MessageRole
+  content  String
+  audioUrl String?
+  costUsd  Float?
 
   contentIdeaId String?
   contentIdea   ContentIdea? @relation(fields: [contentIdeaId], references: [id])
 
-  createdAt     DateTime    @default(now())
+  createdAt DateTime @default(now())
 }
 
 enum MessageRole {
@@ -152,59 +152,47 @@ enum MessageRole {
 // ==================== CONTENT PLAN ====================
 
 model ContentPlan {
-  id             String       @id @default(cuid())
-  userId         String
-  chatSessionId  String       @unique
-  chatSession    ChatSession  @relation(fields: [chatSessionId], references: [id])
+  id            String      @id @default(cuid())
+  userId        String
+  chatSessionId String      @unique
+  chatSession   ChatSession @relation(fields: [chatSessionId], references: [id])
 
-  ideas          ContentIdea[]
+  ideas ContentIdea[]
 
-  createdAt      DateTime     @default(now())
+  createdAt DateTime @default(now())
 }
 
 // ==================== CONTENT IDEAS ====================
 
+// Strategist's plan output — angle, description, source quote, doNot hints.
+// Produced content (text, mediaItems, scheduling, publish state) lives on the
+// related `Post` (1 idea : 0..1 post). Standalone posts have no idea.
 model ContentIdea {
-  id            String        @id @default(cuid())
+  id            String      @id @default(cuid())
   contentPlanId String
-  contentPlan   ContentPlan   @relation(fields: [contentPlanId], references: [id])
+  contentPlan   ContentPlan @relation(fields: [contentPlanId], references: [id])
   userId        String
 
-  platform      Platform
-  format        ContentFormat
-  title         String        @default("")
-  angle         String
-  description   String
+  platform    Platform
+  format      ContentFormat
+  title       String        @default("")
+  angle       String
+  description String
   // Direct quote from the user — passed to platform agent to preserve voice.
   // Empty string when the user did not say anything quote-worthy.
-  sourceQuote   String        @default("")
+  sourceQuote String        @default("")
   // Negative-signal hints from strategist to platform agent (e.g. "don't end
   // with a takeaway"). Empty array when no specific traps to flag.
-  doNot         String[]      @default([])
+  doNot       String[]      @default([])
 
-  status        IdeaStatus    @default(proposed)
-
-  publishStatus String?   // "posted" | "scheduled"
-  scheduledAt   DateTime? // set when post is scheduled for publishing
-  publishedAt   DateTime? // set when post is actually published
-  threadsPostId String?   // Threads media ID after publishing
-
-  // Produced post content (was a separate ProducedContent table; collapsed
-  // here since the relation was always 1:1 and consumers fetched both rows
-  // together). Body shape depends on platform/format — see content tools.
-  body            Json?
-  imageSuggestion Json?
-  // Last media attached to the post. Survives ScheduledPost deletion so
-  // unscheduling preserves the user's uploaded image.
-  mediaUrl        String?
-  mediaType       String?  // "IMAGE" | "VIDEO"
+  status IdeaStatus @default(proposed)
 
   chatMessages      ChatMessage[]
   insightsSnapshots ThreadsInsightsSnapshot[]
-  scheduledPosts    ScheduledPost[]
+  post              Post?
 
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum Platform {
@@ -280,8 +268,8 @@ model StripeWebhookEvent {
 // rows are cleaned up opportunistically.
 model OAuthState {
   nonce     String   @id
-  purpose   String   // "login" | "connect"
-  userId    String?  // bound user for "connect" flow; null for "login"
+  purpose   String // "login" | "connect"
+  userId    String? // bound user for "connect" flow; null for "login"
   expiresAt DateTime
   createdAt DateTime @default(now())
 
@@ -302,7 +290,7 @@ model CreditTransaction {
   outputTokens        Int?
   costCents           Int?
 
-  createdAt DateTime              @default(now())
+  createdAt DateTime @default(now())
 }
 
 enum CreditTransactionType {
@@ -318,15 +306,15 @@ enum CreditTransactionType {
 // ==================== MEDIA FILES ====================
 
 model MediaFile {
-  id        String   @id @default(cuid())
-  userId    String
-  url       String
-  gcsPath   String
-  mimeType  String
-  size      Int
-  width     Int?
-  height    Int?
-  duration  Int?     // seconds, for video
+  id       String @id @default(cuid())
+  userId   String
+  url      String
+  gcsPath  String
+  mimeType String
+  size     Int
+  width    Int?
+  height   Int?
+  duration Int? // seconds, for video
 
   createdAt DateTime @default(now())
 
@@ -349,8 +337,8 @@ model ThreadsAccount {
   isPrivateProfile  Boolean  @default(false)
   postsCount        Int      @default(0)
 
-  styleAnalyzed     Boolean  @default(false)
-  styleAnalyzedAt   DateTime?
+  styleAnalyzed   Boolean   @default(false)
+  styleAnalyzedAt DateTime?
 
   // Cursor for incremental post-count sync. Snapshot job paginates
   // /me/threads only until it hits this ID, then adds the new posts found
@@ -361,46 +349,60 @@ model ThreadsAccount {
   // callback. Never exposed to clients. Nullable for backward compat with
   // rows created before the migration — those users go through the one-time
   // rekey path on their next OAuth callback.
-  loginSecret       String?
+  loginSecret String?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  scheduledPosts    ScheduledPost[]
+  posts             Post[]
   insightsSnapshots ThreadsAccountSnapshot[]
   postInsights      ThreadsPostInsight[]
 }
 
-// Job-queue row. For idea-linked posts (contentIdeaId set), text/media are
-// read from the linked ContentIdea at publish time so user edits flow through.
-// For standalone posts (contentIdeaId null) — composed directly via the
-// calendar's SchedulePostModal — the snapshot lives on these columns.
-model ScheduledPost {
-  id               String              @id @default(cuid())
+// A post is a unit of publishable content. It can be linked to a `ContentIdea`
+// (created from a planned/produced idea) or stand alone (composed directly in
+// the calendar's SchedulePostModal). The model collapses what used to be the
+// produced-content fields on ContentIdea + the ScheduledPost job queue.
+model Post {
+  id               String         @id @default(cuid())
   userId           String
   threadsAccountId String
-  threadsAccount   ThreadsAccount      @relation(fields: [threadsAccountId], references: [id])
+  threadsAccount   ThreadsAccount @relation(fields: [threadsAccountId], references: [id])
 
-  contentIdeaId    String?
-  contentIdea      ContentIdea?        @relation(fields: [contentIdeaId], references: [id])
+  contentIdeaId String?      @unique
+  contentIdea   ContentIdea? @relation(fields: [contentIdeaId], references: [id])
 
-  // Standalone-only snapshot. Null when contentIdeaId is set.
-  text             String?
-  posts            Json?               // multi-post threads
-  mediaType        String?             // "IMAGE" | "VIDEO"
-  mediaUrl         String?
+  // Content snapshot
+  text            String?
+  posts           Json? // multi-post threads — each entry = `{ text, mediaItems? }`
+  // Array of `{ mediaType: "IMAGE" | "VIDEO", mediaUrl: string }`. One item =
+  // single image/video; two or more = carousel.
+  mediaItems      Json?
+  imageSuggestion Json?
 
-  scheduledAt      DateTime
-  publishingAt     DateTime?           // set when worker picks up the post; null otherwise
-  attempts         Int                 @default(0)
-  status           ScheduledPostStatus @default(pending)
-  threadsPostId    String?
-  errorMessage     String?
+  // Lifecycle
+  status        PostStatus @default(draft)
+  scheduledAt   DateTime?
+  publishedAt   DateTime?
+  threadsPostId String?
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  // Job-queue execution internals (managed by ThreadsScheduler).
+  publishingAt DateTime?
+  attempts     Int       @default(0)
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status, scheduledAt])
+}
+
+enum PostStatus {
+  draft // content saved but not scheduled
+  scheduled // queued for publishing
+  publishing // worker has claimed the row
+  published
+  failed
 }
 
 // ==================== THREADS INSIGHTS ====================
@@ -411,14 +413,14 @@ model ThreadsInsightsSnapshot {
   contentIdea   ContentIdea @relation(fields: [contentIdeaId], references: [id])
   userId        String
 
-  views         Int?
-  likes         Int?
-  replies       Int?
-  reposts       Int?
-  quotes        Int?
-  shares        Int?
+  views   Int?
+  likes   Int?
+  replies Int?
+  reposts Int?
+  quotes  Int?
+  shares  Int?
 
-  fetchedAt     DateTime    @default(now())
+  fetchedAt DateTime @default(now())
 
   @@index([contentIdeaId, fetchedAt(sort: Desc)])
 }
@@ -437,14 +439,14 @@ model ThreadsPostInsight {
   publishedAt      DateTime
   preview          String         @default("")
 
-  views            Int            @default(0)
-  likes            Int            @default(0)
-  replies          Int            @default(0)
-  reposts          Int            @default(0)
-  quotes           Int            @default(0)
-  shares           Int            @default(0)
+  views   Int @default(0)
+  likes   Int @default(0)
+  replies Int @default(0)
+  reposts Int @default(0)
+  quotes  Int @default(0)
+  shares  Int @default(0)
 
-  fetchedAt        DateTime       @default(now())
+  fetchedAt DateTime @default(now())
 
   @@unique([threadsAccountId, threadsPostId])
   @@index([userId, publishedAt(sort: Desc)])
@@ -462,18 +464,18 @@ model ThreadsAccountSnapshot {
   capturedDate     DateTime       @db.Date
   capturedAt       DateTime       @default(now())
 
-  followersCount   Int
+  followersCount Int
 
   // Cumulative-since-2024-04-13 totals. Daily delta = today.total - yesterday.total.
-  likesTotal       Int
-  repliesTotal     Int
-  repostsTotal     Int
-  quotesTotal      Int
-  viewsTotal       Int
-  clicksTotal      Int
+  likesTotal   Int
+  repliesTotal Int
+  repostsTotal Int
+  quotesTotal  Int
+  viewsTotal   Int
+  clicksTotal  Int
 
-  postsCount       Int
-  partial          Boolean        @default(false)
+  postsCount Int
+  partial    Boolean @default(false)
 
   @@unique([threadsAccountId, capturedDate])
   @@index([threadsAccountId, capturedDate(sort: Desc)])
@@ -494,11 +496,4 @@ model DataDeletionRequest {
   completedAt      DateTime?
 
   @@index([threadsUserId])
-}
-
-enum ScheduledPostStatus {
-  pending
-  publishing
-  published
-  failed
 }

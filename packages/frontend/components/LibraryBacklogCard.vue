@@ -140,20 +140,37 @@ const displayTitle = computed(() => {
   return angleLabel.value;
 });
 
+function postFirstText(): string {
+  const post = props.item.post;
+  if (!post) return '';
+  if (typeof post.text === 'string' && post.text.length > 0) return post.text;
+  if (Array.isArray(post.posts) && post.posts.length > 0) {
+    const first = post.posts[0] as { text?: unknown } | string;
+    if (typeof first === 'string') return first;
+    if (typeof first?.text === 'string') return first.text;
+  }
+  return '';
+}
+
 const preview = computed(() => {
-  const body = props.item.body ?? {};
-  let text = '';
-  if (typeof body.text === 'string') text = body.text;
-  else if (Array.isArray(body.posts) && body.posts.length > 0) text = body.posts[0] as string;
-  else if (typeof body.caption === 'string') text = body.caption;
+  const text = postFirstText();
   if (!text) return '';
   return text.length > 100 ? text.slice(0, 100) + '…' : text;
 });
 
 const publishText = computed((): string => {
-  const body = props.item.body ?? {};
-  if (Array.isArray(body.posts)) return (body.posts as string[]).join('\n\n');
-  if (typeof body.text === 'string') return body.text;
+  const post = props.item.post;
+  if (!post) return '';
+  if (Array.isArray(post.posts)) {
+    return post.posts.map((entry) => {
+      if (typeof entry === 'string') return entry;
+      if (entry && typeof entry === 'object' && typeof (entry as { text?: unknown }).text === 'string') {
+        return (entry as { text: string }).text;
+      }
+      return '';
+    }).join('\n\n');
+  }
+  if (typeof post.text === 'string') return post.text;
   return '';
 });
 

@@ -385,20 +385,25 @@ export class ThreadsApiService {
   async publishThreadChain(
     threadsUserId: string,
     accessToken: string,
-    posts: Array<{ text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>
+    posts: Array<{ text: string; mediaItems?: Array<{ mediaType: "IMAGE" | "VIDEO"; mediaUrl: string }> }>
   ): Promise<{ postIds: string[] }> {
     if (posts.length === 0) throw new Error("Posts array cannot be empty");
 
-    // Single post fast path — reuses text or media publish helpers
+    // Single post fast path — reuses text/single-media/carousel helpers
     if (posts.length === 1) {
       const single = posts[0];
-      if (single.mediaType && single.mediaUrl) {
+      const items = single.mediaItems ?? [];
+      if (items.length >= 2) {
+        const result = await this.publishCarousel(threadsUserId, accessToken, single.text, items);
+        return { postIds: [result.postId] };
+      }
+      if (items.length === 1) {
         const result = await this.publishSingleMediaPost(
           threadsUserId,
           accessToken,
           single.text,
-          single.mediaType,
-          single.mediaUrl
+          items[0].mediaType,
+          items[0].mediaUrl
         );
         return { postIds: [result.postId] };
       }
@@ -421,12 +426,15 @@ export class ThreadsApiService {
         access_token: accessToken,
       });
 
-      const hasMedia = Boolean(current.mediaType && current.mediaUrl);
-      if (hasMedia) {
-        containerParams.set("media_type", current.mediaType!);
+      // Threads API does not support carousel inside a thread reply; if a
+      // reply has multiple mediaItems, publish only the first.
+      const firstItem = current.mediaItems?.[0];
+      const hasMedia = Boolean(firstItem);
+      if (firstItem) {
+        containerParams.set("media_type", firstItem.mediaType);
         containerParams.set(
-          current.mediaType === "IMAGE" ? "image_url" : "video_url",
-          current.mediaUrl!
+          firstItem.mediaType === "IMAGE" ? "image_url" : "video_url",
+          firstItem.mediaUrl
         );
       } else {
         containerParams.set("media_type", "TEXT");

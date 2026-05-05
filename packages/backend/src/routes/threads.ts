@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { Hono } from "hono";
+import { Prisma } from "../generated/prisma/client.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { threadsApiService, THREADS_BASE_URL } from "../services/threads-api.service.js";
@@ -67,6 +68,82 @@ function buildThreadsLoginEmail(threadsUserId: string): string {
 // rotation (env var changes) does NOT invalidate existing logins.
 function generateLoginSecret(): string {
   return randomBytes(32).toString("hex");
+}
+
+type MediaItem = { mediaType: "IMAGE" | "VIDEO"; mediaUrl: string };
+
+const MAX_MEDIA_ITEMS = 20;
+
+/**
+ * Validate and normalize an array of media items received from the client.
+ * Returns null when the input is missing or empty, the parsed array on
+ * success, or an `{ error }` describing what is wrong.
+ */
+function parseMediaItemsInput(value: unknown): { error: string } | { items: MediaItem[] | null } {
+  if (value === undefined || value === null) return { items: null };
+  if (!Array.isArray(value)) return { error: "mediaItems must be an array" };
+  if (value.length === 0) return { items: null };
+  if (value.length > MAX_MEDIA_ITEMS) {
+    return { error: `mediaItems supports up to ${MAX_MEDIA_ITEMS} entries` };
+  }
+  const items: MediaItem[] = [];
+  for (const [index, entry] of value.entries()) {
+    if (!entry || typeof entry !== "object") {
+      return { error: `mediaItems[${index}] must be an object` };
+    }
+    const candidate = entry as { mediaType?: unknown; mediaUrl?: unknown };
+    if (candidate.mediaType !== "IMAGE" && candidate.mediaType !== "VIDEO") {
+      return { error: `mediaItems[${index}] has invalid mediaType` };
+    }
+    if (typeof candidate.mediaUrl !== "string" || !candidate.mediaUrl) {
+      return { error: `mediaItems[${index}] is missing mediaUrl` };
+    }
+    items.push({ mediaType: candidate.mediaType, mediaUrl: candidate.mediaUrl });
+  }
+  return { items };
+}
+
+/**
+ * Upsert the Post row for an idea-linked or standalone publish/schedule call.
+ * For idea-linked the unique `contentIdeaId` index drives the upsert; standalone
+ * always creates a fresh row.
+ */
+type PostFields = Pick<
+  Prisma.PostUncheckedCreateInput,
+  "text" | "posts" | "mediaItems" | "imageSuggestion" | "status"
+  | "scheduledAt" | "publishedAt" | "threadsPostId"
+  | "publishingAt" | "errorMessage"
+>;
+
+async function upsertPostForIdea(
+  userId: string,
+  threadsAccountId: string,
+  contentIdeaId: string | null,
+  fields: PostFields,
+): Promise<{ id: string }> {
+  // Standalone path — always create a fresh row.
+  if (!contentIdeaId) {
+    const created = await prisma.post.create({
+      data: {
+        userId,
+        threadsAccountId,
+        contentIdeaId: null,
+        ...fields,
+      },
+    });
+    return { id: created.id };
+  }
+  const upserted = await prisma.post.upsert({
+    where: { contentIdeaId },
+    create: {
+      userId,
+      threadsAccountId,
+      contentIdeaId,
+      ...fields,
+    },
+    update: fields,
+  });
+  return { id: upserted.id };
 }
 
 /**
@@ -489,10 +566,10 @@ async function deleteAllUserData(userId: string): Promise<void> {
       await tx.chatMessage.deleteMany({ where: { chatSessionId: { in: sessionIds } } });
     }
 
+    await tx.post.deleteMany({ where: { userId } });
     await tx.contentIdea.deleteMany({ where: { userId } });
     await tx.contentPlan.deleteMany({ where: { userId } });
     await tx.chatSession.deleteMany({ where: { userId } });
-    await tx.scheduledPost.deleteMany({ where: { userId } });
     await tx.threadsAccount.deleteMany({ where: { userId } });
     await tx.mediaFile.deleteMany({ where: { userId } });
     await tx.creditTransaction.deleteMany({ where: { userId } });
@@ -527,16 +604,15 @@ threadsRoutes.delete("/threads/account", requireAuth, async (context) => {
   return context.json({ success: true });
 });
 
-// POST /threads/publish — publish a single post immediately (text-only or with single media)
+// POST /threads/publish — publish a single post immediately (text-only, single
+// media, or carousel — driven by the length of `mediaItems`). Persists the
+// resulting Post row with status=published.
 threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
   const user = context.get("user");
   const body = await context.req.json() as {
     text: string;
     contentIdeaId?: string;
-    mediaUrl?: string;
-    mediaType?: "IMAGE" | "VIDEO";
-    // Carousel: array of { mediaUrl, mediaType }
-    carouselItems?: Array<{ mediaUrl: string; mediaType: "IMAGE" | "VIDEO" }>;
+    mediaItems?: unknown;
   };
 
   if (!body.text?.trim() || typeof body.text !== "string") {
@@ -547,18 +623,13 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
     return context.json({ error: "text must be 500 characters or fewer" }, 400);
   }
 
-  const hasMedia = Boolean(body.mediaUrl && body.mediaType);
-  const hasCarousel = Array.isArray(body.carouselItems) && body.carouselItems.length >= 2;
-
-  if (hasCarousel && body.carouselItems!.length > 20) {
-    return context.json({ error: "Carousel supports 2–20 items" }, 400);
+  const itemsParse = parseMediaItemsInput(body.mediaItems);
+  if ("error" in itemsParse) {
+    return context.json({ error: itemsParse.error }, 400);
   }
+  const items = itemsParse.items ?? [];
 
-  const publishMediaUrls: string[] = [
-    ...(hasMedia ? [body.mediaUrl!] : []),
-    ...(hasCarousel ? body.carouselItems!.map((item) => item.mediaUrl) : []),
-  ];
-  const unknownPublishUrl = await assertMediaUrlsOwnedBy(user.id, publishMediaUrls);
+  const unknownPublishUrl = await assertMediaUrlsOwnedBy(user.id, items.map((item) => item.mediaUrl));
   if (unknownPublishUrl) {
     return context.json({ error: "mediaUrl does not match any uploaded media" }, 400);
   }
@@ -578,20 +649,20 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
   try {
     let result: { postId: string };
 
-    if (hasCarousel) {
+    if (items.length >= 2) {
       result = await threadsApiService.publishCarousel(
         account.threadsUserId,
         account.accessToken,
         body.text,
-        body.carouselItems!
+        items
       );
-    } else if (hasMedia) {
+    } else if (items.length === 1) {
       result = await threadsApiService.publishSingleMediaPost(
         account.threadsUserId,
         account.accessToken,
         body.text,
-        body.mediaType!,
-        body.mediaUrl!
+        items[0].mediaType,
+        items[0].mediaUrl
       );
     } else {
       result = await threadsApiService.publishTextPost(
@@ -606,12 +677,18 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
       data: { postsCount: { increment: 1 } },
     });
 
-    if (body.contentIdeaId) {
-      await prisma.contentIdea.update({
-        where: { id: body.contentIdeaId, userId: user.id },
-        data: { publishStatus: "posted", threadsPostId: result.postId, publishedAt: new Date() },
-      });
-    }
+    const publishedAt = new Date();
+    await upsertPostForIdea(user.id, account.id, body.contentIdeaId ?? null, {
+      text: body.text,
+      posts: Prisma.JsonNull,
+      mediaItems: items.length > 0 ? items : Prisma.JsonNull,
+      status: "published",
+      threadsPostId: result.postId,
+      publishedAt,
+      scheduledAt: null,
+      publishingAt: null,
+      errorMessage: null,
+    });
 
     return context.json({ postId: result.postId });
   } catch (publishError) {
@@ -624,7 +701,7 @@ threadsRoutes.post("/threads/publish", requireAuth, async (context) => {
 threadsRoutes.post("/threads/publish-thread", requireAuth, async (context) => {
   const user = context.get("user");
   const body = await context.req.json() as {
-    posts: Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>;
+    posts: Array<string | { text: string; mediaItems?: unknown }>;
     contentIdeaId?: string;
   };
 
@@ -632,25 +709,32 @@ threadsRoutes.post("/threads/publish-thread", requireAuth, async (context) => {
     return context.json({ error: "posts must be a non-empty array" }, 400);
   }
 
-  const normalized = body.posts.map((entry) =>
-    typeof entry === "string" ? { text: entry } : entry
-  );
+  const normalized: Array<{ text: string; mediaItems?: MediaItem[] }> = [];
+  for (const [postIndex, entry] of body.posts.entries()) {
+    if (typeof entry === "string") {
+      normalized.push({ text: entry });
+      continue;
+    }
+    if (!entry || typeof entry !== "object" || typeof entry.text !== "string") {
+      return context.json({ error: `post[${postIndex}] is invalid` }, 400);
+    }
+    const itemsParse = parseMediaItemsInput(entry.mediaItems);
+    if ("error" in itemsParse) {
+      return context.json({ error: `post[${postIndex}]: ${itemsParse.error}` }, 400);
+    }
+    normalized.push({ text: entry.text, ...(itemsParse.items ? { mediaItems: itemsParse.items } : {}) });
+  }
 
   for (const [postIndex, post] of normalized.entries()) {
-    if (typeof post.text !== "string" || !post.text.trim()) {
+    if (!post.text.trim()) {
       return context.json({ error: `post[${postIndex}] is empty` }, 400);
     }
     if (post.text.length > 500) {
       return context.json({ error: `post[${postIndex}] exceeds 500 characters` }, 400);
     }
-    if (post.mediaUrl && post.mediaType !== "IMAGE" && post.mediaType !== "VIDEO") {
-      return context.json({ error: `post[${postIndex}] has mediaUrl without a valid mediaType` }, 400);
-    }
   }
 
-  const threadMediaUrls = normalized
-    .map((post) => post.mediaUrl)
-    .filter((url): url is string => typeof url === "string");
+  const threadMediaUrls = normalized.flatMap((post) => post.mediaItems?.map((item) => item.mediaUrl) ?? []);
   const unknownThreadUrl = await assertMediaUrlsOwnedBy(user.id, threadMediaUrls);
   if (unknownThreadUrl) {
     return context.json({ error: "mediaUrl does not match any uploaded media" }, 400);
@@ -680,12 +764,18 @@ threadsRoutes.post("/threads/publish-thread", requireAuth, async (context) => {
       data: { postsCount: { increment: 1 } },
     });
 
-    if (body.contentIdeaId) {
-      await prisma.contentIdea.update({
-        where: { id: body.contentIdeaId, userId: user.id },
-        data: { publishStatus: "posted", threadsPostId: result.postIds[0], publishedAt: new Date() },
-      });
-    }
+    const publishedAt = new Date();
+    await upsertPostForIdea(user.id, account.id, body.contentIdeaId ?? null, {
+      text: normalized[0]?.text ?? "",
+      posts: normalized.length > 1 ? normalized : Prisma.JsonNull,
+      mediaItems: Prisma.JsonNull,
+      status: "published",
+      threadsPostId: result.postIds[0],
+      publishedAt,
+      scheduledAt: null,
+      publishingAt: null,
+      errorMessage: null,
+    });
 
     return context.json({ postIds: result.postIds });
   } catch (publishError) {
@@ -695,36 +785,42 @@ threadsRoutes.post("/threads/publish-thread", requireAuth, async (context) => {
 });
 
 // Validate the snapshot of text + media that the frontend sends along with a
-// schedule/PATCH call. Returns { error } on failure or { isThread, normalizedPosts, ideaBody }
-// on success. ideaBody is the value to write into ContentIdea.body.
+// schedule/PATCH call. Returns { error } on failure or the normalized
+// payload ready to write to a Post row.
 type ScheduleBody = {
   text?: string;
-  mediaType?: "IMAGE" | "VIDEO";
-  mediaUrl?: string | null;
-  posts?: Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>;
+  mediaItems?: unknown;
+  posts?: Array<string | { text: string; mediaItems?: unknown }>;
 };
-type IdeaBody = { text: string } | { posts: string[] };
+type NormalizedPost = { text: string; mediaItems?: MediaItem[] };
 function validateScheduleSnapshot(body: ScheduleBody): { error: string } | {
   isThread: boolean;
-  normalizedPosts: Array<{ text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }> | null;
-  ideaBody: IdeaBody;
+  normalizedPosts: NormalizedPost[] | null;
+  mediaItems: MediaItem[] | null;
 } {
   const isThread = Array.isArray(body.posts) && body.posts.length > 1;
-  const normalizedPosts = isThread
-    ? body.posts!.map((entry) => (typeof entry === "string" ? { text: entry } : entry))
-    : null;
+  let normalizedPosts: NormalizedPost[] | null = null;
+  let singleMediaItems: MediaItem[] | null = null;
 
-  if (isThread && normalizedPosts) {
+  if (isThread && body.posts) {
+    normalizedPosts = [];
+    for (const [postIndex, entry] of body.posts.entries()) {
+      if (typeof entry === "string") {
+        normalizedPosts.push({ text: entry });
+        continue;
+      }
+      if (!entry || typeof entry !== "object" || typeof entry.text !== "string") {
+        return { error: `post[${postIndex}] is invalid` };
+      }
+      const parsed = parseMediaItemsInput(entry.mediaItems);
+      if ("error" in parsed) {
+        return { error: `post[${postIndex}]: ${parsed.error}` };
+      }
+      normalizedPosts.push({ text: entry.text, ...(parsed.items ? { mediaItems: parsed.items } : {}) });
+    }
     for (const [postIndex, post] of normalizedPosts.entries()) {
-      if (typeof post.text !== "string" || !post.text.trim()) {
-        return { error: `post[${postIndex}] is empty` };
-      }
-      if (post.text.length > 500) {
-        return { error: `post[${postIndex}] exceeds 500 characters` };
-      }
-      if (post.mediaUrl && post.mediaType !== "IMAGE" && post.mediaType !== "VIDEO") {
-        return { error: `post[${postIndex}] has mediaUrl without a valid mediaType` };
-      }
+      if (!post.text.trim()) return { error: `post[${postIndex}] is empty` };
+      if (post.text.length > 500) return { error: `post[${postIndex}] exceeds 500 characters` };
     }
   } else {
     if (!body.text?.trim() || typeof body.text !== "string") {
@@ -733,26 +829,17 @@ function validateScheduleSnapshot(body: ScheduleBody): { error: string } | {
     if (body.text.length > 500) {
       return { error: "text must be 500 characters or fewer" };
     }
-    if (body.mediaUrl && body.mediaType !== "IMAGE" && body.mediaType !== "VIDEO") {
-      return { error: "mediaUrl requires a valid mediaType" };
-    }
+    const parsed = parseMediaItemsInput(body.mediaItems);
+    if ("error" in parsed) return { error: parsed.error };
+    singleMediaItems = parsed.items;
   }
 
-  const ideaBody: IdeaBody = isThread
-    ? { posts: normalizedPosts!.map((p) => p.text) }
-    : { text: body.text! };
-
-  return { isThread, normalizedPosts, ideaBody };
+  return { isThread, normalizedPosts, mediaItems: singleMediaItems };
 }
 
-// POST /threads/schedule — schedule a post (single or multi-post thread) for later.
-//
-// Two paths:
-//   1. Idea-linked (contentIdeaId set): stores text/media on ContentIdea so
-//      autosaved edits flow through to the scheduled output. ScheduledPost is
-//      a thin job-queue row referencing the idea.
-//   2. Standalone (no contentIdeaId): used by the calendar's compose modal
-//      for ad-hoc posts. Snapshot lives on ScheduledPost itself.
+// POST /threads/schedule — schedule a post (single or multi-post thread) for
+// later. Idea-linked posts upsert by `contentIdeaId`; standalone calls
+// always create a fresh Post row.
 threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
   const user = context.get("user");
   const body = await context.req.json() as ScheduleBody & {
@@ -773,11 +860,11 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
   if ("error" in validation) {
     return context.json({ error: validation.error }, 400);
   }
-  const { isThread, normalizedPosts, ideaBody } = validation;
+  const { isThread, normalizedPosts, mediaItems } = validation;
 
   const mediaUrls = isThread && normalizedPosts
-    ? normalizedPosts.map((post) => post.mediaUrl).filter((url): url is string => typeof url === "string")
-    : body.mediaUrl ? [body.mediaUrl] : [];
+    ? normalizedPosts.flatMap((post) => post.mediaItems?.map((item) => item.mediaUrl) ?? [])
+    : (mediaItems ?? []).map((item) => item.mediaUrl);
   const unknownUrl = await assertMediaUrlsOwnedBy(user.id, mediaUrls);
   if (unknownUrl) {
     return context.json({ error: "mediaUrl does not match any uploaded media" }, 400);
@@ -792,7 +879,6 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
   }
 
   if (body.contentIdeaId) {
-    // Idea-linked: write snapshot to ContentIdea, leave ScheduledPost columns null.
     const ownedIdea = await prisma.contentIdea.findUnique({
       where: { id: body.contentIdeaId, userId: user.id },
       select: { id: true },
@@ -800,118 +886,88 @@ threadsRoutes.post("/threads/schedule", requireAuth, async (context) => {
     if (!ownedIdea) {
       return context.json({ error: "Content idea not found" }, 404);
     }
-
-    await prisma.contentIdea.update({
-      where: { id: body.contentIdeaId },
-      data: {
-        publishStatus: "scheduled",
-        scheduledAt,
-        body: ideaBody,
-        mediaUrl: isThread ? null : (body.mediaUrl ?? null),
-        mediaType: isThread ? null : (body.mediaType ?? null),
-      },
-    });
-
-    const scheduledPost = await prisma.scheduledPost.create({
-      data: {
-        userId: user.id,
-        threadsAccountId: account.id,
-        contentIdeaId: body.contentIdeaId,
-        scheduledAt,
-      },
-    });
-    return context.json({ scheduledPost });
   }
 
-  // Standalone: snapshot lives on ScheduledPost.
-  const scheduledPost = await prisma.scheduledPost.create({
-    data: {
-      userId: user.id,
-      threadsAccountId: account.id,
-      contentIdeaId: null,
-      scheduledAt,
-      text: isThread ? (normalizedPosts?.[0]?.text ?? "") : body.text!,
-      posts: isThread ? (normalizedPosts as unknown as object) : undefined,
-      mediaType: isThread ? null : (body.mediaType ?? null),
-      mediaUrl: isThread ? null : (body.mediaUrl ?? null),
-    },
+  const upserted = await upsertPostForIdea(user.id, account.id, body.contentIdeaId ?? null, {
+    text: isThread ? (normalizedPosts?.[0]?.text ?? "") : body.text!,
+    posts: isThread && normalizedPosts ? normalizedPosts : Prisma.JsonNull,
+    mediaItems: isThread || !mediaItems ? Prisma.JsonNull : mediaItems,
+    status: "scheduled",
+    scheduledAt,
+    publishedAt: null,
+    threadsPostId: null,
+    publishingAt: null,
+    errorMessage: null,
   });
-  return context.json({ scheduledPost });
+
+  const post = await prisma.post.findUnique({ where: { id: upserted.id } });
+  return context.json({ post });
 });
 
-// GET /threads/scheduled — list scheduled posts (default: pending only; ?status=all includes published/failed)
+// GET /threads/scheduled — list posts (default: scheduled only;
+// ?status=all includes draft/publishing/published/failed)
 threadsRoutes.get("/threads/scheduled", requireAuth, async (context) => {
   const user = context.get("user");
-  const statusFilter = context.req.query("status") === "all" ? undefined : "pending";
+  const includeAll = context.req.query("status") === "all";
 
-  const scheduledPosts = await prisma.scheduledPost.findMany({
+  const posts = await prisma.post.findMany({
     where: {
       userId: user.id,
-      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(includeAll ? {} : { status: "scheduled" }),
     },
     orderBy: { scheduledAt: "asc" },
   });
 
-  return context.json({ scheduledPosts });
+  return context.json({ posts });
 });
 
-// PATCH /threads/scheduled/:id — update a pending scheduled post
+// PATCH /threads/scheduled/:id — update a scheduled (or draft) post.
 threadsRoutes.patch("/threads/scheduled/:id", requireAuth, async (context) => {
   const user = context.get("user");
   const postId = context.req.param("id");
   const body = await context.req.json() as {
     text?: string;
-    mediaType?: "TEXT" | "IMAGE" | "VIDEO";
-    mediaUrl?: string | null;
-    posts?: Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>;
+    mediaItems?: unknown;
+    posts?: Array<string | { text: string; mediaItems?: unknown }>;
     scheduledAt?: string;
   };
 
-  const post = await prisma.scheduledPost.findUnique({
+  const post = await prisma.post.findUnique({
     where: { id: postId, userId: user.id },
   });
 
   if (!post) {
-    return context.json({ error: "Scheduled post not found" }, 404);
+    return context.json({ error: "Post not found" }, 404);
   }
 
-  if (post.status !== "pending") {
-    return context.json({ error: "Only pending posts can be edited" }, 400);
+  if (post.status !== "scheduled" && post.status !== "draft") {
+    return context.json({ error: "Only scheduled or draft posts can be edited" }, 400);
   }
 
-  // Caller may send any subset of (text/posts, media, scheduledAt). When text or
-  // posts are present we re-validate them and overwrite ContentIdea.body. When
-  // only scheduledAt changes, the snapshot fields stay untouched.
   const hasSnapshotFields =
     body.text !== undefined ||
     body.posts !== undefined ||
-    body.mediaUrl !== undefined ||
-    body.mediaType !== undefined;
-
-  // Frontend may send mediaType="TEXT" to mean "no media". Normalize before
-  // validation and storage — ContentIdea.mediaType is "IMAGE" | "VIDEO" | null.
-  const normalizedMediaType: "IMAGE" | "VIDEO" | null =
-    body.mediaType === "IMAGE" || body.mediaType === "VIDEO" ? body.mediaType : null;
-  const normalizedMediaUrl = normalizedMediaType ? (body.mediaUrl ?? null) : null;
+    body.mediaItems !== undefined;
 
   let isThread = false;
-  let ideaBodyOverride: IdeaBody | null = null;
+  let normalizedMediaItems: MediaItem[] | null = null;
+  let normalizedThreadPosts: NormalizedPost[] | null = null;
   if (hasSnapshotFields) {
     const validation = validateScheduleSnapshot({
       text: body.text,
       posts: body.posts,
-      mediaUrl: normalizedMediaUrl,
-      mediaType: normalizedMediaType ?? undefined,
+      mediaItems: body.mediaItems,
     });
     if ("error" in validation) {
       return context.json({ error: validation.error }, 400);
     }
     isThread = validation.isThread;
-    ideaBodyOverride = validation.ideaBody;
+    normalizedMediaItems = validation.mediaItems;
+    normalizedThreadPosts = validation.normalizedPosts;
 
     const editMediaUrls = isThread && validation.normalizedPosts
-      ? validation.normalizedPosts.map((entry) => entry.mediaUrl).filter((url): url is string => typeof url === "string")
-      : normalizedMediaUrl ? [normalizedMediaUrl] : [];
+      ? validation.normalizedPosts.flatMap((entry) => entry.mediaItems?.map((item) => item.mediaUrl) ?? [])
+      : (normalizedMediaItems ?? []).map((item) => item.mediaUrl);
     const unknownEditUrl = await assertMediaUrlsOwnedBy(user.id, editMediaUrls);
     if (unknownEditUrl) {
       return context.json({ error: "mediaUrl does not match any uploaded media" }, 400);
@@ -926,79 +982,51 @@ threadsRoutes.patch("/threads/scheduled/:id", requireAuth, async (context) => {
     }
   }
 
-  // Idea-linked: snapshot fields belong on ContentIdea; ScheduledPost only
-  // stores the new scheduledAt. Standalone: snapshot fields stay on ScheduledPost.
-  if (post.contentIdeaId) {
-    const updated = scheduledAt
-      ? await prisma.scheduledPost.update({
-          where: { id: postId },
-          data: { scheduledAt },
-        })
-      : post;
-
-    const ideaUpdate: Record<string, unknown> = {};
-    if (scheduledAt) ideaUpdate.scheduledAt = scheduledAt;
-    if (ideaBodyOverride) ideaUpdate.body = ideaBodyOverride;
-    if (hasSnapshotFields) {
-      ideaUpdate.mediaUrl = isThread ? null : normalizedMediaUrl;
-      ideaUpdate.mediaType = isThread ? null : normalizedMediaType;
-    }
-    if (Object.keys(ideaUpdate).length > 0) {
-      await prisma.contentIdea.update({
-        where: { id: post.contentIdeaId, userId: user.id },
-        data: ideaUpdate,
-      });
-    }
-    return context.json({ scheduledPost: updated });
-  }
-
-  const standaloneUpdate: Record<string, unknown> = {};
-  if (scheduledAt) standaloneUpdate.scheduledAt = scheduledAt;
+  const update: Record<string, unknown> = {};
+  if (scheduledAt) update.scheduledAt = scheduledAt;
   if (hasSnapshotFields) {
     if (isThread) {
-      standaloneUpdate.text = "";
-      standaloneUpdate.posts = body.posts;
-      standaloneUpdate.mediaType = null;
-      standaloneUpdate.mediaUrl = null;
+      update.text = normalizedThreadPosts?.[0]?.text ?? "";
+      update.posts = normalizedThreadPosts;
+      update.mediaItems = Prisma.JsonNull;
     } else {
-      standaloneUpdate.text = body.text;
-      standaloneUpdate.posts = null;
-      standaloneUpdate.mediaType = normalizedMediaType;
-      standaloneUpdate.mediaUrl = normalizedMediaUrl;
+      update.text = body.text ?? post.text;
+      update.posts = Prisma.JsonNull;
+      update.mediaItems = normalizedMediaItems ?? Prisma.JsonNull;
     }
   }
-  const updated = Object.keys(standaloneUpdate).length > 0
-    ? await prisma.scheduledPost.update({ where: { id: postId }, data: standaloneUpdate })
+  const updated = Object.keys(update).length > 0
+    ? await prisma.post.update({ where: { id: postId }, data: update })
     : post;
-  return context.json({ scheduledPost: updated });
+  return context.json({ post: updated });
 });
 
-// DELETE /threads/scheduled/:id — cancel a scheduled post
+// DELETE /threads/scheduled/:id — cancel a scheduled post. For idea-linked
+// posts the row is downgraded to `draft` (preserves uploaded media for the
+// editor); for standalone posts it is deleted outright.
 threadsRoutes.delete("/threads/scheduled/:id", requireAuth, async (context) => {
   const user = context.get("user");
   const postId = context.req.param("id");
 
-  const post = await prisma.scheduledPost.findUnique({
+  const post = await prisma.post.findUnique({
     where: { id: postId, userId: user.id },
   });
 
   if (!post) {
-    return context.json({ error: "Scheduled post not found" }, 404);
+    return context.json({ error: "Post not found" }, 404);
   }
 
-  if (post.status !== "pending") {
-    return context.json({ error: "Cannot cancel a post that is not pending" }, 400);
+  if (post.status !== "scheduled") {
+    return context.json({ error: "Cannot cancel a post that is not scheduled" }, 400);
   }
-
-  await prisma.scheduledPost.delete({ where: { id: postId } });
 
   if (post.contentIdeaId) {
-    await prisma.contentIdea.update({
-      where: { id: post.contentIdeaId, userId: user.id },
-      data: { publishStatus: null, scheduledAt: null },
-      // mediaUrl and mediaType are intentionally preserved so the image
-      // remains visible in the editor after removing a schedule.
+    await prisma.post.update({
+      where: { id: postId },
+      data: { status: "draft", scheduledAt: null, publishingAt: null, attempts: 0, errorMessage: null },
     });
+  } else {
+    await prisma.post.delete({ where: { id: postId } });
   }
 
   return context.json({ success: true });
@@ -1279,8 +1307,8 @@ threadsRoutes.get("/threads/insights/streak", requireAuth, async (context) => {
 });
 
 // GET /threads/pipeline-ideas — actual ideas for the dashboard pipeline carousel:
-//   toReview     = ContentIdeas with status=proposed (waiting for user to approve/reject)
-//   readyToPublish = ContentIdeas with status=completed and no publishStatus
+//   toReview       = ContentIdeas with status=proposed (waiting for user to approve/reject)
+//   readyToPublish = ContentIdeas with produced post in `draft` (not yet scheduled)
 // Each item includes the chatSessionId needed to build a deep-link URL.
 threadsRoutes.get("/threads/pipeline-ideas", requireAuth, async (context) => {
   const user = context.get("user");
@@ -1292,9 +1320,9 @@ threadsRoutes.get("/threads/pipeline-ideas", requireAuth, async (context) => {
     platform: true,
     format: true,
     status: true,
-    publishStatus: true,
     createdAt: true,
     contentPlan: { select: { chatSessionId: true } },
+    post: { select: { status: true } },
   } as const;
 
   const [toReview, readyToPublish] = await Promise.all([
@@ -1305,7 +1333,7 @@ threadsRoutes.get("/threads/pipeline-ideas", requireAuth, async (context) => {
       take: 20,
     }),
     prisma.contentIdea.findMany({
-      where: { userId: user.id, status: "completed", publishStatus: null },
+      where: { userId: user.id, status: "completed", post: { status: "draft" } },
       select: ideaSelect,
       orderBy: { createdAt: "desc" },
       take: 20,
@@ -1316,8 +1344,8 @@ threadsRoutes.get("/threads/pipeline-ideas", requireAuth, async (context) => {
 });
 
 // GET /threads/pipeline-counts — counts for the dashboard pipeline widget:
-//   ideasToReview = ContentIdeas waiting for the user to approve/reject
-//   readyToPublish = posts with content produced but not scheduled or posted
+//   ideasToReview  = ContentIdeas waiting for the user to approve/reject
+//   readyToPublish = produced posts in `draft` (not yet scheduled or posted)
 threadsRoutes.get("/threads/pipeline-counts", requireAuth, async (context) => {
   const user = context.get("user");
 
@@ -1329,7 +1357,7 @@ threadsRoutes.get("/threads/pipeline-counts", requireAuth, async (context) => {
       where: {
         userId: user.id,
         status: "completed",
-        publishStatus: null,
+        post: { status: "draft" },
       },
     }),
   ]);
@@ -1425,10 +1453,11 @@ threadsRoutes.post("/threads/insights/:contentIdeaId/refresh", requireAuth, asyn
 
   const idea = await prisma.contentIdea.findUnique({
     where: { id: contentIdeaId, userId: user.id },
-    select: { threadsPostId: true },
+    select: { post: { select: { threadsPostId: true } } },
   });
 
-  if (!idea?.threadsPostId) {
+  const threadsPostId = idea?.post?.threadsPostId ?? null;
+  if (!threadsPostId) {
     return context.json({ error: "No Threads post ID for this idea" }, 400);
   }
 
@@ -1445,7 +1474,7 @@ threadsRoutes.post("/threads/insights/:contentIdeaId/refresh", requireAuth, asyn
   }
 
   try {
-    const url = new URL(`${THREADS_BASE_URL}/${idea.threadsPostId}/insights`);
+    const url = new URL(`${THREADS_BASE_URL}/${threadsPostId}/insights`);
     url.searchParams.set("metric", "views,likes,replies,reposts,quotes,shares");
     url.searchParams.set("access_token", account.accessToken);
 

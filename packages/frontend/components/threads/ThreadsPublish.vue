@@ -117,14 +117,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { CheckCircle, ChevronDown, Clock } from 'lucide-vue-next';
 
-type SingleMedia = { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string };
-type CarouselMedia = { carouselItems: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string }> };
-type PostMedia = SingleMedia | CarouselMedia;
+type MediaItem = { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string };
 
 const props = defineProps<{
   text: string;
   posts?: string[] | null;
-  postsMedia?: Array<PostMedia | null> | null;
+  postsMedia?: Array<MediaItem[] | null> | null;
   contentIdeaId?: string;
   publishStatus?: 'posted' | 'scheduled' | null;
   scheduledAt?: string | null;
@@ -228,14 +226,14 @@ onUnmounted(() => {
 
 function buildThreadPayload() {
   return (props.posts ?? []).map((text, index) => {
-    const media = props.postsMedia?.[index];
-    if (!media) return { text };
-    if ('mediaType' in media) return { text, mediaType: media.mediaType, mediaUrl: media.mediaUrl };
-    // carousel in thread chain → use first item only (API doesn't support carousel per reply)
-    const first = media.carouselItems[0];
-    if (first) return { text, mediaType: first.mediaType, mediaUrl: first.mediaUrl };
-    return { text };
+    const items = props.postsMedia?.[index];
+    if (!items || items.length === 0) return { text };
+    return { text, mediaItems: items };
   });
+}
+
+function singlePostMediaItems(): MediaItem[] {
+  return props.postsMedia?.[0] ?? [];
 }
 
 async function findPendingScheduledPostId(): Promise<string | null> {
@@ -300,11 +298,7 @@ async function publishNow(): Promise<void> {
       scheduleBody.posts = buildThreadPayload();
     } else {
       scheduleBody.text = props.text;
-      const singleMedia = props.postsMedia?.[0];
-      if (singleMedia && 'mediaType' in singleMedia) {
-        scheduleBody.mediaUrl = singleMedia.mediaUrl;
-        scheduleBody.mediaType = singleMedia.mediaType;
-      }
+      scheduleBody.mediaItems = singlePostMediaItems();
     }
 
     await $fetch(`${apiBaseUrl}/api/threads/schedule`, {
@@ -340,14 +334,7 @@ async function saveScheduledChanges(): Promise<void> {
       saveBody.posts = buildThreadPayload();
     } else {
       saveBody.text = props.text;
-      const singleMedia = props.postsMedia?.[0];
-      if (singleMedia && 'mediaType' in singleMedia) {
-        saveBody.mediaUrl = singleMedia.mediaUrl;
-        saveBody.mediaType = singleMedia.mediaType;
-      } else {
-        saveBody.mediaType = 'TEXT';
-        saveBody.mediaUrl = null;
-      }
+      saveBody.mediaItems = singlePostMediaItems();
     }
 
     await $fetch(`${apiBaseUrl}/api/threads/scheduled/${existingId}`, {
@@ -385,14 +372,7 @@ async function schedulePost(): Promise<void> {
       scheduleBody.posts = buildThreadPayload();
     } else {
       scheduleBody.text = props.text;
-      const singleMedia = props.postsMedia?.[0];
-      if (singleMedia && 'mediaType' in singleMedia) {
-        scheduleBody.mediaUrl = singleMedia.mediaUrl;
-        scheduleBody.mediaType = singleMedia.mediaType;
-      } else {
-        scheduleBody.mediaType = 'TEXT';
-        scheduleBody.mediaUrl = null;
-      }
+      scheduleBody.mediaItems = singlePostMediaItems();
     }
 
     // If already scheduled, find the existing pending record and patch it instead

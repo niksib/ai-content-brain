@@ -265,7 +265,7 @@
               :angle="idea.angle"
               :description="idea.description"
               :status="idea.status"
-              :publish-status="idea.publishStatus"
+              :publish-status="idea.post?.status === 'published' ? 'posted' : (idea.post?.status === 'scheduled' || idea.post?.status === 'publishing' ? 'scheduled' : null)"
               :avatar-url="idea.platform === 'threads' ? (threadsAccount?.profilePictureUrl ?? null) : null"
               :username="idea.platform === 'threads' ? (threadsAccount?.username ?? null) : null"
               :is-updating="store.recentlyUpdatedIdeaIds.has(idea.id)"

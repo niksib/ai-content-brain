@@ -316,14 +316,51 @@ export async function executeSaveProducedContent(input: Record<string, unknown>)
     parsedBody = normalizeThreadsBody(parsedBody);
   }
 
+  // Split the platform-specific body into the Post columns: a single text or
+  // a thread of `{ text }` entries. mediaItems and scheduling stay default.
+  const text = typeof parsedBody.text === "string" ? parsedBody.text : null;
+  const threadPosts = Array.isArray(parsedBody.posts) && parsedBody.posts.length > 0
+    ? parsedBody.posts.map((entry: unknown) => ({ text: typeof entry === "string" ? entry : "" }))
+    : null;
+
+  const idea = await prisma.contentIdea.findUnique({
+    where: { id: contentIdeaId },
+    select: { userId: true, post: { select: { id: true } } },
+  });
+  if (!idea) {
+    return JSON.stringify({ success: false, message: "Content idea not found." });
+  }
+  const account = await prisma.threadsAccount.findUnique({
+    where: { userId: idea.userId },
+    select: { id: true },
+  });
+  if (!account) {
+    return JSON.stringify({ success: false, message: "Threads account not connected." });
+  }
+
   await prisma.contentIdea.update({
     where: { id: contentIdeaId },
-    data: {
-      status: "completed",
-      body: parsedBody,
-      ...(imageSuggestion !== undefined && { imageSuggestion }),
-    },
+    data: { status: "completed" },
   });
+
+  const postFields = {
+    text,
+    posts: threadPosts ?? undefined,
+    ...(imageSuggestion !== undefined ? { imageSuggestion } : {}),
+  };
+
+  if (idea.post) {
+    await prisma.post.update({ where: { id: idea.post.id }, data: postFields });
+  } else {
+    await prisma.post.create({
+      data: {
+        userId: idea.userId,
+        threadsAccountId: account.id,
+        contentIdeaId,
+        ...postFields,
+      },
+    });
+  }
 
   return JSON.stringify({ success: true, message: "Produced content saved and idea marked as completed." });
 }

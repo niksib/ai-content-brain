@@ -38,6 +38,7 @@ ideaRoutes.get("/sessions/:id/ideas", requireAuth, async (context) => {
     include: {
       ideas: {
         orderBy: { createdAt: "asc" },
+        include: { post: true },
       },
     },
   });
@@ -151,11 +152,14 @@ ideaRoutes.post(
       where: { id: ideaId, userId: user.id },
       include: {
         contentPlan: { include: { chatSession: true } },
+        post: true,
       },
     });
 
     if (!idea) return context.json({ error: "Idea not found" }, 404);
-    if (!idea.body) return context.json({ error: "Idea has no produced content yet" }, 400);
+    if (!idea.post?.text && !idea.post?.posts) {
+      return context.json({ error: "Idea has no produced content yet" }, 400);
+    }
 
     const chatSession = idea.contentPlan.chatSession;
 
@@ -172,11 +176,14 @@ ideaRoutes.post(
     const agent = await resolvePlatformAgent(idea, user.id);
 
     // Synthetic initial context: production prompt + what was produced
+    const producedSnapshot = idea.post
+      ? { text: idea.post.text, posts: idea.post.posts, mediaItems: idea.post.mediaItems, imageSuggestion: idea.post.imageSuggestion }
+      : null;
     const syntheticHistory = [
       { role: "user" as const, content: agent.buildProductionPrompt() },
       {
         role: "assistant" as const,
-        content: `I've produced and saved the content:\n\n${JSON.stringify(idea.body, null, 2)}`,
+        content: `I've produced and saved the content:\n\n${JSON.stringify(producedSnapshot, null, 2)}`,
       },
     ];
 
@@ -211,8 +218,9 @@ ideaRoutes.post(
     const onContentSaved = async () => {
       const updatedIdea = await prisma.contentIdea.findUnique({
         where: { id: ideaId },
+        include: { post: true },
       });
-      if (updatedIdea?.body) {
+      if (updatedIdea?.post) {
         send("idea_updated", updatedIdea);
       }
     };
@@ -247,7 +255,9 @@ ideaRoutes.post(
   }
 );
 
-// Update produced content body (user manual edits)
+// Update produced content body (user manual edits). Body shape is platform-
+// specific; we accept either `{ text }` or `{ posts: string[] }` and persist
+// to the linked Post row.
 ideaRoutes.patch("/ideas/:id/content", requireAuth, async (context) => {
   const user = context.get("user");
   const ideaId = context.req.param("id");
@@ -259,16 +269,22 @@ ideaRoutes.patch("/ideas/:id/content", requireAuth, async (context) => {
 
   const idea = await prisma.contentIdea.findUnique({
     where: { id: ideaId, userId: user.id },
-    select: { id: true, body: true },
+    select: { id: true, post: { select: { id: true } } },
   });
 
   if (!idea) return context.json({ error: "Idea not found" }, 404);
-  if (!idea.body) return context.json({ error: "No produced content yet" }, 400);
+  if (!idea.post) return context.json({ error: "No produced content yet" }, 400);
 
-  const updated = await prisma.contentIdea.update({
-    where: { id: ideaId },
-    data: { body },
-    select: { id: true, body: true, imageSuggestion: true },
+  const text = typeof body.text === "string" ? body.text : null;
+  const posts = Array.isArray(body.posts) && body.posts.length > 0 ? body.posts.map((entry: unknown) => ({ text: typeof entry === "string" ? entry : "" })) : null;
+
+  const updated = await prisma.post.update({
+    where: { id: idea.post.id },
+    data: {
+      text,
+      posts: posts ?? undefined,
+    },
+    select: { id: true, text: true, posts: true, imageSuggestion: true },
   });
 
   return context.json({ content: updated });
@@ -281,6 +297,7 @@ ideaRoutes.get("/ideas/:id", requireAuth, async (context) => {
 
   const idea = await prisma.contentIdea.findUnique({
     where: { id: ideaId, userId: user.id },
+    include: { post: true },
   });
 
   if (!idea) {

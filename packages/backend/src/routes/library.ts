@@ -14,9 +14,10 @@ libraryRoutes.get("/library", requireAuth, async (context) => {
   const platform = context.req.query("platform") || undefined;
   const format = context.req.query("format") || undefined;
 
+  // Library shows ideas that have produced content (i.e. an attached Post).
   const where: Record<string, unknown> = {
     userId: user.id,
-    body: { not: null as unknown as undefined },
+    post: { isNot: null },
   };
   if (platform) {
     where.platform = platform;
@@ -31,6 +32,19 @@ libraryRoutes.get("/library", requireAuth, async (context) => {
       include: {
         contentPlan: {
           select: { chatSessionId: true },
+        },
+        post: {
+          select: {
+            id: true,
+            text: true,
+            posts: true,
+            mediaItems: true,
+            imageSuggestion: true,
+            status: true,
+            scheduledAt: true,
+            publishedAt: true,
+            threadsPostId: true,
+          },
         },
         insightsSnapshots: {
           orderBy: { fetchedAt: 'desc' },
@@ -68,6 +82,19 @@ libraryRoutes.get("/library/:id", requireAuth, async (context) => {
     where: { id: ideaId, userId: user.id },
     include: {
       contentPlan: { select: { chatSessionId: true } },
+      post: {
+        select: {
+          id: true,
+          text: true,
+          posts: true,
+          mediaItems: true,
+          imageSuggestion: true,
+          status: true,
+          scheduledAt: true,
+          publishedAt: true,
+          threadsPostId: true,
+        },
+      },
     },
   });
 

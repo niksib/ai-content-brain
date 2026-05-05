@@ -46,7 +46,7 @@
           {{ post.text.length }} / 500
         </span>
 
-        <label v-if="!post.media" class="threads-form__attach">
+        <label v-if="!post.mediaItems || post.mediaItems.length === 0" class="threads-form__attach">
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
@@ -58,7 +58,7 @@
         </label>
 
         <div v-else class="threads-form__attachment">
-          <span class="threads-form__attachment-type">{{ post.media.mediaType }}</span>
+          <span class="threads-form__attachment-type">{{ post.mediaItems[0].mediaType }}</span>
           <button type="button" class="threads-form__attachment-remove" @click="detachMedia(index)">
             Remove
           </button>
@@ -73,9 +73,14 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
 
+export interface ThreadsMediaItem {
+  mediaType: 'IMAGE' | 'VIDEO';
+  mediaUrl: string;
+}
+
 export interface ThreadsSchedulePost {
   text: string;
-  media: { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string } | null;
+  mediaItems: ThreadsMediaItem[];
 }
 
 const MAX_POSTS = 10;
@@ -100,7 +105,7 @@ function emitUpdate(next: ThreadsSchedulePost[]): void {
 
 function addPost(): void {
   if (props.posts.length >= MAX_POSTS) return;
-  emitUpdate([...props.posts, { text: '', media: null }]);
+  emitUpdate([...props.posts, { text: '', mediaItems: [] }]);
 }
 
 function removePost(index: number): void {
@@ -118,7 +123,7 @@ function updateText(index: number, text: string): void {
 
 function detachMedia(index: number): void {
   const next = props.posts.slice();
-  next[index] = { ...next[index], media: null };
+  next[index] = { ...next[index], mediaItems: [] };
   emitUpdate(next);
 }
 
@@ -142,7 +147,7 @@ async function onFileSelected(index: number, event: Event): Promise<void> {
 
     const mediaType: 'IMAGE' | 'VIDEO' = response.mimeType.startsWith('video/') ? 'VIDEO' : 'IMAGE';
     const next = props.posts.slice();
-    next[index] = { ...next[index], media: { mediaType, mediaUrl: response.url } };
+    next[index] = { ...next[index], mediaItems: [{ mediaType, mediaUrl: response.url }] };
     emitUpdate(next);
   } catch (error: unknown) {
     const apiError = (error as { data?: { error?: string } })?.data?.error;

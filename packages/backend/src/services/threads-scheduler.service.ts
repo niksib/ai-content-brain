@@ -13,6 +13,40 @@ function buildPostPreview(text: string): string {
   return trimmed.slice(0, POST_PREVIEW_MAX_CHARS - 1) + "…";
 }
 
+type MediaItem = { mediaType: "IMAGE" | "VIDEO"; mediaUrl: string };
+
+function parseMediaItems(value: unknown): MediaItem[] {
+  if (!Array.isArray(value)) return [];
+  const items: MediaItem[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const candidate = entry as { mediaType?: unknown; mediaUrl?: unknown };
+    if ((candidate.mediaType === "IMAGE" || candidate.mediaType === "VIDEO") && typeof candidate.mediaUrl === "string") {
+      items.push({ mediaType: candidate.mediaType, mediaUrl: candidate.mediaUrl });
+    }
+  }
+  return items;
+}
+
+type ThreadEntry = { text: string; mediaItems?: MediaItem[] };
+
+function parseThreadPosts(value: unknown): ThreadEntry[] | null {
+  if (!Array.isArray(value)) return null;
+  const entries: ThreadEntry[] = [];
+  for (const raw of value) {
+    if (typeof raw === "string") {
+      entries.push({ text: raw });
+      continue;
+    }
+    if (!raw || typeof raw !== "object") continue;
+    const candidate = raw as { text?: unknown; mediaItems?: unknown };
+    if (typeof candidate.text !== "string") continue;
+    const items = parseMediaItems(candidate.mediaItems);
+    entries.push({ text: candidate.text, ...(items.length > 0 ? { mediaItems: items } : {}) });
+  }
+  return entries;
+}
+
 export class ThreadsSchedulerService {
   start(): void {
     cron.schedule("* * * * *", async () => {
@@ -26,12 +60,12 @@ export class ThreadsSchedulerService {
     const now = new Date();
     const stuckCutoff = new Date(now.getTime() - STUCK_THRESHOLD_MS);
 
-    // Atomically claim all due pending posts in one pass.
+    // Atomically claim all due scheduled posts in one pass.
     // updateMany with publishingAt = null filter prevents concurrent ticks
     // (or parallel workers) from claiming the same row twice.
-    await prisma.scheduledPost.updateMany({
+    await prisma.post.updateMany({
       where: {
-        status: "pending",
+        status: "scheduled",
         scheduledAt: { lte: now },
         publishingAt: null,
         attempts: { lt: MAX_ATTEMPTS },
@@ -44,7 +78,7 @@ export class ThreadsSchedulerService {
     });
 
     // Reclaim stuck "publishing" posts whose worker never finished (crash, timeout).
-    await prisma.scheduledPost.updateMany({
+    await prisma.post.updateMany({
       where: {
         status: "publishing",
         publishingAt: { lt: stuckCutoff },
@@ -57,7 +91,7 @@ export class ThreadsSchedulerService {
     });
 
     // Any row still in publishing that has hit the attempt limit is failed permanently.
-    await prisma.scheduledPost.updateMany({
+    await prisma.post.updateMany({
       where: {
         status: "publishing",
         attempts: { gte: MAX_ATTEMPTS },
@@ -69,86 +103,55 @@ export class ThreadsSchedulerService {
       },
     });
 
-    // Load the posts we just claimed. `publishingAt` was just set to `now`,
-    // so we filter tightly to avoid racing a concurrent tick. Text/media live
-    // on the linked ContentIdea — JOIN to read the latest snapshot.
-    const duePosts = await prisma.scheduledPost.findMany({
+    // Load the rows we just claimed. `publishingAt` was just set to `now`,
+    // so we filter tightly to avoid racing a concurrent tick.
+    const duePosts = await prisma.post.findMany({
       where: {
         status: "publishing",
         publishingAt: now,
       },
       include: {
         threadsAccount: true,
-        contentIdea: {
-          select: { body: true, mediaUrl: true, mediaType: true },
-        },
       },
     });
 
     await Promise.allSettled(
-      duePosts.map((scheduledPost) => this.publishScheduledPost(scheduledPost))
+      duePosts.map((post) => this.publishPost(post))
     );
   }
 
-  private async publishScheduledPost(
-    scheduledPost: {
+  private async publishPost(
+    post: {
       id: string;
       userId: string;
       threadsAccountId: string;
-      contentIdeaId: string | null;
       text: string | null;
       posts: unknown;
-      mediaType: string | null;
-      mediaUrl: string | null;
+      mediaItems: unknown;
       threadsAccount: { threadsUserId: string; accessToken: string };
-      contentIdea: { body: unknown; mediaUrl: string | null; mediaType: string | null } | null;
     }
   ): Promise<void> {
-    const { id: postId, userId, threadsAccountId, contentIdeaId, threadsAccount, contentIdea } = scheduledPost;
+    const { id: postId, userId, threadsAccountId, threadsAccount } = post;
     const { threadsUserId, accessToken } = threadsAccount;
 
     try {
-      // Idea-linked: read snapshot from ContentIdea (autosaved edits flow through).
-      // Standalone: snapshot lives on ScheduledPost itself.
-      let text = "";
-      let postsField: Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }> | null = null;
-      let mediaUrl: string | null = null;
-      let mediaType: string | null = null;
-
-      if (contentIdeaId) {
-        if (!contentIdea || !contentIdea.body) {
-          throw new Error("Scheduled post has no linked ContentIdea body");
-        }
-        const ideaBody = contentIdea.body as { text?: string; posts?: string[] };
-        const ideaPosts = Array.isArray(ideaBody.posts) ? ideaBody.posts : null;
-        postsField = ideaPosts ? ideaPosts.map((entryText) => ({ text: entryText })) : null;
-        text = ideaPosts && ideaPosts.length > 1
-          ? ""
-          : (typeof ideaBody.text === "string" ? ideaBody.text : (ideaPosts?.[0] ?? ""));
-        mediaUrl = contentIdea.mediaUrl;
-        mediaType = contentIdea.mediaType;
-      } else {
-        postsField = Array.isArray(scheduledPost.posts)
-          ? (scheduledPost.posts as Array<string | { text: string; mediaType?: "IMAGE" | "VIDEO"; mediaUrl?: string }>)
-          : null;
-        text = scheduledPost.text ?? "";
-        mediaUrl = scheduledPost.mediaUrl;
-        mediaType = scheduledPost.mediaType;
-      }
-
-      const isThread = postsField !== null && postsField.length > 1;
+      const threadEntries = parseThreadPosts(post.posts);
+      const isThread = threadEntries !== null && threadEntries.length > 1;
+      const text = post.text ?? (threadEntries?.[0]?.text ?? "");
+      const mediaItems = parseMediaItems(post.mediaItems);
 
       let firstPostId: string;
 
       if (isThread) {
-        const normalized = postsField!.map((entry) =>
-          typeof entry === "string" ? { text: entry } : entry
-        );
-        const result = await threadsApiService.publishThreadChain(threadsUserId, accessToken, normalized);
+        const result = await threadsApiService.publishThreadChain(threadsUserId, accessToken, threadEntries!);
         firstPostId = result.postIds[0];
         console.log(`[ThreadsScheduler] Published thread ${postId} → post IDs: ${result.postIds.join(", ")}`);
-      } else if (mediaUrl && (mediaType === "IMAGE" || mediaType === "VIDEO")) {
-        const result = await threadsApiService.publishSingleMediaPost(threadsUserId, accessToken, text, mediaType, mediaUrl);
+      } else if (mediaItems.length >= 2) {
+        const result = await threadsApiService.publishCarousel(threadsUserId, accessToken, text, mediaItems);
+        firstPostId = result.postId;
+        console.log(`[ThreadsScheduler] Published carousel ${postId} (${mediaItems.length} items) → Threads ID ${firstPostId}`);
+      } else if (mediaItems.length === 1) {
+        const result = await threadsApiService.publishSingleMediaPost(threadsUserId, accessToken, text, mediaItems[0].mediaType, mediaItems[0].mediaUrl);
         firstPostId = result.postId;
         console.log(`[ThreadsScheduler] Published media post ${postId} → Threads ID ${firstPostId}`);
       } else {
@@ -157,22 +160,20 @@ export class ThreadsSchedulerService {
         console.log(`[ThreadsScheduler] Published post ${postId} → Threads ID ${firstPostId}`);
       }
 
-      await prisma.scheduledPost.update({
+      await prisma.post.update({
         where: { id: postId },
-        data: { status: "published", threadsPostId: firstPostId, publishingAt: null },
+        data: {
+          status: "published",
+          publishedAt: new Date(),
+          threadsPostId: firstPostId,
+          publishingAt: null,
+        },
       });
 
       await prisma.threadsAccount.update({
         where: { id: threadsAccountId },
         data: { postsCount: { increment: 1 } },
       });
-
-      if (contentIdeaId) {
-        await prisma.contentIdea.update({
-          where: { id: contentIdeaId },
-          data: { publishStatus: "posted", threadsPostId: firstPostId, publishedAt: new Date() },
-        });
-      }
 
       // Seed a ThreadsPostInsight row immediately so the streak endpoint and
       // dashboard totals reflect today's post without waiting for the 03:00
@@ -181,7 +182,7 @@ export class ThreadsSchedulerService {
       // post is already live; an insight-write failure must not fail the
       // publish.
       try {
-        const previewSourceRaw = postsField && postsField.length > 0 ? postsField[0] : null;
+        const previewSourceRaw = threadEntries && threadEntries.length > 0 ? threadEntries[0] : null;
         const previewSource =
           typeof previewSourceRaw === "string"
             ? previewSourceRaw
@@ -214,13 +215,14 @@ export class ThreadsSchedulerService {
           redactSecrets(insightError),
         );
       }
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       // Release the claim so the next tick can retry (unless attempts exhausted).
-      await prisma.scheduledPost.update({
+      await prisma.post.update({
         where: { id: postId },
         data: {
-          status: "pending",
+          status: "scheduled",
           publishingAt: null,
           errorMessage,
         },

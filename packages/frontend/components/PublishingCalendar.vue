@@ -129,10 +129,14 @@ import { ChevronLeft, ChevronRight, CalendarPlus } from 'lucide-vue-next';
 import type { LibraryItem } from '~/stores/library';
 import PlatformIcon from '~/components/PlatformIcon.vue';
 
+export interface StandalonePostMediaItem {
+  mediaType: 'IMAGE' | 'VIDEO';
+  mediaUrl: string;
+}
+
 export interface StandalonePostThreadEntry {
   text: string;
-  mediaType?: 'IMAGE' | 'VIDEO';
-  mediaUrl?: string;
+  mediaItems: StandalonePostMediaItem[];
 }
 
 export interface StandalonePost {
@@ -141,8 +145,7 @@ export interface StandalonePost {
   status: 'pending' | 'publishing' | 'published' | 'failed';
   text: string;
   isThread: boolean;
-  mediaType: 'TEXT' | 'IMAGE' | 'VIDEO';
-  mediaUrl: string | null;
+  mediaItems: StandalonePostMediaItem[];
   posts: StandalonePostThreadEntry[] | null;
   scheduledAt: string;
   publishedAt: string | null;
@@ -198,12 +201,12 @@ const daysInMonth = computed(() => {
 
     const libraryEntries: DayEntry[] = props.items
       .filter((item) => {
-        const { publishStatus, scheduledAt, publishedAt } = item;
+        const post = item.post;
         let iso = item.createdAt;
-        if (publishStatus === 'posted' && publishedAt) {
-          iso = publishedAt;
-        } else if (publishStatus === 'scheduled' && scheduledAt) {
-          iso = scheduledAt;
+        if (post?.status === 'published' && post.publishedAt) {
+          iso = post.publishedAt;
+        } else if ((post?.status === 'scheduled' || post?.status === 'publishing') && post.scheduledAt) {
+          iso = post.scheduledAt;
         }
         const d = new Date(iso);
         return d.getFullYear() === props.currentYear &&
@@ -264,14 +267,16 @@ function ideaTitle(item: LibraryItem): string {
 }
 
 function chipStatusLabel(item: LibraryItem): string {
-  if (item.publishStatus === 'posted') return 'Posted';
-  if (item.publishStatus === 'scheduled') return 'Sched';
+  const status = item.post?.status;
+  if (status === 'published') return 'Posted';
+  if (status === 'scheduled' || status === 'publishing') return 'Sched';
   return 'Ready';
 }
 
 function bubbleClass(item: LibraryItem): string {
-  if (item.publishStatus === 'posted') return 'calendar-bubble--posted';
-  if (item.publishStatus === 'scheduled') return 'calendar-bubble--scheduled';
+  const status = item.post?.status;
+  if (status === 'published') return 'calendar-bubble--posted';
+  if (status === 'scheduled' || status === 'publishing') return 'calendar-bubble--scheduled';
   return 'calendar-bubble--ready';
 }
 
@@ -291,9 +296,9 @@ function standaloneStatusLabel(post: StandalonePost): string {
 function entryTimeLabel(entry: DayEntry): string {
   let iso: string | null = null;
   if (entry.kind === 'library') {
-    const { publishStatus, scheduledAt } = entry.item;
+    const post = entry.item.post;
     // Posted items show the "Posted" status label, not the publication time.
-    if (publishStatus === 'scheduled' && scheduledAt) iso = scheduledAt;
+    if ((post?.status === 'scheduled' || post?.status === 'publishing') && post.scheduledAt) iso = post.scheduledAt;
   } else {
     // Published items show the "Posted" status label, not the publication time.
     if (entry.post.status !== 'published') iso = entry.post.scheduledAt;
@@ -304,8 +309,10 @@ function entryTimeLabel(entry: DayEntry): string {
 
 function standaloneFormatLabel(post: StandalonePost): string {
   if (post.isThread) return 'Thread';
-  if (post.mediaType === 'VIDEO') return 'Video';
-  if (post.mediaType === 'IMAGE') return 'Post+img';
+  if (post.mediaItems.length >= 2) return 'Carousel';
+  const first = post.mediaItems[0];
+  if (first?.mediaType === 'VIDEO') return 'Video';
+  if (first?.mediaType === 'IMAGE') return 'Post+img';
   return 'Post';
 }
 

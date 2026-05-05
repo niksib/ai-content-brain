@@ -47,57 +47,74 @@ const schedulerOpen = ref(false);
 const editingData = ref<SchedulePostEditData | null>(null);
 const standalonePosts = ref<StandalonePost[]>([]);
 
-interface ScheduledPostDto {
+interface PostDto {
   id: string;
   contentIdeaId: string | null;
   text: string | null;
   posts: unknown;
-  mediaType: 'IMAGE' | 'VIDEO' | null;
-  mediaUrl: string | null;
-  scheduledAt: string;
-  status: 'pending' | 'publishing' | 'published' | 'failed';
+  mediaItems: unknown;
+  scheduledAt: string | null;
+  publishedAt: string | null;
+  status: 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed';
   updatedAt: string;
+}
+
+function normalizeMediaItems(raw: unknown): Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string }> {
+  if (!Array.isArray(raw)) return [];
+  const items: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string }> = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const candidate = entry as { mediaType?: unknown; mediaUrl?: unknown };
+    if ((candidate.mediaType === 'IMAGE' || candidate.mediaType === 'VIDEO') && typeof candidate.mediaUrl === 'string') {
+      items.push({ mediaType: candidate.mediaType, mediaUrl: candidate.mediaUrl });
+    }
+  }
+  return items;
 }
 
 function normalizeThreadEntries(raw: unknown): StandalonePostThreadEntry[] | null {
   if (!Array.isArray(raw)) return null;
   return raw.map((entry) => {
-    if (typeof entry === 'string') return { text: entry };
-    const candidate = entry as { text?: unknown; mediaType?: unknown; mediaUrl?: unknown };
+    if (typeof entry === 'string') return { text: entry, mediaItems: [] };
+    const candidate = entry as { text?: unknown; mediaItems?: unknown };
     return {
       text: typeof candidate.text === 'string' ? candidate.text : '',
-      mediaType: candidate.mediaType === 'IMAGE' || candidate.mediaType === 'VIDEO' ? candidate.mediaType : undefined,
-      mediaUrl: typeof candidate.mediaUrl === 'string' ? candidate.mediaUrl : undefined,
+      mediaItems: normalizeMediaItems(candidate.mediaItems),
     };
   });
 }
 
 async function loadStandalonePosts(): Promise<void> {
   try {
-    const response = await $fetch<{ scheduledPosts: ScheduledPostDto[] }>(
+    const response = await $fetch<{ posts: PostDto[] }>(
       `${config.public.apiBaseUrl}/api/threads/scheduled?status=all`,
       { credentials: 'include' },
     );
-    standalonePosts.value = response.scheduledPosts
+    standalonePosts.value = response.posts
       .filter((post) => !post.contentIdeaId)
       .map((post) => {
         const threadEntries = normalizeThreadEntries(post.posts);
         return {
           id: post.id,
           platform: 'threads',
-          status: post.status,
+          status: mapPostStatus(post.status),
           text: post.text ?? '',
           isThread: threadEntries !== null && threadEntries.length > 1,
-          mediaType: (post.mediaType ?? 'TEXT') as 'TEXT' | 'IMAGE' | 'VIDEO',
-          mediaUrl: post.mediaUrl,
+          mediaItems: normalizeMediaItems(post.mediaItems),
           posts: threadEntries,
-          scheduledAt: post.scheduledAt,
-          publishedAt: post.status === 'published' ? post.updatedAt : null,
+          scheduledAt: post.scheduledAt ?? '',
+          publishedAt: post.publishedAt ?? (post.status === 'published' ? post.updatedAt : null),
         };
       });
   } catch {
     standalonePosts.value = [];
   }
+}
+
+function mapPostStatus(status: PostDto['status']): 'pending' | 'publishing' | 'published' | 'failed' {
+  if (status === 'scheduled') return 'pending';
+  if (status === 'draft') return 'pending';
+  return status;
 }
 
 function onMonthChange(year: number, month: number): void {
@@ -126,15 +143,11 @@ function openEdit(post: StandalonePost): void {
   const modalPosts = post.isThread && post.posts
     ? post.posts.map((entry) => ({
         text: entry.text,
-        media: entry.mediaUrl && entry.mediaType
-          ? { mediaType: entry.mediaType, mediaUrl: entry.mediaUrl }
-          : null,
+        mediaItems: entry.mediaItems.slice(),
       }))
     : [{
         text: post.text,
-        media: post.mediaUrl && (post.mediaType === 'IMAGE' || post.mediaType === 'VIDEO')
-          ? { mediaType: post.mediaType, mediaUrl: post.mediaUrl }
-          : null,
+        mediaItems: post.mediaItems.slice(),
       }];
 
   editingData.value = {

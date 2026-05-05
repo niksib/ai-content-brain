@@ -72,7 +72,7 @@ sessionRoutes.get("/sessions", requireAuth, async (context) => {
             select: { ideas: true },
           },
           ideas: {
-            select: { publishStatus: true },
+            select: { post: { select: { status: true } } },
           },
         },
       },
@@ -88,8 +88,8 @@ sessionRoutes.get("/sessions", requireAuth, async (context) => {
       status: session.status,
       messageCount: session._count.messages,
       ideaCount: session.contentPlan?._count?.ideas ?? 0,
-      postedCount: ideas.filter((i) => i.publishStatus === "posted").length,
-      scheduledCount: ideas.filter((i) => i.publishStatus === "scheduled").length,
+      postedCount: ideas.filter((i) => i.post?.status === "published").length,
+      scheduledCount: ideas.filter((i) => i.post?.status === "scheduled").length,
     };
   });
 
@@ -129,7 +129,7 @@ sessionRoutes.delete("/sessions/:id", requireAuth, async (context) => {
     const ideaIds = ideas.map((idea) => idea.id);
 
     await prisma.threadsInsightsSnapshot.deleteMany({ where: { contentIdeaId: { in: ideaIds } } });
-    await prisma.scheduledPost.deleteMany({ where: { contentIdeaId: { in: ideaIds } } });
+    await prisma.post.deleteMany({ where: { contentIdeaId: { in: ideaIds } } });
     await prisma.contentIdea.deleteMany({ where: { contentPlanId: plan.id } });
     await prisma.contentPlan.delete({ where: { id: plan.id } });
   }

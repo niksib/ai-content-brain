@@ -13,8 +13,24 @@ export interface ThreadsInsightsSnapshot {
   fetchedAt: string;
 }
 
-// LibraryItem is now a flat ContentIdea (ProducedContent was merged into it).
-// Kept the name to limit the blast radius across callers.
+export interface PostMediaItem {
+  mediaType: 'IMAGE' | 'VIDEO';
+  mediaUrl: string;
+}
+
+export interface PostDto {
+  id: string;
+  text: string | null;
+  posts: unknown;
+  mediaItems?: PostMediaItem[] | null;
+  imageSuggestion?: Record<string, unknown> | null;
+  status: 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed';
+  scheduledAt?: string | null;
+  publishedAt?: string | null;
+  threadsPostId?: string | null;
+}
+
+// LibraryItem represents a ContentIdea row plus its produced Post (1:0..1).
 export interface LibraryItem {
   id: string;
   title?: string;
@@ -23,14 +39,7 @@ export interface LibraryItem {
   platform: string;
   format: string;
   status: string;
-  publishStatus?: string | null;
-  scheduledAt?: string | null;
-  publishedAt?: string | null;
-  threadsPostId?: string | null;
-  mediaUrl?: string | null;
-  mediaType?: string | null;
-  body?: Record<string, unknown> | null;
-  imageSuggestion?: Record<string, unknown> | null;
+  post?: PostDto | null;
   contentPlan?: { chatSessionId: string } | null;
   insightsSnapshots?: ThreadsInsightsSnapshot[];
   createdAt: string;
@@ -110,19 +119,21 @@ export const useLibraryStore = defineStore('library', () => {
 
   function markPublished(contentIdeaId: string, threadsPostId: string): void {
     const item = items.value.find((i) => i.id === contentIdeaId);
-    if (item) {
-      item.publishStatus = 'posted';
-      item.threadsPostId = threadsPostId;
-      item.scheduledAt = null;
-      item.publishedAt = new Date().toISOString();
+    if (item?.post) {
+      item.post = {
+        ...item.post,
+        status: 'published',
+        threadsPostId,
+        scheduledAt: null,
+        publishedAt: new Date().toISOString(),
+      };
     }
   }
 
   function markScheduled(contentIdeaId: string, scheduledAt: string): void {
     const item = items.value.find((i) => i.id === contentIdeaId);
-    if (item) {
-      item.publishStatus = 'scheduled';
-      item.scheduledAt = scheduledAt;
+    if (item?.post) {
+      item.post = { ...item.post, status: 'scheduled', scheduledAt };
     }
   }
 

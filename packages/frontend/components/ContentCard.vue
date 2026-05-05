@@ -3,8 +3,8 @@
     <div class="content-card__header">
       <span class="content-card__platform">{{ platformEmoji }}</span>
       <span class="content-card__format">{{ formatLabel }}</span>
-      <span v-if="item.publishStatus === 'posted'" class="content-card__posted-badge">Posted</span>
-      <span v-else-if="item.publishStatus === 'scheduled'" class="content-card__scheduled-badge">Scheduled</span>
+      <span v-if="item.post?.status === 'published'" class="content-card__posted-badge">Posted</span>
+      <span v-else-if="item.post?.status === 'scheduled' || item.post?.status === 'publishing'" class="content-card__scheduled-badge">Scheduled</span>
       <span class="content-card__date">{{ formattedDate }}</span>
     </div>
 
@@ -15,7 +15,7 @@
 
     <!-- Post analytics (only for posted Threads posts) -->
     <div
-      v-if="item.publishStatus === 'posted' && item.threadsPostId && item.platform === 'threads'"
+      v-if="item.post?.status === 'published' && item.post.threadsPostId && item.platform === 'threads'"
       class="content-card__insights"
       @click.stop
     >
@@ -154,23 +154,16 @@ const formattedDate = computed(() => {
 });
 
 const preview = computed(() => {
-  const body = props.item.body;
+  const post = props.item.post;
+  if (!post) return '';
   let text = '';
-
-  if (typeof body === 'object' && body !== null) {
-    if (typeof body.text === 'string') {
-      text = body.text;
-    } else if (typeof body.caption === 'string') {
-      text = body.caption;
-    } else if (Array.isArray(body.slides) && body.slides.length > 0) {
-      const firstSlide = body.slides[0] as Record<string, unknown>;
-      text = (firstSlide?.text as string) ?? '';
-    } else if (Array.isArray(body.script) && body.script.length > 0) {
-      const firstLine = body.script[0] as Record<string, unknown>;
-      text = (firstLine?.text as string) ?? '';
-    }
+  if (typeof post.text === 'string' && post.text.length > 0) {
+    text = post.text;
+  } else if (Array.isArray(post.posts) && post.posts.length > 0) {
+    const first = post.posts[0] as { text?: unknown } | string;
+    if (typeof first === 'string') text = first;
+    else if (typeof first?.text === 'string') text = first.text;
   }
-
   if (!text) return '';
   return text.length > 80 ? text.slice(0, 80) + '...' : text;
 });
