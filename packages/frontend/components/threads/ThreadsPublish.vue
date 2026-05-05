@@ -239,12 +239,12 @@ function singlePostMediaItems(): MediaItem[] {
 async function findPendingScheduledPostId(): Promise<string | null> {
   if (!props.contentIdeaId) return null;
   try {
-    const resp = await $fetch<{ scheduledPosts: Array<{ id: string; contentIdeaId: string | null; status: string }> }>(
+    const resp = await $fetch<{ posts: Array<{ id: string; contentIdeaId: string | null; status: string }> }>(
       `${apiBaseUrl}/api/threads/scheduled?status=all`,
       { credentials: 'include' },
     );
-    return resp.scheduledPosts.find(
-      (p) => p.contentIdeaId === props.contentIdeaId && p.status === 'pending',
+    return resp.posts.find(
+      (p) => p.contentIdeaId === props.contentIdeaId && p.status === 'scheduled',
     )?.id ?? null;
   } catch {
     return null;
