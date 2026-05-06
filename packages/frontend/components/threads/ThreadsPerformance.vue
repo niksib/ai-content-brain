@@ -6,6 +6,14 @@
         <h3 class="threads-performance__title">Threads Performance</h3>
       </div>
       <div class="threads-performance__controls">
+        <span
+          v-if="isReloading && !isRefreshing"
+          class="threads-performance__reload-indicator"
+          aria-hidden="true"
+        >
+          <span class="threads-performance__spinner"></span>
+        </span>
+
         <button
           v-if="profileStore.isAdmin"
           type="button"
@@ -36,17 +44,28 @@
       </div>
     </header>
 
-    <div v-if="isLoading" class="threads-performance__state">
+    <div v-if="isInitialLoad" class="threads-performance__state">
       <span class="threads-performance__spinner"></span>
       <span>Loading performance data</span>
     </div>
 
-    <div v-else-if="loadError" class="threads-performance__state threads-performance__state--error">
+    <div v-else-if="loadError && !snapshot" class="threads-performance__state threads-performance__state--error">
       {{ loadError }}
     </div>
 
-    <template v-else-if="snapshot">
-      <p v-if="!previousAvailable" class="threads-performance__hint">
+    <!-- Keep the body mounted during period reloads so the layout doesn't
+         collapse and jump. isReloading dims the body and the header shows a
+         spinner; stale data stays visible until the new fetch resolves. -->
+    <div
+      v-else-if="snapshot"
+      class="threads-performance__body"
+      :class="{ 'threads-performance__body--reloading': isReloading }"
+      :aria-busy="isReloading"
+    >
+      <p v-if="loadError" class="threads-performance__hint threads-performance__hint--warn">
+        {{ loadError }} Showing previous data.
+      </p>
+      <p v-else-if="!previousAvailable" class="threads-performance__hint">
         Building your baseline. Daily comparisons appear once a previous snapshot is recorded.
       </p>
       <p v-else-if="snapshot.partial" class="threads-performance__hint threads-performance__hint--warn">
@@ -57,6 +76,7 @@
         <article class="kpi">
           <span class="kpi__label">Followers</span>
           <span class="kpi__value">{{ formatNumber(snapshot.followersCount) }}</span>
+          <span class="kpi__hint">Lifetime</span>
           <DeltaBadge
             v-if="delta"
             :value="delta.followers"
@@ -67,6 +87,7 @@
         <article class="kpi">
           <span class="kpi__label">Likes</span>
           <span class="kpi__value">{{ formatNumber(snapshot.likesTotal) }}</span>
+          <span class="kpi__hint">Lifetime</span>
           <DeltaBadge
             v-if="delta"
             :value="delta.likes"
@@ -77,6 +98,7 @@
         <article class="kpi">
           <span class="kpi__label">Views</span>
           <span class="kpi__value">{{ formatNumber(snapshot.viewsTotal) }}</span>
+          <span class="kpi__hint">Lifetime</span>
           <DeltaBadge
             v-if="delta"
             :value="delta.views"
@@ -87,6 +109,7 @@
         <article class="kpi">
           <span class="kpi__label">Replies</span>
           <span class="kpi__value">{{ formatNumber(snapshot.repliesTotal) }}</span>
+          <span class="kpi__hint">Lifetime</span>
           <DeltaBadge
             v-if="delta"
             :value="delta.replies"
@@ -138,7 +161,7 @@
           <p class="streak-card__caption">{{ streakSubline }}</p>
         </section>
       </div>
-    </template>
+    </div>
 
     <div v-else class="threads-performance__state">
       <p>No snapshot yet. We will capture your first one shortly after connecting Threads.</p>
@@ -265,7 +288,11 @@ const streakSubline = computed<string>(() => {
   return `Post today to make it ${days + 1} days.`;
 });
 
-const isLoading = ref(true);
+// Separate the very first fetch (no data yet — show full loading state) from
+// subsequent reloads triggered by period changes or admin refresh (keep KPI
+// grid mounted with stale data so the layout doesn't collapse).
+const isInitialLoad = ref(true);
+const isReloading = ref(false);
 const isRefreshing = ref(false);
 const loadError = ref('');
 
@@ -273,8 +300,17 @@ const profileStore = useProfileStore();
 const config = useRuntimeConfig();
 const apiBaseUrl = config.public.apiBaseUrl as string;
 
+// Monotonic request id so rapid period switches don't leave stale callbacks
+// flipping flags or overwriting newer data.
+let loadRequestId = 0;
+
 async function loadAll(): Promise<void> {
-  isLoading.value = true;
+  const requestId = ++loadRequestId;
+  if (snapshot.value === null) {
+    isInitialLoad.value = true;
+  } else {
+    isReloading.value = true;
+  }
   loadError.value = '';
   try {
     const [timelineResponse, topPostsResponse, streakResponse] = await Promise.all([
@@ -292,6 +328,7 @@ async function loadAll(): Promise<void> {
       ),
     ]);
 
+    if (requestId !== loadRequestId) return;
     snapshot.value = timelineResponse.snapshot;
     delta.value = timelineResponse.delta;
     previousAvailable.value = timelineResponse.previousAvailable;
@@ -299,10 +336,14 @@ async function loadAll(): Promise<void> {
     streak.value = streakResponse.streak;
     todayPosted.value = streakResponse.todayPosted;
   } catch (caughtError) {
+    if (requestId !== loadRequestId) return;
     console.error('[ThreadsPerformance] load failed', caughtError);
     loadError.value = 'Could not load performance data. Try again in a moment.';
   } finally {
-    isLoading.value = false;
+    if (requestId === loadRequestId) {
+      isInitialLoad.value = false;
+      isReloading.value = false;
+    }
   }
 }
 
@@ -404,6 +445,24 @@ function percentChange(current: number, deltaValue: number): number | null {
 }
 
 .threads-performance__state--error { color: #b91c1c; }
+
+.threads-performance__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  transition: opacity 0.18s ease;
+}
+
+.threads-performance__body--reloading {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.threads-performance__reload-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.25rem;
+}
 
 .threads-performance__spinner {
   width: 14px;
@@ -524,6 +583,15 @@ function percentChange(current: number, deltaValue: number): number | null {
   letter-spacing: -0.02em;
   color: #111827;
   line-height: 1.1;
+}
+
+.kpi__hint {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  margin-top: -0.125rem;
 }
 
 /* Lower grid */
