@@ -339,6 +339,13 @@ export class ThreadsApiService {
       itemContainerIds.push(itemData.id);
     }
 
+    // Threads rejects carousel parents whose children are still IN_PROGRESS
+    // with "Invalid Carousel Children: ... invalid, nonexistent, or expired".
+    // Poll all children to FINISHED in parallel before assembling the parent.
+    await Promise.all(
+      itemContainerIds.map((containerId) => this.pollContainerStatus(containerId, accessToken))
+    );
+
     // Step 2: Create carousel container
     const carouselParams = new URLSearchParams({
       media_type: "CAROUSEL",
