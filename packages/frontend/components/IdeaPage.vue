@@ -884,9 +884,17 @@ watch(
   { deep: true },
 );
 
-function restoreIdeaMedia(items: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string }>): void {
-  if (items.length === 0) return;
-  const restoredFiles: UploadedMediaFile[] = items.map((item) => ({
+type PersistedMediaItem = { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string };
+
+function isValidMediaItem(value: unknown): value is PersistedMediaItem {
+  if (!value || typeof value !== 'object') return false;
+  if (!('mediaType' in value) || !('mediaUrl' in value)) return false;
+  const { mediaType, mediaUrl } = value as { mediaType: unknown; mediaUrl: unknown };
+  return (mediaType === 'IMAGE' || mediaType === 'VIDEO') && typeof mediaUrl === 'string';
+}
+
+function toUploadedFiles(items: PersistedMediaItem[]): UploadedMediaFile[] {
+  return items.map((item) => ({
     id: item.mediaUrl,
     url: item.mediaUrl,
     mimeType: item.mediaType === 'VIDEO' ? 'video/mp4' : 'image/jpeg',
@@ -895,8 +903,17 @@ function restoreIdeaMedia(items: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl:
     height: null,
     duration: null,
   }));
-  ensureMediaSlots(Math.max(1, editableThreadPosts.value.length));
-  postsMedia.value[0] = restoredFiles;
+}
+
+// Thread posts store media per-entry inside Post.posts[i].mediaItems; single
+// posts store it at top-level Post.mediaItems. Hydrate accordingly so reload
+// restores attachments to the correct post slot.
+function restoreIdeaMedia(perPostItems: PersistedMediaItem[][]): void {
+  if (perPostItems.length === 0 || perPostItems.every((items) => items.length === 0)) return;
+  ensureMediaSlots(Math.max(perPostItems.length, editableThreadPosts.value.length, 1));
+  perPostItems.forEach((items, index) => {
+    if (items.length > 0) postsMedia.value[index] = toUploadedFiles(items);
+  });
 }
 
 onMounted(async () => {
@@ -905,7 +922,7 @@ onMounted(async () => {
   $fetch<{ account: ThreadsAccount | null }>(`${apiBaseUrl}/api/threads/account`, { credentials: 'include' })
     .then((r) => { threadsAccount.value = r.account; })
     .catch(() => {});
-  let pendingMediaItems: Array<{ mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string }> = [];
+  let pendingPerPostMedia: PersistedMediaItem[][] = [];
   try {
     const freshIdea = await store.loadIdea(props.ideaId);
     if (freshIdea) {
@@ -913,11 +930,15 @@ onMounted(async () => {
       if (freshIdea.post?.scheduledAt) {
         scheduledAt.value = freshIdea.post.scheduledAt;
       }
-      if (Array.isArray(freshIdea.post?.mediaItems)) {
-        pendingMediaItems = freshIdea.post!.mediaItems!.filter(
-          (item): item is { mediaType: 'IMAGE' | 'VIDEO'; mediaUrl: string } =>
-            !!item && (item.mediaType === 'IMAGE' || item.mediaType === 'VIDEO') && typeof item.mediaUrl === 'string'
-        );
+      const persistedPosts = freshIdea.post?.posts;
+      if (Array.isArray(persistedPosts) && persistedPosts.length > 0) {
+        pendingPerPostMedia = persistedPosts.map((entry) => {
+          if (!entry || typeof entry !== 'object') return [];
+          const items = (entry as { mediaItems?: unknown }).mediaItems;
+          return Array.isArray(items) ? items.filter(isValidMediaItem) : [];
+        });
+      } else if (Array.isArray(freshIdea.post?.mediaItems)) {
+        pendingPerPostMedia = [freshIdea.post!.mediaItems!.filter(isValidMediaItem)];
       }
     }
   } catch (error) {
@@ -931,10 +952,10 @@ onMounted(async () => {
   // DOM. Two ticks: the first lets the threadPosts watcher run and render the
   // DOM; the second lets the watcher's inner nextTick fire so el.innerText is
   // set before postsMedia mutates.
-  if (pendingMediaItems.length > 0) {
+  if (pendingPerPostMedia.some((items) => items.length > 0)) {
     await nextTick();
     await nextTick();
-    restoreIdeaMedia(pendingMediaItems);
+    restoreIdeaMedia(pendingPerPostMedia);
   }
 });
 </script>
