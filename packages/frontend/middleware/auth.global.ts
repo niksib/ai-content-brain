@@ -15,7 +15,13 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // which differs from the client result and triggers a hydration mismatch.
   if (import.meta.server) return;
 
-  if (to.path === '/' || to.path === '/og-preview' || to.path.startsWith('/data-deletion-status/')) return;
+  if (
+    to.path === '/' ||
+    to.path === '/og-preview' ||
+    to.path === '/privacy' ||
+    to.path === '/terms' ||
+    to.path.startsWith('/data-deletion-status/')
+  ) return;
 
   const isAuthenticated = useState<boolean | null>('auth:authenticated', () => null);
   const checkedAt = useState<number>('auth:checked-at', () => 0);
