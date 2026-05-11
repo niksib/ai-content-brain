@@ -101,7 +101,8 @@ export class ThreadsApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`Threads token exchange failed: ${response.status}`);
+      const errorBody = redactSecrets(await response.text().catch(() => "(unreadable)"));
+      throw new Error(`Threads token exchange failed: ${response.status} ${errorBody}`);
     }
 
     const data = await response.json() as { access_token: string };
@@ -118,7 +119,8 @@ export class ThreadsApiService {
     const response = await fetch(`${THREADS_LONG_LIVED_URL}?${params.toString()}`);
 
     if (!response.ok) {
-      throw new Error(`Threads long-lived token exchange failed: ${response.status}`);
+      const errorBody = redactSecrets(await response.text().catch(() => "(unreadable)"));
+      throw new Error(`Threads long-lived token exchange failed: ${response.status} ${errorBody}`);
     }
 
     const data = await response.json() as { access_token: string; token_type: string; expires_in: number };
